@@ -116,6 +116,10 @@ trait IntoMatchArg<T> {
     fn into_match_arg(self) -> MatchArg<T>;
 }
 
+impl<T> IntoMatchArg<T> for MatchArg<T> {
+    fn into_match_arg(self) -> Self { self }
+}
+
 impl<'a, T> IntoMatchArg<T> for T
     where T: 'static + Eq + std::fmt::Debug {
 
@@ -264,4 +268,32 @@ fn test_return() {
     let mock = scenario.create_mock();
     scenario.expect(mock.baz_call().and_return(2));
     assert_eq!(2, mock.baz());
+}
+
+#[cfg(test)]
+fn less_than<T: 'static + PartialOrd + std::fmt::Debug>(limit: T) -> MatchArg<T> {
+    Box::new(move |value| {
+        if value < &limit {
+            Ok(())
+        } else {
+            Err(format!("{:?} is not less than {:?}", value, limit))
+        }
+    })
+}
+
+#[test]
+#[should_panic(expected="4 is not less than 3")]
+fn test_arg_match_failure() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock();
+    scenario.expect(mock.bar_call(less_than(3)).and_return(()));
+    mock.bar(4);
+}
+
+#[test]
+fn test_arg_match_success() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock();
+    scenario.expect(mock.bar_call(less_than(3)).and_return(()));
+    mock.bar(2);
 }
