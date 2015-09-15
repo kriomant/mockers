@@ -1,0 +1,8 @@
+[package]
+name = "mockers"
+version = "0.1.0"
+authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+
+[lib]
+name = "mockers"
+plugin = true
