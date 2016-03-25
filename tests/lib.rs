@@ -1,5 +1,3 @@
-#![feature(box_raw)]
-
 extern crate mockers;
 
 use std::rc::Rc;
@@ -42,7 +40,7 @@ impl AMock {
     }
 
     fn bar(&self, arg: u32) {
-        let args = (arg);
+        let args = (arg,);
         let args_ptr: *const u8 = unsafe { std::mem::transmute(&args) };
         let result_ptr: *mut u8 = self.scenario.borrow_mut().call(self.mock_id, 1, args_ptr);
         let result: Box<()> = unsafe { Box::from_raw(result_ptr as *mut ()) };

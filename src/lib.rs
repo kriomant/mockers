@@ -1,5 +1,3 @@
-#![feature(box_raw)]
-
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::cell::RefCell;
