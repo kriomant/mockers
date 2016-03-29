@@ -1,0 +1,11 @@
+[package]
+name = "mockers_macros"
+version = "0.1.0"
+authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+
+[lib]
+name = "mockers_macros"
+plugin = true
+
+[dependencies.mockers]
+path = ".."

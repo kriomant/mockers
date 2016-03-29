@@ -1,8 +1,14 @@
 [package]
+authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 name = "mockers"
 version = "0.1.0"
-authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+
+[dependencies]
+
+[dev-dependencies]
+
+[dev-dependencies.mockers_macros]
+path = "mockers_macros"
 
 [lib]
 name = "mockers"
-plugin = true
