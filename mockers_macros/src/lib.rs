@@ -94,7 +94,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     let mut impl_methods = Vec::with_capacity(members.len());
     let mut trait_impl_methods = Vec::with_capacity(members.len());
 
-    for (i_member, member) in members.iter().enumerate() {
+    for member in members.iter() {
         if let TraitItemKind::Method(ref sig, ref _opt_body) = member.node {
             if sig.unsafety != Unsafety::Normal {
                 cx.span_err(member.span, "unsafe trait methods are not supported");
@@ -121,7 +121,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
             }
 
             //let method_name = member.ident;
-            if let Some(methods) = generate_trait_methods(cx, member.span, i_member, member.ident, &sig.decl) {
+            if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl) {
                 impl_methods.push(methods.impl_method);
                 trait_impl_methods.push(methods.trait_impl_method);
             }
@@ -168,7 +168,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     MacEager::items(SmallVector::many(vec![struct_item, mock_impl_item, impl_item, trait_impl_item]))
 }
 
-fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_index: usize, method_ident: Ident, decl: &FnDecl) -> Option<GeneratedMethods> {
+fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_ident: Ident, decl: &FnDecl) -> Option<GeneratedMethods> {
     // Arguments without `&self`.
     let args = &decl.inputs[1..];
 
@@ -181,8 +181,8 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_index: usize, metho
         }
     };
 
-    let trait_impl_method = generate_trait_impl_method(cx, sp, method_index, method_ident, args, &return_type);
-    let impl_method = generate_impl_method(cx, sp, method_index, method_ident, args, &return_type);
+    let trait_impl_method = generate_trait_impl_method(cx, sp, method_ident, args, &return_type);
+    let impl_method = generate_impl_method(cx, sp, method_ident, args, &return_type);
 
     if let (Some(tim), Some(im)) = (trait_impl_method, impl_method) {
         Some(GeneratedMethods {
@@ -211,7 +211,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_index: usize, metho
 ///                                arg0.into_match_arg())
 /// }
 /// ```
-fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, method_index: usize,
+fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
                         method_ident: Ident, args: &[Arg],
                         return_type: &Ty) -> Option<ImplItem> {
     // For each argument generate...
@@ -219,7 +219,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, method_index: usize,
     let mut inputs = Vec::<Arg>::new();
     let mut new_args = Vec::<P<Expr>>::new();
     new_args.push(cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
-    new_args.push(cx.expr_usize(sp, method_index));
+    new_args.push(cx.expr_str(sp, method_ident.name.as_str()));
     for (i, arg) in args.iter().enumerate() {
         let arg_type = &arg.ty;
         let arg_type_ident = cx.ident_of(&format!("Arg{}Match", i));
@@ -312,9 +312,10 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, method_index: usize,
 /// }
 /// ```
 /// where constant marked with "mock_id" is unique trait method ID.
-fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, method_index: usize,
+fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
                               method_ident: Ident, args: &[Arg],
                               return_type: &Ty) -> Option<ImplItem> {
+    let method_name = method_ident.name.as_str();
     // Generate expression returning tuple of all method arguments.
     let tuple_values: Vec<P<Expr>> =
         args.iter().flat_map(|i| {
@@ -342,14 +343,14 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, method_index: usize,
                             vec![])
     }).collect();
     new_args.insert(0, cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
-    new_args.insert(1, cx.expr_usize(sp, method_index));
+    new_args.insert(1, cx.expr_str(sp, method_name.clone()));
     let mut ainputs = inputs.clone();
     ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
 
     let fn_mock = quote_block!(cx, {
         let args = $args_tuple;
         let args_ptr: *const u8 = unsafe { std::mem::transmute(&args) };
-        let result_ptr: *mut u8 = self.scenario.borrow_mut().call(self.mock_id, $method_index, args_ptr);
+        let result_ptr: *mut u8 = self.scenario.borrow_mut().call(self.mock_id, $method_name, args_ptr);
         let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
         *result
     }).unwrap();

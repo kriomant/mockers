@@ -24,7 +24,7 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="Unexpected event")]
+#[should_panic(expected="Unexpected call of `bar`, `foo` call is expected")]
 fn test_unit() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();

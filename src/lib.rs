@@ -5,21 +5,21 @@ use std::cell::RefCell;
 pub trait CheckCall {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8;
     fn get_mock_id(&self) -> usize;
-    fn get_method_id(&self) -> usize;
+    fn get_method_name(&self) -> &'static str;
 }
 
 #[must_use]
 pub struct CallMatch0<Res> {
     mock_id: usize,
-    method_id: usize,
+    method_name: &'static str,
 
     _phantom: PhantomData<Res>,
 }
 impl<Res> CallMatch0<Res> {
-    pub fn new(mock_id: usize, method_id: usize) -> Self {
+    pub fn new(mock_id: usize, method_name: &'static str) -> Self {
         CallMatch0 {
             mock_id: mock_id,
-            method_id: method_id,
+            method_name: method_name,
             _phantom: PhantomData
         }
     }
@@ -40,7 +40,7 @@ impl<Res> CheckCall for Expectation0<Res> {
         Box::into_raw(Box::new(result)) as *mut u8
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_id(&self) -> usize { self.call_match.method_id }
+    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
 }
 impl<Res> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
@@ -51,16 +51,16 @@ impl<Res> CallMatch0<Res> {
 #[must_use]
 pub struct CallMatch1<Arg0, Res> {
     mock_id: usize,
-    method_id: usize,
+    method_name: &'static str,
     arg0: MatchArg<Arg0>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
-    pub fn new(mock_id: usize, method_id: usize, arg0: MatchArg<Arg0>) -> Self {
+    pub fn new(mock_id: usize, method_name: &'static str, arg0: MatchArg<Arg0>) -> Self {
         CallMatch1 {
             mock_id: mock_id,
-            method_id: method_id,
+            method_name: method_name,
             arg0: arg0,
             _phantom: PhantomData
         }
@@ -85,7 +85,7 @@ impl<Arg0, Res> CheckCall for Expectation1<Arg0, Res> {
         Box::into_raw(Box::new(result)) as *mut u8
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_id(&self) -> usize { self.call_match.method_id }
+    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
@@ -96,18 +96,18 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 #[must_use]
 pub struct CallMatch2<Arg0, Arg1, Res> {
     mock_id: usize,
-    method_id: usize,
+    method_name: &'static str,
     arg0: MatchArg<Arg0>,
     arg1: MatchArg<Arg1>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
-    pub fn new(mock_id: usize, method_id: usize,
+    pub fn new(mock_id: usize, method_name: &'static str,
                arg0: MatchArg<Arg0>, arg1: MatchArg<Arg1>) -> Self {
         CallMatch2 {
             mock_id: mock_id,
-            method_id: method_id,
+            method_name: method_name,
             arg0: arg0,
             arg1: arg1,
             _phantom: PhantomData
@@ -134,7 +134,7 @@ impl<Arg0, Arg1, Res> CheckCall for Expectation2<Arg0, Arg1, Res> {
         Box::into_raw(Box::new(result)) as *mut u8
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_id(&self) -> usize { self.call_match.method_id }
+    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
@@ -217,10 +217,11 @@ impl Scenario {
 }
 
 impl ScenarioInternals {
-    pub fn call(&mut self, mock_id: usize, method_id: usize, args_ptr: *const u8) -> *mut u8 {
+    pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
         let event = self.events.remove(0);
-        if event.get_mock_id() != mock_id || event.get_method_id() != method_id {
-            panic!("Unexpected event");
+        if event.get_mock_id() != mock_id || event.get_method_name() != method_name {
+            panic!("Unexpected call of `{}`, `{}` call is expected",
+                   method_name, event.get_method_name());
         }
         event.check_call(args_ptr)
     }
