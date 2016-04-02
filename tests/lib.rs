@@ -6,12 +6,21 @@ extern crate mockers;
 use std::rc::Rc;
 use std::cell::RefCell;
 use mockers::{Scenario, ScenarioInternals, Mock,
-              MatchArg, IntoMatchArg};
+              MatchArg, IntoMatchArg, ANY};
 
 trait A {
     fn foo(&self);
     fn bar(&self, arg: u32);
     fn baz(&self) -> u32;
+}
+
+mock!{
+    AMock,
+    trait A {
+        fn foo(&self);
+        fn bar(&self, arg: u32);
+        fn baz(&self) -> u32;
+    }
 }
 
 #[test]
@@ -59,11 +68,10 @@ fn test_arg_match_success() {
     mock.bar(2);
 }
 
-mock!{
-    AMock,
-    trait A {
-        fn foo(&self);
-        fn bar(&self, arg: u32);
-        fn baz(&self) -> u32;
-    }
+#[test]
+fn test_any_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<AMock>();
+    scenario.expect(mock.bar_call(ANY).and_return(()));
+    mock.bar(2);
 }

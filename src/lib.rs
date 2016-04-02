@@ -152,6 +152,9 @@ impl<T> IntoMatchArg<T> for MatchArg<T> {
     fn into_match_arg(self) -> Self { self }
 }
 
+/// Use value as arg matcher.
+///
+/// Returned matcher checks argument for equality.
 impl<'a, T> IntoMatchArg<T> for T
     where T: 'static + Eq + std::fmt::Debug {
 
@@ -165,6 +168,15 @@ impl<'a, T> IntoMatchArg<T> for T
         })
     }
 }
+
+pub struct MatchAny;
+impl<T> IntoMatchArg<T> for MatchAny {
+    fn into_match_arg(self) -> MatchArg<T> {
+        Box::new(move |_| { Ok(()) })
+    }
+}
+/// Matches any value.
+pub const ANY: MatchAny = MatchAny;
 
 pub trait Mock {
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
