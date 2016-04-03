@@ -216,6 +216,19 @@ impl Scenario {
     }
 }
 
+impl Drop for Scenario {
+    fn drop(&mut self) {
+        let events = &self.internals.borrow().events;
+        if !events.is_empty() {
+            let mut s = String::from("Expected calls are not performed:\n");
+            for event in events {
+                s.push_str(&format!("`{}`\n", event.get_method_name()));
+            }
+            panic!(s);
+        }
+    }
+}
+
 impl ScenarioInternals {
     pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
         let event = self.events.remove(0);

@@ -75,3 +75,11 @@ fn test_any_match() {
     scenario.expect(mock.bar_call(ANY).and_return(()));
     mock.bar(2);
 }
+
+#[test]
+#[should_panic(expected="Expected calls are not performed:\n`bar`\n")]
+fn test_expected_call_not_performed() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<AMock>();
+    scenario.expect(mock.bar_call(ANY).and_return(()));
+}
