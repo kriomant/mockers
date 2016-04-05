@@ -8,9 +8,11 @@ use syntax::abi::Abi;
 use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
-                  Visibility, ImplItemKind, Arg, Ty, TyParam, DUMMY_NODE_ID};
+                  Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
+                  PathParameters, DUMMY_NODE_ID};
 use syntax::codemap::{Span, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
+use syntax::parse::parser::PathParsingMode;
 use syntax::parse::token::special_idents::self_;
 use syntax::parse::token::Token;
 use syntax::ptr::P;
@@ -33,8 +35,11 @@ fn generate_mock(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResul
         }
 
         _ => {
-            cx.span_err(sp, "Mock identifier and comma are expected, example usage:
-                             mock!{FooMock,
+            cx.span_err(sp, "Mock identifier, trait module (may be `self`) and trait definition
+                             separated by comma are expected, example usage:
+                             mock!{
+                                FooMock,
+                                ::path::to::foo::module,
                                 trait Foo { … }
                              }");
             DummyResult::any(sp)
@@ -46,6 +51,20 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                                   sp: Span, mock_ident: Ident,
                                   trait_tokens: &[TokenTree]) -> Box<MacResult + 'static> {
     let mut parser = cx.new_parser_from_tts(trait_tokens);
+
+    let trait_mod_path = match parser.parse_path(PathParsingMode::NoTypesAllowed) {
+        Ok(path) => path,
+        Err(mut err) => {
+            err.emit();
+            return DummyResult::any(sp)
+        }
+    };
+
+    if !parser.eat(&Token::Comma) {
+        cx.span_err(parser.span, "Comma expected after module path");
+        return DummyResult::any(sp)
+    }
+
     match parser.parse_item() {
         Ok(Some(item)) => {
             match item.node {
@@ -62,7 +81,12 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
 
                     assert!(param_bounds.is_empty());
 
-                    generate_mock_for_trait(cx, sp, mock_ident, item.ident, &trait_subitems)
+                    let mut trait_path = trait_mod_path.clone();
+                    trait_path.segments.push(PathSegment {
+                        identifier: item.ident,
+                        parameters: PathParameters::none(),
+                    });
+                    generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems)
                 },
                 _ => {
                     cx.span_err(sp, "Trait definition expected");
@@ -89,7 +113,7 @@ struct GeneratedMethods {
 }
 
 fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
-                           mock_ident: Ident, trait_ident: Ident,
+                           mock_ident: Ident, trait_path: &Path,
                            members: &[TraitItem]) -> Box<MacResult + 'static> {
     let mut impl_methods = Vec::with_capacity(members.len());
     let mut trait_impl_methods = Vec::with_capacity(members.len());
@@ -120,7 +144,6 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                 }
             }
 
-            //let method_name = member.ident;
             if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl) {
                 impl_methods.push(methods.impl_method);
                 trait_impl_methods.push(methods.trait_impl_method);
@@ -151,7 +174,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                                   ItemKind::Impl(Unsafety::Normal,
                                                  ImplPolarity::Positive,
                                                  Generics::default(),
-                                                 Some(cx.trait_ref(cx.path_ident(sp, trait_ident))),
+                                                 Some(cx.trait_ref(trait_path.clone())),
                                                  cx.ty_ident(sp, mock_ident),
                                                  trait_impl_methods));
 

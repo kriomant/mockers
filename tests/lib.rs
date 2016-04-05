@@ -8,20 +8,25 @@ use std::cell::RefCell;
 use mockers::{Scenario, ScenarioInternals, Mock,
               MatchArg, IntoMatchArg, ANY};
 
-trait A {
-    fn foo(&self);
-    fn bar(&self, arg: u32);
-    fn baz(&self) -> u32;
+mod nested {
+    pub trait A {
+        fn foo(&self);
+        fn bar(&self, arg: u32);
+        fn baz(&self) -> u32;
+    }
 }
 
 mock!{
     AMock,
+    nested,
     trait A {
         fn foo(&self);
         fn bar(&self, arg: u32);
         fn baz(&self) -> u32;
     }
 }
+
+use nested::A;
 
 #[test]
 #[should_panic(expected="Unexpected call of `bar`, `foo` call is expected")]
