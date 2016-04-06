@@ -250,6 +250,9 @@ impl Drop for Scenario {
 
 impl ScenarioInternals {
     pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
+        if self.events.is_empty() {
+            panic!("Unexpected call of `{}`, no calls are expected", method_name);
+        }
         let event = self.events.remove(0);
         if event.get_mock_id() != mock_id || event.get_method_name() != method_name {
             panic!("Unexpected call of `{}`, `{}` call is expected",
