@@ -2,6 +2,10 @@
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 name = "mockers"
 version = "0.1.0"
+repository = "https://github.com/kriomant/mockers"
+keywords = ["mock", "test"]
+readme = "README.md"
+license = "MIT"
 
 [dependencies]
 
