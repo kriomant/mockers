@@ -29,12 +29,12 @@ mock!{
 use nested::A;
 
 #[test]
-#[should_panic(expected="Unexpected call of `bar`, `foo` call is expected")]
+#[should_panic(expected="Unexpected call of `foo`, `bar(2)` call is expected")]
 fn test_unit() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();
-    scenario.expect(mock.foo_call().and_return(()));
-    mock.bar(2);
+    scenario.expect(mock.bar_call(2).and_return(()));
+    mock.foo();
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn test_any_match() {
 }
 
 #[test]
-#[should_panic(expected="Expected calls are not performed:\n`bar`\n")]
+#[should_panic(expected="Expected calls are not performed:\n`bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();

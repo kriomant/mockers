@@ -6,6 +6,7 @@ pub trait CheckCall {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8;
     fn get_mock_id(&self) -> usize;
     fn get_method_name(&self) -> &'static str;
+    fn describe(&self) -> String;
 }
 
 #[must_use]
@@ -41,6 +42,9 @@ impl<Res> CheckCall for Expectation0<Res> {
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
     fn get_method_name(&self) -> &'static str { self.call_match.method_name }
+    fn describe(&self) -> String {
+        format!("{}()", self.get_method_name())
+    }
 }
 impl<Res> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
@@ -86,6 +90,10 @@ impl<Arg0, Res> CheckCall for Expectation1<Arg0, Res> {
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
     fn get_method_name(&self) -> &'static str { self.call_match.method_name }
+    fn describe(&self) -> String {
+        format!("{}({})", self.get_method_name(),
+                          self.call_match.arg0.describe())
+    }
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
@@ -136,6 +144,11 @@ impl<Arg0, Arg1, Res> CheckCall for Expectation2<Arg0, Arg1, Res> {
     }
     fn get_mock_id(&self) -> usize { self.call_match.mock_id }
     fn get_method_name(&self) -> &'static str { self.call_match.method_name }
+    fn describe(&self) -> String {
+        format!("{}({}, {})", self.get_method_name(),
+                              self.call_match.arg0.describe(),
+                              self.call_match.arg1.describe())
+    }
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
@@ -228,7 +241,7 @@ impl Drop for Scenario {
         if !events.is_empty() {
             let mut s = String::from("Expected calls are not performed:\n");
             for event in events {
-                s.push_str(&format!("`{}`\n", event.get_method_name()));
+                s.push_str(&format!("`{}`\n", event.describe()));
             }
             panic!(s);
         }
@@ -240,7 +253,7 @@ impl ScenarioInternals {
         let event = self.events.remove(0);
         if event.get_mock_id() != mock_id || event.get_method_name() != method_name {
             panic!("Unexpected call of `{}`, `{}` call is expected",
-                   method_name, event.get_method_name());
+                   method_name, event.describe());
         }
         event.check_call(args_ptr)
     }
