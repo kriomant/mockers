@@ -52,12 +52,12 @@ impl<Res> CallMatch0<Res> {
 pub struct CallMatch1<Arg0, Res> {
     mock_id: usize,
     method_name: &'static str,
-    arg0: MatchArg<Arg0>,
+    arg0: Box<MatchArg<Arg0>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
-    pub fn new(mock_id: usize, method_name: &'static str, arg0: MatchArg<Arg0>) -> Self {
+    pub fn new(mock_id: usize, method_name: &'static str, arg0: Box<MatchArg<Arg0>>) -> Self {
         CallMatch1 {
             mock_id: mock_id,
             method_name: method_name,
@@ -74,7 +74,7 @@ pub struct Expectation1<Arg0, Res> {
 }
 impl<Arg0, Res> Expectation1<Arg0, Res> {
     fn check(self, arg0: &Arg0) -> Res {
-        (*self.call_match.arg0)(arg0).unwrap();
+        self.call_match.arg0.matches(arg0).unwrap();
         self.result
     }
 }
@@ -97,14 +97,15 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 pub struct CallMatch2<Arg0, Arg1, Res> {
     mock_id: usize,
     method_name: &'static str,
-    arg0: MatchArg<Arg0>,
-    arg1: MatchArg<Arg1>,
+    arg0: Box<MatchArg<Arg0>>,
+    arg1: Box<MatchArg<Arg1>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn new(mock_id: usize, method_name: &'static str,
-               arg0: MatchArg<Arg0>, arg1: MatchArg<Arg1>) -> Self {
+               arg0: Box<MatchArg<Arg0>>,
+               arg1: Box<MatchArg<Arg1>>) -> Self {
         CallMatch2 {
             mock_id: mock_id,
             method_name: method_name,
@@ -122,8 +123,8 @@ pub struct Expectation2<Arg0, Arg1, Res> {
 }
 impl <Arg0, Arg1, Res> Expectation2<Arg0, Arg1, Res> {
     fn check(self, arg0: &Arg0, arg1: &Arg1) -> Res {
-        (*self.call_match.arg0)(arg0).unwrap();
-        (*self.call_match.arg1)(arg1).unwrap();
+        self.call_match.arg0.matches(arg0).unwrap();
+        self.call_match.arg1.matches(arg1).unwrap();
         self.result
     }
 }
@@ -142,38 +143,43 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     }
 }
 
-pub type MatchArg<T> = Box<Fn(&T) -> Result<(), String>>;
-
-pub trait IntoMatchArg<T> {
-    fn into_match_arg(self) -> MatchArg<T>;
-}
-
-impl<T> IntoMatchArg<T> for MatchArg<T> {
-    fn into_match_arg(self) -> Self { self }
-}
-
-/// Use value as arg matcher.
+/// Argument matcher
 ///
-/// Returned matcher checks argument for equality.
-impl<'a, T> IntoMatchArg<T> for T
-    where T: 'static + Eq + std::fmt::Debug {
+/// Basically it is predicate telling whether argument
+/// value satisfies to some criteria. However, in case
+/// of mismatch it explains what and why doesn't match.
+pub trait MatchArg<T> {
+    fn matches(&self, arg: &T) -> Result<(), String>;
+    fn describe(&self) -> String;
+}
 
-    fn into_match_arg(self) -> MatchArg<T> {
-        Box::new(move |value| {
-            if *value == self {
-                Ok(())
-            } else {
-                Err(format!("{:?} is not equal to {:?}", value, self))
-            }
-        })
+/// Matches argument with value of same type using equality.
+impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        if self == arg {
+            Ok(())
+        } else {
+            Err(format!("{:?} is not equal to {:?}", arg, self))
+        }
+    }
+
+    fn describe(&self) -> String {
+        format!("{:?}", self)
     }
 }
 
 pub struct MatchAny;
-impl<T> IntoMatchArg<T> for MatchAny {
-    fn into_match_arg(self) -> MatchArg<T> {
-        Box::new(move |_| { Ok(()) })
+impl ToString for MatchAny {
+    fn to_string(&self) -> String {
+        "_".to_owned()
     }
+}
+impl<T> MatchArg<T> for MatchAny {
+    fn matches(&self, _: &T) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn describe(&self) -> String { "_".to_owned() }
 }
 /// Matches any value.
 pub const ANY: MatchAny = MatchAny;

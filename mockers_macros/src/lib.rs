@@ -9,7 +9,7 @@ use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfK
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
-                  PathParameters, DUMMY_NODE_ID};
+                  PathParameters, TyParamBound, DUMMY_NODE_ID};
 use syntax::codemap::{Span, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
 use syntax::parse::parser::PathParsingMode;
@@ -227,11 +227,11 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_ident: Ident, decl:
 ///
 /// Example of method generated for trait method `fn bar(a: u32)`:
 /// ```
-/// pub fn bar_call<Arg0Match: ::mockers::IntoMatchArg<u32>>(&self,
-///                                                          arg0: Arg0Match)
+/// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
+///                                                      arg0: Arg0Match)
 ///  -> ::mockers::CallMatch1<u32, ()> {
 ///     ::mockers::CallMatch1::new(self.mock_id, 1usize /* mock_id */,
-///                                arg0.into_match_arg())
+///                                Box::new(arg0))
 /// }
 /// ```
 fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
@@ -249,14 +249,17 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
         let arg_ident = cx.ident_of(&format!("arg{}", i));
 
         // 1. Type parameter
-        let into_match_arg_path = quote_path!(cx, ::mockers::IntoMatchArg<$arg_type>);
+        let match_arg_path = quote_path!(cx, ::mockers::MatchArg<$arg_type>);
         arg_matcher_types.push(cx.typaram(sp,
                                           arg_type_ident,
-                                          P::from_vec(vec![cx.typarambound(into_match_arg_path)]),
+                                          P::from_vec(vec![
+                                              cx.typarambound(match_arg_path),
+                                              TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
+                                          ]),
                                           None));
         inputs.push(quote_arg!(cx, $arg_ident: $arg_type_ident));
 
-        new_args.push(quote_expr!(cx, $arg_ident.into_match_arg()));
+        new_args.push(quote_expr!(cx, Box::new($arg_ident)));
     }
 
     let call_match_ident = cx.ident_of(&format!("CallMatch{}", args.len()));
@@ -359,14 +362,6 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
                cx.ident_of(&format!("arg{}", i)),
                cx.ty_ident(sp, cx.ident_of(&format!("Arg{}Match", i))))
     }).collect();
-    let mut new_args: Vec<_> = (0 .. args.len()).map(|i| {
-        cx.expr_method_call(sp,
-                            cx.expr_ident(sp, cx.ident_of(&format!("arg{}", i))),
-                            cx.ident_of("into_match_arg"),
-                            vec![])
-    }).collect();
-    new_args.insert(0, cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
-    new_args.insert(1, cx.expr_str(sp, method_name.clone()));
     let mut ainputs = inputs.clone();
     ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
 

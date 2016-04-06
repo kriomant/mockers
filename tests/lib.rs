@@ -6,7 +6,7 @@ extern crate mockers;
 use std::rc::Rc;
 use std::cell::RefCell;
 use mockers::{Scenario, ScenarioInternals, Mock,
-              MatchArg, IntoMatchArg, ANY};
+              MatchArg, ANY};
 
 mod nested {
     pub trait A {
@@ -46,14 +46,23 @@ fn test_return() {
 }
 
 #[cfg(test)]
-fn less_than<T: 'static + PartialOrd + std::fmt::Debug>(limit: T) -> MatchArg<T> {
-    Box::new(move |value| {
-        if value < &limit {
+struct LessThanMatchArg<T>(T);
+impl<T: PartialOrd + std::fmt::Debug + 'static> MatchArg<T> for LessThanMatchArg<T> {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        if arg < &self.0 {
             Ok(())
         } else {
-            Err(format!("{:?} is not less than {:?}", value, limit))
+            Err(format!("{:?} is not less than {:?}", arg, self.0))
         }
-    })
+    }
+
+    fn describe(&self) -> String {
+        format!("less_than({:?})", self.0)
+    }
+}
+#[cfg(test)]
+fn less_than<T: 'static + PartialOrd + std::fmt::Debug>(limit: T) -> LessThanMatchArg<T> {
+    LessThanMatchArg(limit)
 }
 
 #[test]
