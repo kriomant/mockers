@@ -3,10 +3,7 @@
 
 extern crate mockers;
 
-use std::rc::Rc;
-use std::cell::RefCell;
-use mockers::{Scenario, ScenarioInternals, Mock,
-              MatchArg, ANY};
+use mockers::{Scenario, MatchArg, ANY};
 
 mod nested {
     pub trait A {

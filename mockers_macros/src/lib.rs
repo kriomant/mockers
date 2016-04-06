@@ -155,7 +155,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 
     let struct_item = quote_item!(cx,
         struct $mock_ident {
-            scenario: Rc<RefCell<ScenarioInternals>>,
+            scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
             mock_id: usize,
         }
     ).unwrap();
@@ -179,8 +179,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                                                  trait_impl_methods));
 
     let mock_impl_item = quote_item!(cx,
-        impl Mock for $mock_ident {
-            fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self {
+        impl ::mockers::Mock for $mock_ident {
+            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
                 $mock_ident {
                     scenario: scenario_int,
                     mock_id: id,
