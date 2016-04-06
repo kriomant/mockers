@@ -227,6 +227,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span, method_ident: Ident, decl:
 ///
 /// Example of method generated for trait method `fn bar(a: u32)`:
 /// ```
+/// #[allow(dead_code)]
 /// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
 ///                                                      arg0: Arg0Match)
 ///  -> ::mockers::CallMatch1<u32, ()> {
@@ -308,7 +309,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
         id: DUMMY_NODE_ID,
         ident: expect_method_name,
         vis: Visibility::Public,
-        attrs: vec![],
+        attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         node: ImplItemKind::Method(call_sig, body),
         span: sp,
     };
