@@ -165,6 +165,22 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured
 …
 ```
 
+## Argument matchers
+
+`*_call` mock methods receive argument matchers as parameters. Any value
+of required type (which implements `Eq`) can be used as matcher,
+in this case it is just compared to actual argument value.
+
+You can use `arg!` macro to match argument values against pattern:
+
+```rust
+#[macro_use(arg)]
+…
+scenario.expect(mock.method_receiving_option_call(arg!(Some(_))).and_return(()));
+```
+
+Set of specialized matchers (like `lt`, `gt` and `contains`) will be available soon.
+
 ## License
 
 Copyright © 2016 Mikhail Trishchenkov

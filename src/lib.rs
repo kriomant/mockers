@@ -261,3 +261,41 @@ impl ScenarioInternals {
         event.check_call(args_ptr)
     }
 }
+
+pub struct FnMatchArg<T, F: Fn(&T) -> Result<(), String>> {
+    func: F,
+    description: String,
+    _phantom: PhantomData<T>,
+}
+impl<T, F: Fn(&T) -> Result<(), String>> FnMatchArg<T, F> {
+    pub fn new(description: String, func: F) -> Self {
+        FnMatchArg {
+            func: func,
+            description: description,
+            _phantom: PhantomData,
+        }
+    }
+}
+impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        let func = &self.func;
+        func(arg)
+    }
+    fn describe(&self) -> String {
+        self.description.clone()
+    }
+}
+
+#[macro_export]
+macro_rules! arg {
+    ($p:pat) => {{
+        let pattern_str = stringify!($p);
+        let descr = format!("arg!({})", pattern_str);
+        $crate::FnMatchArg::new(descr, move |arg| {
+            match arg {
+                &$p => Ok(()),
+                _ => Err(format!("{:?} isn't matched by {}", arg, pattern_str)),
+            }
+        })
+    }};
+}
