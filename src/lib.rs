@@ -4,6 +4,19 @@ use std::cell::RefCell;
 
 pub mod matchers;
 
+enum MockCallResult<T> {
+    Return(T),
+    Panic(String),
+}
+impl<T> MockCallResult<T> {
+    fn get(self) -> T {
+        match self {
+            MockCallResult::Return(value) => value,
+            MockCallResult::Panic(msg) => panic!(msg),
+        }
+    }
+}
+
 pub trait CheckCall {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8;
     fn get_mock_id(&self) -> usize;
@@ -31,10 +44,10 @@ impl<Res> CallMatch0<Res> {
 #[must_use]
 pub struct Expectation0<Res> {
     call_match: CallMatch0<Res>,
-    result: Res,
+    result: MockCallResult<Res>,
 }
 impl<Res> Expectation0<Res> {
-    fn check(self) -> Res { self.result }
+    fn check(self) -> Res { self.result.get() }
 }
 impl<Res> CheckCall for Expectation0<Res> {
     fn check_call(self: Box<Self>, _args: *const u8) -> *mut u8 {
@@ -50,7 +63,11 @@ impl<Res> CheckCall for Expectation0<Res> {
 }
 impl<Res> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
-        Expectation0 { call_match: self, result: result }
+        Expectation0 { call_match: self, result: MockCallResult::Return(result) }
+    }
+
+    pub fn and_panic(self, msg: String) -> Expectation0<Res> {
+        Expectation0 { call_match: self, result: MockCallResult::Panic(msg) }
     }
 }
 
@@ -76,12 +93,12 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 #[must_use]
 pub struct Expectation1<Arg0, Res> {
     call_match: CallMatch1<Arg0, Res>,
-    result: Res,
+    result: MockCallResult<Res>,
 }
 impl<Arg0, Res> Expectation1<Arg0, Res> {
     fn check(self, arg0: &Arg0) -> Res {
         self.call_match.arg0.matches(arg0).unwrap();
-        self.result
+        self.result.get()
     }
 }
 impl<Arg0, Res> CheckCall for Expectation1<Arg0, Res> {
@@ -99,7 +116,11 @@ impl<Arg0, Res> CheckCall for Expectation1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, result: result }
+        Expectation1 { call_match: self, result: MockCallResult::Return(result) }
+    }
+
+    pub fn and_panic(self, msg: String) -> Expectation1<Arg0, Res> {
+        Expectation1 { call_match: self, result: MockCallResult::Panic(msg) }
     }
 }
 
@@ -129,13 +150,13 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
 #[must_use]
 pub struct Expectation2<Arg0, Arg1, Res> {
     call_match: CallMatch2<Arg0, Arg1, Res>,
-    result: Res,
+    result: MockCallResult<Res>,
 }
 impl <Arg0, Arg1, Res> Expectation2<Arg0, Arg1, Res> {
     fn check(self, arg0: &Arg0, arg1: &Arg1) -> Res {
         self.call_match.arg0.matches(arg0).unwrap();
         self.call_match.arg1.matches(arg1).unwrap();
-        self.result
+        self.result.get()
     }
 }
 impl<Arg0, Arg1, Res> CheckCall for Expectation2<Arg0, Arg1, Res> {
@@ -154,7 +175,11 @@ impl<Arg0, Arg1, Res> CheckCall for Expectation2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, result: result }
+        Expectation2 { call_match: self, result: MockCallResult::Return(result) }
+    }
+
+    pub fn and_panic(self, msg: String) -> Expectation2<Arg0, Arg1, Res> {
+        Expectation2 { call_match: self, result: MockCallResult::Panic(msg) }
     }
 }
 

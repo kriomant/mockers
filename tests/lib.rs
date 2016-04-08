@@ -110,3 +110,12 @@ fn test_arg_macro_mismatch() {
     scenario.expect(mock.cmplx_call(arg!(Some(_))).and_return(()));
     mock.cmplx(None);
 }
+
+#[test]
+#[should_panic(expected="boom!")]
+fn test_panic_result() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<AMock>();
+    scenario.expect(mock.foo_call().and_panic("boom!".to_owned()));
+    mock.foo();
+}
