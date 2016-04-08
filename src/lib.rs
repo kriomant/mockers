@@ -2,6 +2,8 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+pub mod matchers;
+
 pub trait CheckCall {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8;
     fn get_mock_id(&self) -> usize;

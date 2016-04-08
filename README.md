@@ -180,7 +180,8 @@ You can use `arg!` macro to match argument values against pattern:
 scenario.expect(mock.method_receiving_option_call(arg!(Some(_))).and_return(()));
 ```
 
-Set of specialized matchers (like `lt`, `gt` and `contains`) will be available soon.
+Basic matchers (comparison: `eq`, `ne`, `gt`, …; logical: `not`, `or`, `and`) are available in `matchers` module.
+Specialized matchers (like `is_empty` or `contains`) will be available soon.
 
 ## License
 
