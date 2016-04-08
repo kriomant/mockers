@@ -11,6 +11,7 @@ pub trait A {
     fn bar(&self, arg: u32);
     fn baz(&self) -> u32;
     fn cmplx(&self, maybe: Option<u32>);
+    fn modify(&mut self);
 }
 
 mock!{
@@ -21,6 +22,7 @@ mock!{
         fn bar(&self, arg: u32);
         fn baz(&self) -> u32;
         fn cmplx(&self, maybe: Option<u32>);
+        fn modify(&mut self);
     }
 }
 
@@ -118,4 +120,12 @@ fn test_panic_result() {
     let mock = scenario.create_mock::<AMock>();
     scenario.expect(mock.foo_call().and_panic("boom!".to_owned()));
     mock.foo();
+}
+
+#[test]
+fn test_mut_self_method() {
+    let mut scenario = Scenario::new();
+    let mut mock = scenario.create_mock::<AMock>();
+    scenario.expect(mock.modify_call().and_return(()));
+    mock.modify();
 }

@@ -7,7 +7,7 @@ Mocking library for Rust.
 For now it is not a full-featured mocking library, but just
 a prototype to gather feedback. For example, only methods with
 two or less arguments are supported, `self` must be passed
-by read-only reference and so on.
+by reference and so on.
 
 Mocking magic is implemented using compiler plugin, so **nightly Rust
 is required**. It was tested to work with *1.9.0-nightly (74b886ab1 2016-03-13)*.
