@@ -12,6 +12,7 @@ pub trait A {
     fn baz(&self) -> u32;
     fn cmplx(&self, maybe: Option<u32>);
     fn modify(&mut self);
+    fn consume(self);
 }
 
 mock!{
@@ -23,6 +24,7 @@ mock!{
         fn baz(&self) -> u32;
         fn cmplx(&self, maybe: Option<u32>);
         fn modify(&mut self);
+        fn consume(self);
     }
 }
 
@@ -128,4 +130,12 @@ fn test_mut_self_method() {
     let mut mock = scenario.create_mock::<AMock>();
     scenario.expect(mock.modify_call().and_return(()));
     mock.modify();
+}
+
+#[test]
+fn test_value_self_method() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<AMock>();
+    scenario.expect(mock.consume_call().and_return(()));
+    mock.consume();
 }

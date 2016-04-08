@@ -146,15 +146,16 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                 cx.span_err(member.span, "parametrized trait methods are not supported");
                 continue;
             }
-            let mutability = match sig.explicit_self.node {
-                SelfKind::Region(None, mutability, _) => mutability,
+            match sig.explicit_self.node {
+                SelfKind::Value(_) |
+                SelfKind::Region(None, _, _) => (),
                 _ => {
-                    cx.span_err(member.span, "only methods receiving `&self` or `&mut self` are supported");
+                    cx.span_err(member.span, "only methods with implicit `self` (`self`, `&self` or `&mut self`) are supported");
                     continue;
                 }
-            };
+            }
 
-            if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, mutability, &sig.decl) {
+            if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.explicit_self.node, &sig.decl) {
                 impl_methods.push(methods.impl_method);
                 trait_impl_methods.push(methods.trait_impl_method);
             }
@@ -202,7 +203,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
-                          method_ident: Ident, mutability: Mutability,
+                          method_ident: Ident, self_kind: &SelfKind,
                           decl: &FnDecl) -> Option<GeneratedMethods> {
     // Arguments without `&self`.
     let args = &decl.inputs[1..];
@@ -218,7 +219,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
 
     let trait_impl_method = generate_trait_impl_method(
             cx, sp, method_ident,
-            mutability, args, &return_type);
+            self_kind, args, &return_type);
     let impl_method = generate_impl_method(cx, sp, method_ident, args, &return_type);
 
     if let (Some(tim), Some(im)) = (trait_impl_method, impl_method) {
@@ -354,7 +355,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
 /// ```
 /// where constant marked with "mock_id" is unique trait method ID.
 fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
-                              method_ident: Ident, mutability: Mutability,
+                              method_ident: Ident, self_kind: &SelfKind,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
     let method_name = method_ident.name.as_str();
     // Generate expression returning tuple of all method arguments.
@@ -372,13 +373,6 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
 
     let mut call_match_args: Vec<_> = args.iter().map(|arg| arg.ty.clone()).collect();
     call_match_args.push(P(return_type.clone()));
-    let inputs: Vec<Arg> = (0 .. args.len()).map(|i| {
-        cx.arg(sp,
-               cx.ident_of(&format!("arg{}", i)),
-               cx.ty_ident(sp, cx.ident_of(&format!("Arg{}Match", i))))
-    }).collect();
-    let mut ainputs = inputs.clone();
-    ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
 
     let fn_mock = quote_block!(cx, {
         let args = $args_tuple;
@@ -395,7 +389,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
         };
         cx.arg(sp, ident.node, a.ty.clone())
     }).collect();
-    impl_args.insert(0, Arg::new_self(sp, mutability, self_));
+    impl_args.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
     let impl_sig = MethodSig {
         unsafety: Unsafety::Normal,
         constness: Constness::NotConst,
@@ -406,7 +400,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
             variadic: false,
         }),
         generics: Generics::default(),
-        explicit_self: respan(sp, SelfKind::Region(None, mutability, method_ident)),
+        explicit_self: respan(sp, self_kind.clone()),
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
