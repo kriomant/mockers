@@ -95,7 +95,7 @@ use mockers::Scenario;
 #[test]
 fn test_make_hotter() {
     let mut scenario = Scenario::new();
-    let cond = scenario.create_mock::<AirConditionerMock>();
+    let cond = scenario.create_mock::<AirConditioner>();
     air::set_temperature_20(&cond);
 }
 ```
@@ -130,7 +130,7 @@ Lets start writing scenario:
 #[test]
 fn test_make_hotter() {
     let mut scenario = Scenario::new();
-    let cond = scenario.create_mock::<AirConditionerMock>();
+    let cond = scenario.create_mock::<AirConditioner>();
 
     // Expect that conditioner will be asked for temperature
     // and return 16.

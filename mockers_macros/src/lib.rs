@@ -165,7 +165,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     }
 
     let struct_item = quote_item!(cx,
-        struct $mock_ident {
+        pub struct $mock_ident {
             scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
             mock_id: usize,
         }
@@ -199,7 +199,18 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
             }
         }
     ).unwrap();
-    MacEager::items(SmallVector::many(vec![struct_item, mock_impl_item, impl_item, trait_impl_item]))
+
+    let mocked_impl_item = quote_item!(cx,
+        impl ::mockers::Mocked for &'static $trait_path {
+            type MockImpl = $mock_ident;
+        }
+    ).unwrap();
+
+    MacEager::items(SmallVector::many(vec![struct_item,
+                                           mock_impl_item,
+                                           impl_item,
+                                           trait_impl_item,
+                                           mocked_impl_item]))
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,

@@ -228,6 +228,10 @@ pub trait Mock {
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
 }
 
+pub trait Mocked {
+    type MockImpl: Mock;
+}
+
 pub struct ScenarioInternals {
     events: Vec<Box<CheckCall>>,
 }
@@ -247,8 +251,9 @@ impl Scenario {
         }
     }
 
-    pub fn create_mock<T: Mock>(&mut self) -> T {
-        T::new(self.get_next_mock_id(), self.internals.clone())
+    pub fn create_mock<T: ?Sized>(&mut self) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        <&'static T as Mocked>::MockImpl::new(self.get_next_mock_id(), self.internals.clone())
     }
 
     fn get_next_mock_id(&mut self) -> usize {
