@@ -6,18 +6,16 @@ extern crate mockers;
 
 use mockers::{Scenario, MatchArg, ANY};
 
-mod nested {
-    pub trait A {
-        fn foo(&self);
-        fn bar(&self, arg: u32);
-        fn baz(&self) -> u32;
-        fn cmplx(&self, maybe: Option<u32>);
-    }
+pub trait A {
+    fn foo(&self);
+    fn bar(&self, arg: u32);
+    fn baz(&self) -> u32;
+    fn cmplx(&self, maybe: Option<u32>);
 }
 
 mock!{
     AMock,
-    nested,
+    self,
     trait A {
         fn foo(&self);
         fn bar(&self, arg: u32);
@@ -25,8 +23,6 @@ mock!{
         fn cmplx(&self, maybe: Option<u32>);
     }
 }
-
-use nested::A;
 
 #[test]
 #[should_panic(expected="Unexpected call of `foo`, `bar(2)` call is expected")]

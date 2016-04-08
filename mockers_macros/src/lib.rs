@@ -13,6 +13,7 @@ use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfK
 use syntax::codemap::{Span, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
 use syntax::parse::parser::PathParsingMode;
+use syntax::parse::token;
 use syntax::parse::token::special_idents::self_;
 use syntax::parse::token::Token;
 use syntax::ptr::P;
@@ -52,11 +53,17 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                                   trait_tokens: &[TokenTree]) -> Box<MacResult + 'static> {
     let mut parser = cx.new_parser_from_tts(trait_tokens);
 
-    let trait_mod_path = match parser.parse_path(PathParsingMode::NoTypesAllowed) {
-        Ok(path) => path,
-        Err(mut err) => {
-            err.emit();
-            return DummyResult::any(sp)
+    let trait_mod_path = match parser.token {
+        token::Ident(id, token::Plain) if id.name == self_.name => {
+            parser.bump();
+            None
+        },
+        _ => match parser.parse_path(PathParsingMode::NoTypesAllowed) {
+            Ok(path) => Some(path),
+            Err(mut err) => {
+                err.emit();
+                return DummyResult::any(sp)
+            }
         }
     };
 
@@ -81,7 +88,10 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
 
                     assert!(param_bounds.is_empty());
 
-                    let mut trait_path = trait_mod_path.clone();
+                    let mut trait_path = match trait_mod_path {
+                        Some(path) => path.clone(),
+                        None => Path { span: sp, global: false, segments: vec![] },
+                    };
                     trait_path.segments.push(PathSegment {
                         identifier: item.ident,
                         parameters: PathParameters::none(),

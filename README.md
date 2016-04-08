@@ -73,7 +73,8 @@ Now create mock type for some trait:
 ```rust
 mock!{
     AirConditionerMock,
-    air, // This is mocked trait's package
+    air, // This is mocked trait's package.
+         // Use `self` to mock local trait.
     trait AirConditioner {
         fn make_hotter(&self, by: i16);
         fn make_cooler(&self, by: i16);
