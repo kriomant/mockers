@@ -180,8 +180,22 @@ You can use `arg!` macro to match argument values against pattern:
 scenario.expect(mock.method_receiving_option_call(arg!(Some(_))).and_return(()));
 ```
 
-Basic matchers (comparison: `eq`, `ne`, `gt`, …; logical: `not`, `or`, `and`) are available in `matchers` module.
+Basic matchers (comparison: `eq`, `ne`, `gt`, …; logical: `not`, `or`, `and`)
+are available in `matchers` module.
 Specialized matchers (like `is_empty` or `contains`) will be available soon.
+
+You may easily create ad-hoc matchers using `check` method:
+```rust
+scenario.expect(mock.method(check(|x: &Option<u32>| x.is_some()))
+                    .and_return(()));
+```
+
+Unfortunately, you can't create polymorphic checker this way (i.e. checker
+which may be used for `Option<T>` for any `T`). You have to write own
+struct and `MatchArg` implementation in order to do that.
+
+Another inconvenience of ad-hoc checkers is that error message is
+uninformative. However, this is fixable and I'm working on this.
 
 ## License
 

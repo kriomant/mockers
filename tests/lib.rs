@@ -4,7 +4,7 @@
 #[macro_use(arg)]
 extern crate mockers;
 
-use mockers::{Scenario, MatchArg, ANY};
+use mockers::{Scenario, MatchArg, ANY, check};
 
 pub trait A {
     fn foo(&self);
@@ -114,6 +114,25 @@ fn test_arg_macro_mismatch() {
     scenario.expect(mock.cmplx_call(arg!(Some(_))).and_return(()));
     mock.cmplx(None);
 }
+
+
+#[test]
+fn test_check_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(Some(3));
+}
+
+#[test]
+#[should_panic(expected="<custom function>")]
+fn test_check_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(None);
+}
+
 
 #[test]
 #[should_panic(expected="boom!")]
