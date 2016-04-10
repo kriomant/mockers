@@ -4,7 +4,8 @@
 #[macro_use(arg)]
 extern crate mockers;
 
-use mockers::{Scenario, MatchArg, ANY, check};
+use mockers::{Scenario, MatchArg};
+use mockers::matchers::{ANY, check};
 
 pub trait A {
     fn foo(&self);

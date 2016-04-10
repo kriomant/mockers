@@ -4,6 +4,28 @@ use super::MatchArg;
 use std::marker::PhantomData;
 use std::fmt::Debug;
 
+pub use self::ext::*;
+
+mod ext;
+
+
+pub struct MatchAny;
+impl ToString for MatchAny {
+    fn to_string(&self) -> String {
+        "_".to_owned()
+    }
+}
+impl<T> MatchArg<T> for MatchAny {
+    fn matches(&self, _: &T) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn describe(&self) -> String { "_".to_owned() }
+}
+/// Matches any value.
+pub const ANY: MatchAny = MatchAny;
+
+
 /// Hack for interpreting macro result as token stream and
 /// converting it to items.
 /// It is used to overcome inability to properly receive
@@ -128,4 +150,57 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for OrMatchArg<T, M
 }
 pub fn or<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(matcher0: M0, matcher1: M1) -> OrMatchArg<T, M0, M1> {
     OrMatchArg(matcher0, matcher1, PhantomData)
+}
+
+
+pub struct FnMatchArg<T, F: Fn(&T) -> Result<(), String>> {
+    func: F,
+    _phantom: PhantomData<T>,
+}
+impl<T, F: Fn(&T) -> Result<(), String>> FnMatchArg<T, F> {
+    pub fn new(func: F) -> Self {
+        FnMatchArg {
+            func: func,
+            _phantom: PhantomData,
+        }
+    }
+}
+impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        let func = &self.func;
+        func(arg)
+    }
+    fn describe(&self) -> String {
+        "<function>".to_owned()
+    }
+}
+
+
+pub struct BoolFnMatchArg<T, F: Fn(&T) -> bool> {
+    func: F,
+    _phantom: PhantomData<T>,
+}
+impl<T, F: Fn(&T) -> bool> BoolFnMatchArg<T, F> {
+    pub fn new(func: F) -> Self {
+        BoolFnMatchArg {
+            func: func,
+            _phantom: PhantomData,
+        }
+    }
+}
+impl<T, F: Fn(&T) -> bool> MatchArg<T> for BoolFnMatchArg<T, F> {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        let func = &self.func;
+        if func(arg) {
+            Ok(())
+        } else {
+            Err("<custom function>".to_owned())
+        }
+    }
+    fn describe(&self) -> String {
+        "<custom function>".to_owned()
+    }
+}
+pub fn check<T, F: Fn(&T) -> bool>(f: F) -> BoolFnMatchArg<T, F> {
+    BoolFnMatchArg { func: f, _phantom: PhantomData }
 }

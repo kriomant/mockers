@@ -186,6 +186,7 @@ Specialized matchers (like `is_empty` or `contains`) will be available soon.
 
 You may easily create ad-hoc matchers using `check` method:
 ```rust
+use mockers::matchers::check;
 scenario.expect(mock.method(check(|x: &Option<u32>| x.is_some()))
                     .and_return(()));
 ```

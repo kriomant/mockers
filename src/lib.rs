@@ -208,22 +208,6 @@ impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
     }
 }
 
-pub struct MatchAny;
-impl ToString for MatchAny {
-    fn to_string(&self) -> String {
-        "_".to_owned()
-    }
-}
-impl<T> MatchArg<T> for MatchAny {
-    fn matches(&self, _: &T) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn describe(&self) -> String { "_".to_owned() }
-}
-/// Matches any value.
-pub const ANY: MatchAny = MatchAny;
-
 pub trait Mock {
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
 }
@@ -295,71 +279,20 @@ impl ScenarioInternals {
 }
 
 
-pub struct FnMatchArg<T, F: Fn(&T) -> Result<(), String>> {
-    func: F,
-    description: String,
-    _phantom: PhantomData<T>,
-}
-impl<T, F: Fn(&T) -> Result<(), String>> FnMatchArg<T, F> {
-    pub fn new(description: String, func: F) -> Self {
-        FnMatchArg {
-            func: func,
-            description: description,
-            _phantom: PhantomData,
-        }
-    }
-}
-impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
-    fn matches(&self, arg: &T) -> Result<(), String> {
-        let func = &self.func;
-        func(arg)
-    }
-    fn describe(&self) -> String {
-        self.description.clone()
-    }
-}
-
-
-pub struct BoolFnMatchArg<T, F: Fn(&T) -> bool> {
-    func: F,
-    _phantom: PhantomData<T>,
-}
-impl<T, F: Fn(&T) -> bool> BoolFnMatchArg<T, F> {
-    pub fn new(func: F) -> Self {
-        BoolFnMatchArg {
-            func: func,
-            _phantom: PhantomData,
-        }
-    }
-}
-impl<T, F: Fn(&T) -> bool> MatchArg<T> for BoolFnMatchArg<T, F> {
-    fn matches(&self, arg: &T) -> Result<(), String> {
-        let func = &self.func;
-        if func(arg) {
-            Ok(())
-        } else {
-            Err("<custom function>".to_owned())
-        }
-    }
-    fn describe(&self) -> String {
-        "<custom function>".to_owned()
-    }
-}
-pub fn check<T, F: Fn(&T) -> bool>(f: F) -> BoolFnMatchArg<T, F> {
-    BoolFnMatchArg { func: f, _phantom: PhantomData }
-}
-
 
 #[macro_export]
 macro_rules! arg {
     ($p:pat) => {{
+        use $crate::matchers::MatchArgExt;
+
         let pattern_str = stringify!($p);
-        let descr = format!("arg!({})", pattern_str);
-        $crate::FnMatchArg::new(descr, move |arg| {
+        $crate::matchers::FnMatchArg::new(move |arg| {
             match arg {
                 &$p => Ok(()),
                 _ => Err(format!("{:?} isn't matched by {}", arg, pattern_str)),
             }
+        }).with_description_fn(move || {
+            format!("arg!({})", pattern_str)
         })
     }};
 }
