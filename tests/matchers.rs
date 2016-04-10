@@ -1,23 +1,37 @@
 #![feature(plugin)]
 #![plugin(mockers_macros)]
 
+#[macro_use(arg)]
 extern crate mockers;
 
 use mockers::Scenario;
 use mockers::matchers::*;
 
 pub trait A {
+    fn bar(&self, arg: u32);
     fn noarg(&self);
     fn num(&self, arg: u32);
+    fn cmplx(&self, maybe: Option<u32>);
 }
 
 mock!{
     AMock,
     self,
     trait A {
+        fn bar(&self, arg: u32);
         fn noarg(&self);
         fn num(&self, arg: u32);
+        fn cmplx(&self, maybe: Option<u32>);
     }
+}
+
+
+#[test]
+fn test_any_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.bar_call(ANY).and_return(()));
+    mock.bar(2);
 }
 
 
@@ -216,4 +230,40 @@ fn test_or_matcher_mismatch() {
     let mock = scenario.create_mock::<A>();
     scenario.expect(mock.num_call(or(lt(2), gt(5))).and_return(()));
     mock.num(4);
+}
+
+
+#[test]
+fn test_arg_macro_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(arg!(Some(_))).and_return(()));
+    mock.cmplx(Some(3));
+}
+
+#[test]
+#[should_panic(expected="None isn\\'t matched by Some(_)")]
+fn test_arg_macro_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(arg!(Some(_))).and_return(()));
+    mock.cmplx(None);
+}
+
+
+#[test]
+fn test_check_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(Some(3));
+}
+
+#[test]
+#[should_panic(expected="<custom function>")]
+fn test_check_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(None);
 }
