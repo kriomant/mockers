@@ -4,8 +4,8 @@
 #[macro_use(arg)]
 extern crate mockers;
 
-use mockers::{Scenario, MatchArg};
-use mockers::matchers::{ANY, check};
+use mockers::Scenario;
+use mockers::matchers::{ANY, check, lt};
 
 pub trait A {
     fn foo(&self);
@@ -46,32 +46,13 @@ fn test_return() {
     assert_eq!(2, mock.baz());
 }
 
-#[cfg(test)]
-struct LessThanMatchArg<T>(T);
-impl<T: PartialOrd + std::fmt::Debug + 'static> MatchArg<T> for LessThanMatchArg<T> {
-    fn matches(&self, arg: &T) -> Result<(), String> {
-        if arg < &self.0 {
-            Ok(())
-        } else {
-            Err(format!("{:?} is not less than {:?}", arg, self.0))
-        }
-    }
-
-    fn describe(&self) -> String {
-        format!("less_than({:?})", self.0)
-    }
-}
-#[cfg(test)]
-fn less_than<T: 'static + PartialOrd + std::fmt::Debug>(limit: T) -> LessThanMatchArg<T> {
-    LessThanMatchArg(limit)
-}
 
 #[test]
 #[should_panic(expected="4 is not less than 3")]
 fn test_arg_match_failure() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
-    scenario.expect(mock.bar_call(less_than(3)).and_return(()));
+    scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(4);
 }
 
@@ -79,7 +60,7 @@ fn test_arg_match_failure() {
 fn test_arg_match_success() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
-    scenario.expect(mock.bar_call(less_than(3)).and_return(()));
+    scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(2);
 }
 
