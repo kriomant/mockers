@@ -277,38 +277,3 @@ impl ScenarioInternals {
         event.check_call(args_ptr)
     }
 }
-
-
-
-#[macro_export]
-macro_rules! arg {
-    ($p:pat) => {{
-        use $crate::matchers::MatchArgExt;
-
-        let pattern_str = stringify!($p);
-        $crate::matchers::FnMatchArg::new(move |arg| {
-            match arg {
-                &$p => Ok(()),
-                _ => Err(format!("{:?} isn't matched by {}", arg, pattern_str)),
-            }
-        }).with_description_fn(move || {
-            format!("arg!({})", pattern_str)
-        })
-    }};
-}
-
-#[macro_export]
-macro_rules! check {
-    ($e:expr) => {{
-        use $crate::matchers::MatchArgExt;
-
-        let lambda_str = stringify!($e);
-        $crate::matchers::BoolFnMatchArg::new($e)
-            .with_custom_msg(move |arg| {
-                format!("{:?} doesn't satisfy to {}", arg, lambda_str)
-            })
-            .with_description_fn(move || {
-                format!("check!({})", lambda_str)
-            })
-    }};
-}
