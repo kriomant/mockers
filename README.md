@@ -24,10 +24,10 @@ Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mockers = "0.1.0"
+mockers = "0.2.0"
 
 [dev-dependencies]
-mockers_macros = "0.1.0"
+mockers_macros = "0.2.0"
 ```
 
 Say we have `air` crate with some trait and method using this trait:
