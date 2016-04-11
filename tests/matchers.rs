@@ -1,7 +1,7 @@
 #![feature(plugin)]
 #![plugin(mockers_macros)]
 
-#[macro_use(arg)]
+#[macro_use(arg, check)]
 extern crate mockers;
 
 use mockers::Scenario;
@@ -265,5 +265,23 @@ fn test_check_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
     scenario.expect(mock.cmplx_call(check(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(None);
+}
+
+
+#[test]
+fn test_check_macro_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check!(|t:&Option<u32>| t.is_some())).and_return(()));
+    mock.cmplx(Some(3));
+}
+
+#[test]
+#[should_panic(expected="None doesn\\'t satisfy to |t: &Option<u32>| t.is_some()")]
+fn test_check_macro_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.cmplx_call(check!(|t:&Option<u32>| t.is_some())).and_return(()));
     mock.cmplx(None);
 }

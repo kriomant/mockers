@@ -296,3 +296,19 @@ macro_rules! arg {
         })
     }};
 }
+
+#[macro_export]
+macro_rules! check {
+    ($e:expr) => {{
+        use $crate::matchers::MatchArgExt;
+
+        let lambda_str = stringify!($e);
+        $crate::matchers::BoolFnMatchArg::new($e)
+            .with_custom_msg(move |arg| {
+                format!("{:?} doesn't satisfy to {}", arg, lambda_str)
+            })
+            .with_description_fn(move || {
+                format!("check!({})", lambda_str)
+            })
+    }};
+}

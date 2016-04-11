@@ -195,8 +195,16 @@ Unfortunately, you can't create polymorphic checker this way (i.e. checker
 which may be used for `Option<T>` for any `T`). You have to write own
 struct and `MatchArg` implementation in order to do that.
 
-Another inconvenience of ad-hoc checkers is that error message is
-uninformative. However, this is fixable and I'm working on this.
+Use `check!` macro instead of `check` function to get slightly more
+informative error message:
+
+```rust
+#[macro_use(check)]
+extern crate mockers;
+
+scenario.expect(mock.method(check!(|x: &Option<u32>| x.is_some()))
+                    .and_return(()));
+```
 
 ## License
 
