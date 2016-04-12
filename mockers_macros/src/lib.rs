@@ -9,7 +9,7 @@ use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfK
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
-                  PathParameters, TyParamBound, DUMMY_NODE_ID};
+                  PathParameters, TyParamBound, Defaultness, DUMMY_NODE_ID};
 use syntax::codemap::{Span, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
 use syntax::parse::parser::PathParsingMode;
@@ -338,6 +338,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
         attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         node: ImplItemKind::Method(call_sig, body),
         span: sp,
+        defaultness: Defaultness::Final,
     };
 
     Some(impl_subitem)
@@ -420,6 +421,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
         attrs: vec![quote_attr!(cx, #[allow(unused_mut)])],
         node: ImplItemKind::Method(impl_sig, P(fn_mock)),
         span: sp,
+        defaultness: Defaultness::Final,
     };
 
     Some(trait_impl_subitem)

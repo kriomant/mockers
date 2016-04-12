@@ -10,7 +10,7 @@ two or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin, so **nightly Rust
-is required**. It was tested to work with *1.9.0-nightly (74b886ab1 2016-03-13)*.
+is required**. It was tested to work with *1.9.0-nightly (924da295c 2016-04-10)*.
 
 ## Usage
 
@@ -24,10 +24,10 @@ Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mockers = "0.2.0"
+mockers = "0.2.1"
 
 [dev-dependencies]
-mockers_macros = "0.2.0"
+mockers_macros = "0.2.1"
 ```
 
 Say we have `air` crate with some trait and method using this trait:
