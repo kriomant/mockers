@@ -27,7 +27,7 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="Unexpected call of `foo`, `bar(2)` call is expected")]
+#[should_panic(expected="Unexpected call of `A#0::foo`, `A#0::bar(2)` call is expected")]
 fn test_unit() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -63,7 +63,7 @@ fn test_arg_match_success() {
 
 
 #[test]
-#[should_panic(expected="Expected calls are not performed:\n`bar(_)`\n")]
+#[should_panic(expected="Expected calls are not performed:\n`A#0::bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -94,4 +94,13 @@ fn test_value_self_method() {
     let mock = scenario.create_mock::<A>();
     scenario.expect(mock.consume_call().and_return(()));
     mock.consume();
+}
+
+#[test]
+#[should_panic(expected="Unexpected call of `amock::foo`, `amock::bar(2)` call is expected")]
+fn test_named_mock() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_named_mock::<A>("amock".to_owned());
+    scenario.expect(mock.bar_call(2).and_return(()));
+    mock.foo();
 }

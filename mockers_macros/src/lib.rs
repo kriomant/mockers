@@ -18,6 +18,7 @@ use syntax::parse::token::special_idents::self_;
 use syntax::parse::token::Token;
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
+use syntax::print::pprust;
 
 use syntax::ext::build::AstBuilder;
 
@@ -200,9 +201,11 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
         }
     ).unwrap();
 
+    let mocked_class_name = pprust::path_to_string(trait_path);
     let mocked_impl_item = quote_item!(cx,
         impl ::mockers::Mocked for &'static $trait_path {
             type MockImpl = $mock_ident;
+            fn class_name() -> &'static str { $mocked_class_name }
         }
     ).unwrap();
 

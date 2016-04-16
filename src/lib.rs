@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 pub mod matchers;
 
@@ -350,10 +351,18 @@ pub trait Mock {
 
 pub trait Mocked {
     type MockImpl: Mock;
+
+    /// Returns name of mocked class
+    fn class_name() -> &'static str;
 }
 
 pub struct ScenarioInternals {
     events: Vec<Box<CheckCall>>,
+
+    /// Mapping from mock ID to mock name.
+    mock_names: HashMap<usize, Rc<String>>,
+    /// Set of used mock names used to quicly check for conflicts.
+    allocated_names: HashSet<Rc<String>>,
 }
 
 pub struct Scenario {
@@ -366,6 +375,9 @@ impl Scenario {
         Scenario {
             internals: Rc::new(RefCell::new(ScenarioInternals {
                 events: Vec::new(),
+
+                mock_names: HashMap::new(),
+                allocated_names: HashSet::new(),
             })),
             next_mock_id: 0,
         }
@@ -373,7 +385,16 @@ impl Scenario {
 
     pub fn create_mock<T: ?Sized>(&mut self) -> <&'static T as Mocked>::MockImpl
             where &'static T: Mocked {
-        <&'static T as Mocked>::MockImpl::new(self.get_next_mock_id(), self.internals.clone())
+        let mock_id = self.get_next_mock_id();
+        self.generate_name_for_class(mock_id, <&'static T as Mocked>::class_name());
+        <&'static T as Mocked>::MockImpl::new(mock_id, self.internals.clone())
+    }
+
+    pub fn create_named_mock<T: ?Sized>(&mut self, name: String) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        let mock_id = self.get_next_mock_id();
+        self.register_name(mock_id, name);
+        <&'static T as Mocked>::MockImpl::new(mock_id, self.internals.clone())
     }
 
     fn get_next_mock_id(&mut self) -> usize {
@@ -385,15 +406,40 @@ impl Scenario {
     pub fn expect<C: CheckCall + 'static>(&mut self, call: C) {
         self.internals.borrow_mut().events.push(Box::new(call));
     }
+
+    fn register_name(&mut self, mock_id: usize, name: String) {
+        let mut int = self.internals.borrow_mut();
+        if int.allocated_names.contains(&name) {
+            panic!("Mock name {} already used", name);
+        }
+        let name_rc = Rc::new(name);
+        int.mock_names.insert(mock_id, name_rc.clone());
+        int.allocated_names.insert(name_rc);
+    }
+
+    fn generate_name_for_class(&mut self, mock_id: usize, class_name: &str) {
+        let mut int = self.internals.borrow_mut();
+        for i in 0.. {
+            let name = format!("{}#{}", class_name, i);
+            if !int.allocated_names.contains(&name) {
+                let name_rc = Rc::new(name);
+                int.mock_names.insert(mock_id, name_rc.clone());
+                int.allocated_names.insert(name_rc);
+                break;
+            }
+        }
+    }
 }
 
 impl Drop for Scenario {
     fn drop(&mut self) {
-        let events = &self.internals.borrow().events;
+        let int = self.internals.borrow();
+        let events = &int.events;
         if !events.is_empty() {
             let mut s = String::from("Expected calls are not performed:\n");
             for event in events {
-                s.push_str(&format!("`{}`\n", event.describe()));
+                let mock_name = int.mock_names.get(&event.get_mock_id()).unwrap();
+                s.push_str(&format!("`{}::{}`\n", mock_name, event.describe()));
             }
             panic!(s);
         }
@@ -403,12 +449,15 @@ impl Drop for Scenario {
 impl ScenarioInternals {
     pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
         if self.events.is_empty() {
-            panic!("Unexpected call of `{}`, no calls are expected", method_name);
+            let mock_name = self.mock_names.get(&mock_id).unwrap();
+            panic!("Unexpected call of `{}::{}`, no calls are expected", mock_name, method_name);
         }
         let event = self.events.remove(0);
         if event.get_mock_id() != mock_id || event.get_method_name() != method_name {
-            panic!("Unexpected call of `{}`, `{}` call is expected",
-                   method_name, event.describe());
+            let expected_mock_name = self.mock_names.get(&event.get_mock_id()).unwrap();
+            let actual_mock_name = self.mock_names.get(&mock_id).unwrap();
+            panic!("Unexpected call of `{}::{}`, `{}::{}` call is expected",
+                   actual_mock_name, method_name, expected_mock_name, event.describe());
         }
         event.check_call(args_ptr)
     }
