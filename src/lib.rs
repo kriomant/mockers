@@ -18,7 +18,7 @@ impl<T> MockCallResult<T> {
     }
 }
 
-pub trait CheckCall {
+pub trait Expectation {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8;
     fn get_mock_id(&self) -> usize;
     fn get_method_name(&self) -> &'static str;
@@ -50,7 +50,7 @@ pub struct Expectation0<Res> {
 impl<Res> Expectation0<Res> {
     fn check(self) -> Res { self.result.get() }
 }
-impl<Res> CheckCall for Expectation0<Res> {
+impl<Res> Expectation for Expectation0<Res> {
     fn check_call(self: Box<Self>, _args: *const u8) -> *mut u8 {
         //let args_tuple: &() = unsafe { std::mem::transmute(args) };
         let result = self.check();
@@ -102,7 +102,7 @@ impl<Arg0, Res> Expectation1<Arg0, Res> {
         self.result.get()
     }
 }
-impl<Arg0, Res> CheckCall for Expectation1<Arg0, Res> {
+impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8 {
         let args_tuple: &(Arg0,) = unsafe { std::mem::transmute(args) };
         let result = self.check(&args_tuple.0);
@@ -160,7 +160,7 @@ impl <Arg0, Arg1, Res> Expectation2<Arg0, Arg1, Res> {
         self.result.get()
     }
 }
-impl<Arg0, Arg1, Res> CheckCall for Expectation2<Arg0, Arg1, Res> {
+impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8 {
         let args_tuple: &(Arg0, Arg1) = unsafe { std::mem::transmute(args) };
         let result = self.check(&args_tuple.0, &args_tuple.1);
@@ -225,7 +225,7 @@ impl <Arg0, Arg1, Arg2, Res> Expectation3<Arg0, Arg1, Arg2, Res> {
         self.result.get()
     }
 }
-impl<Arg0, Arg1, Arg2, Res> CheckCall for Expectation3<Arg0, Arg1, Arg2, Res> {
+impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8 {
         let args_tuple: &(Arg0, Arg1, Arg2) = unsafe { std::mem::transmute(args) };
         let result = self.check(&args_tuple.0, &args_tuple.1, &args_tuple.2);
@@ -293,7 +293,7 @@ impl <Arg0, Arg1, Arg2, Arg3, Res> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
         self.result.get()
     }
 }
-impl<Arg0, Arg1, Arg2, Arg3, Res> CheckCall for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
+impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn check_call(self: Box<Self>, args: *const u8) -> *mut u8 {
         let args_tuple: &(Arg0, Arg1, Arg2, Arg3) = unsafe { std::mem::transmute(args) };
         let result = self.check(&args_tuple.0, &args_tuple.1, &args_tuple.2, &args_tuple.3);
@@ -357,7 +357,7 @@ pub trait Mocked {
 }
 
 pub struct ScenarioInternals {
-    events: Vec<Box<CheckCall>>,
+    expectations: Vec<Box<Expectation>>,
 
     /// Mapping from mock ID to mock name.
     mock_names: HashMap<usize, Rc<String>>,
@@ -374,7 +374,7 @@ impl Scenario {
     pub fn new() -> Self {
         Scenario {
             internals: Rc::new(RefCell::new(ScenarioInternals {
-                events: Vec::new(),
+                expectations: Vec::new(),
 
                 mock_names: HashMap::new(),
                 allocated_names: HashSet::new(),
@@ -403,8 +403,8 @@ impl Scenario {
         id
     }
 
-    pub fn expect<C: CheckCall + 'static>(&mut self, call: C) {
-        self.internals.borrow_mut().events.push(Box::new(call));
+    pub fn expect<C: Expectation + 'static>(&mut self, call: C) {
+        self.internals.borrow_mut().expectations.push(Box::new(call));
     }
 
     fn register_name(&mut self, mock_id: usize, name: String) {
@@ -442,12 +442,12 @@ impl Drop for Scenario {
         }
 
         let int = self.internals.borrow();
-        let events = &int.events;
-        if !events.is_empty() {
+        let expectations = &int.expectations;
+        if !expectations.is_empty() {
             let mut s = String::from("Expected calls are not performed:\n");
-            for event in events {
-                let mock_name = int.mock_names.get(&event.get_mock_id()).unwrap();
-                s.push_str(&format!("`{}::{}`\n", mock_name, event.describe()));
+            for expectation in expectations {
+                let mock_name = int.mock_names.get(&expectation.get_mock_id()).unwrap();
+                s.push_str(&format!("`{}::{}`\n", mock_name, expectation.describe()));
             }
             panic!(s);
         }
@@ -455,18 +455,19 @@ impl Drop for Scenario {
 }
 
 impl ScenarioInternals {
+    /// Verify call performed on mock object
     pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
-        if self.events.is_empty() {
+        if self.expectations.is_empty() {
             let mock_name = self.mock_names.get(&mock_id).unwrap();
             panic!("Unexpected call of `{}::{}`, no calls are expected", mock_name, method_name);
         }
-        let event = self.events.remove(0);
-        if event.get_mock_id() != mock_id || event.get_method_name() != method_name {
-            let expected_mock_name = self.mock_names.get(&event.get_mock_id()).unwrap();
+        let expectation = self.expectations.remove(0);
+        if expectation.get_mock_id() != mock_id || expectation.get_method_name() != method_name {
+            let expected_mock_name = self.mock_names.get(&expectation.get_mock_id()).unwrap();
             let actual_mock_name = self.mock_names.get(&mock_id).unwrap();
             panic!("Unexpected call of `{}::{}`, `{}::{}` call is expected",
-                   actual_mock_name, method_name, expected_mock_name, event.describe());
+                   actual_mock_name, method_name, expected_mock_name, expectation.describe());
         }
-        event.check_call(args_ptr)
+        expectation.check_call(args_ptr)
     }
 }
