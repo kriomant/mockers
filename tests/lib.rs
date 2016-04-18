@@ -104,3 +104,17 @@ fn test_named_mock() {
     scenario.expect(mock.bar_call(2).and_return(()));
     mock.foo();
 }
+
+/// Test that when test is failed, then remaining scenario
+/// expectations are not checked and don't cause panic-during-drop
+/// which will lead to ugly failure with not very useful message.
+#[test]
+#[should_panic(expected="caboom!")]
+fn test_failed_with_remaining_expectations() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    // This expectation will never be satisfied.
+    scenario.expect(mock.bar_call(2).and_return(()));
+    panic!("caboom!");
+}

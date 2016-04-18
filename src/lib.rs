@@ -433,6 +433,14 @@ impl Scenario {
 
 impl Drop for Scenario {
     fn drop(&mut self) {
+        // Test is already failed, so it isn't necessary to check remaining
+        // expectations. And if we do, then panic-during-drop will cause
+        // test to fail with uncomprehensive message like:
+        // "(signal: 4, SIGILL: illegal instruction)"
+        if std::thread::panicking() {
+            return;
+        }
+
         let int = self.internals.borrow();
         let events = &int.events;
         if !events.is_empty() {
