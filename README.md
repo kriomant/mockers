@@ -1,7 +1,7 @@
 
-master|0.2.1
+master|0.2.2
 --|--
-[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers)|[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.2.1)](https://travis-ci.org/kriomant/mockers)
+[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers)|[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.2.2)](https://travis-ci.org/kriomant/mockers)
 
 # Mockers
 
@@ -15,7 +15,7 @@ two or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin, so **nightly Rust
-is required**. It was tested to work with *1.9.0-nightly (924da295c 2016-04-10)*.
+is required**. It was tested to work with *1.10.0-nightly (645dd013a 2016-04-24)*.
 
 ## Usage
 
@@ -29,10 +29,10 @@ Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mockers = "0.2.1"
+mockers = "0.2.2"
 
 [dev-dependencies]
-mockers_macros = "0.2.1"
+mockers_macros = "0.2.2"
 ```
 
 Say we have `air` crate with some trait and method using this trait:

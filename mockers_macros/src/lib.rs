@@ -12,9 +12,9 @@ use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfK
                   PathParameters, TyParamBound, Defaultness, DUMMY_NODE_ID};
 use syntax::codemap::{Span, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
-use syntax::parse::parser::PathParsingMode;
+use syntax::parse::parser::PathStyle;
 use syntax::parse::token;
-use syntax::parse::token::special_idents::self_;
+use syntax::parse::token::keywords;
 use syntax::parse::token::Token;
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
@@ -29,7 +29,7 @@ pub fn plugin_registrar(reg: &mut Registry) {
 
 fn generate_mock(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
     match args {
-        [TokenTree::Token(_, Token::Ident(mock_ident, _)),
+        [TokenTree::Token(_, Token::Ident(mock_ident)),
          TokenTree::Token(comma_span, Token::Comma),
          rest..] => {
             let trait_sp = sp.trim_start(comma_span).unwrap();
@@ -55,11 +55,11 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
     let mut parser = cx.new_parser_from_tts(trait_tokens);
 
     let trait_mod_path = match parser.token {
-        token::Ident(id, token::Plain) if id.name == self_.name => {
+        token::Ident(id) if id.name == keywords::SelfValue.name() => {
             parser.bump();
             None
         },
-        _ => match parser.parse_path(PathParsingMode::NoTypesAllowed) {
+        _ => match parser.parse_path(PathStyle::Mod) {
             Ok(path) => Some(path),
             Err(mut err) => {
                 err.emit();
@@ -319,7 +319,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
     let body_expr = cx.expr_call(sp, cx.expr_path(new_method_path), new_args);
     let body = cx.block(sp, vec![], Some(body_expr));
     let mut ainputs = inputs.clone();
-    ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
+    ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, keywords::SelfValue.ident()));
 
     let call_sig = MethodSig {
         unsafety: Unsafety::Normal,
@@ -404,7 +404,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
         };
         cx.arg(sp, ident.node, a.ty.clone())
     }).collect();
-    impl_args.insert(0, Arg::new_self(sp, Mutability::Immutable, self_));
+    impl_args.insert(0, Arg::new_self(sp, Mutability::Immutable, keywords::SelfValue.ident()));
     let impl_sig = MethodSig {
         unsafety: Unsafety::Normal,
         constness: Constness::NotConst,
