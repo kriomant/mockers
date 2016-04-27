@@ -11,6 +11,7 @@ pub trait A {
     fn bar(&self, arg: u32);
     fn baz(&self) -> u32;
     fn modify(&mut self);
+    fn ask(&self, arg: u32) -> u32;
     fn consume(self);
 }
 
@@ -22,6 +23,7 @@ mock!{
         fn bar(&self, arg: u32);
         fn baz(&self) -> u32;
         fn modify(&mut self);
+        fn ask(&self, arg: u32) -> u32;
         fn consume(self);
     }
 }
@@ -117,4 +119,14 @@ fn test_failed_with_remaining_expectations() {
     // This expectation will never be satisfied.
     scenario.expect(mock.bar_call(2).and_return(()));
     panic!("caboom!");
+}
+
+#[test]
+fn test_expect_and_call() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    // This expectation will never be satisfied.
+    scenario.expect(mock.ask_call(2).and_call(|arg| { arg+1 }));
+    assert_eq!(mock.ask(2), 3);
 }

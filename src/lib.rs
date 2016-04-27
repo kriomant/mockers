@@ -5,15 +5,77 @@ use std::collections::{HashMap, HashSet};
 
 pub mod matchers;
 
-enum MockCallResult<T> {
+enum MockCallResult0<T> {
     Return(T),
     Panic(String),
+    Call(Box<Fn() -> T>),
 }
-impl<T> MockCallResult<T> {
+impl<T> MockCallResult0<T> {
     fn get(self) -> T {
         match self {
-            MockCallResult::Return(value) => value,
-            MockCallResult::Panic(msg) => panic!(msg),
+            MockCallResult0::Return(value) => value,
+            MockCallResult0::Panic(msg) => panic!(msg),
+            MockCallResult0::Call(func) => func(),
+        }
+    }
+}
+
+enum MockCallResult1<Arg0, T> {
+    Return(T),
+    Panic(String),
+    Call(Box<Fn(&Arg0) -> T>),
+}
+impl<Arg0, T> MockCallResult1<Arg0, T> {
+    fn get(self, arg0: &Arg0) -> T {
+        match self {
+            MockCallResult1::Return(value) => value,
+            MockCallResult1::Panic(msg) => panic!(msg),
+            MockCallResult1::Call(func) => func(arg0),
+        }
+    }
+}
+
+enum MockCallResult2<Arg0, Arg1, T> {
+    Return(T),
+    Panic(String),
+    Call(Box<Fn(&Arg0, &Arg1) -> T>),
+}
+impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
+    fn get(self, arg0: &Arg0, arg1: &Arg1) -> T {
+        match self {
+            MockCallResult2::Return(value) => value,
+            MockCallResult2::Panic(msg) => panic!(msg),
+            MockCallResult2::Call(func) => func(arg0, arg1),
+        }
+    }
+}
+
+enum MockCallResult3<Arg0, Arg1, Arg2, T> {
+    Return(T),
+    Panic(String),
+    Call(Box<Fn(&Arg0, &Arg1, &Arg2) -> T>),
+}
+impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
+    fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2) -> T {
+        match self {
+            MockCallResult3::Return(value) => value,
+            MockCallResult3::Panic(msg) => panic!(msg),
+            MockCallResult3::Call(func) => func(arg0, arg1, arg2),
+        }
+    }
+}
+
+enum MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
+    Return(T),
+    Panic(String),
+    Call(Box<Fn(&Arg0, &Arg1, &Arg2, &Arg3) -> T>),
+}
+impl<Arg0, Arg1, Arg2, Arg3, T> MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
+    fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2, arg3: &Arg3) -> T {
+        match self {
+            MockCallResult4::Return(value) => value,
+            MockCallResult4::Panic(msg) => panic!(msg),
+            MockCallResult4::Call(func) => func(arg0, arg1, arg2, arg3),
         }
     }
 }
@@ -45,7 +107,7 @@ impl<Res> CallMatch0<Res> {
 #[must_use]
 pub struct Expectation0<Res> {
     call_match: CallMatch0<Res>,
-    result: MockCallResult<Res>,
+    result: MockCallResult0<Res>,
 }
 impl<Res> Expectation0<Res> {
     fn check(self) -> Res { self.result.get() }
@@ -64,11 +126,16 @@ impl<Res> Expectation for Expectation0<Res> {
 }
 impl<Res> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
-        Expectation0 { call_match: self, result: MockCallResult::Return(result) }
+        Expectation0 { call_match: self, result: MockCallResult0::Return(result) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation0<Res> {
-        Expectation0 { call_match: self, result: MockCallResult::Panic(msg) }
+        Expectation0 { call_match: self, result: MockCallResult0::Panic(msg) }
+    }
+
+    pub fn and_call<F>(self, func: F) -> Expectation0<Res>
+            where F: Fn() -> Res + 'static {
+        Expectation0 { call_match: self, result: MockCallResult0::Call(Box::new(func)) }
     }
 }
 
@@ -94,12 +161,12 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 #[must_use]
 pub struct Expectation1<Arg0, Res> {
     call_match: CallMatch1<Arg0, Res>,
-    result: MockCallResult<Res>,
+    result: MockCallResult1<Arg0, Res>,
 }
 impl<Arg0, Res> Expectation1<Arg0, Res> {
     fn check(self, arg0: &Arg0) -> Res {
         self.call_match.arg0.matches(arg0).unwrap();
-        self.result.get()
+        self.result.get(arg0)
     }
 }
 impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
@@ -117,11 +184,16 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, result: MockCallResult::Return(result) }
+        Expectation1 { call_match: self, result: MockCallResult1::Return(result) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, result: MockCallResult::Panic(msg) }
+        Expectation1 { call_match: self, result: MockCallResult1::Panic(msg) }
+    }
+
+    pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
+            where F: Fn(&Arg0) -> Res + 'static {
+        Expectation1 { call_match: self, result: MockCallResult1::Call(Box::new(func)) }
     }
 }
 
@@ -151,13 +223,13 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
 #[must_use]
 pub struct Expectation2<Arg0, Arg1, Res> {
     call_match: CallMatch2<Arg0, Arg1, Res>,
-    result: MockCallResult<Res>,
+    result: MockCallResult2<Arg0, Arg1, Res>,
 }
 impl <Arg0, Arg1, Res> Expectation2<Arg0, Arg1, Res> {
     fn check(self, arg0: &Arg0, arg1: &Arg1) -> Res {
         self.call_match.arg0.matches(arg0).unwrap();
         self.call_match.arg1.matches(arg1).unwrap();
-        self.result.get()
+        self.result.get(arg0, arg1)
     }
 }
 impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
@@ -176,11 +248,16 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, result: MockCallResult::Return(result) }
+        Expectation2 { call_match: self, result: MockCallResult2::Return(result) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, result: MockCallResult::Panic(msg) }
+        Expectation2 { call_match: self, result: MockCallResult2::Panic(msg) }
+    }
+
+    pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
+            where F: Fn(&Arg0, &Arg1) -> Res + 'static {
+        Expectation2 { call_match: self, result: MockCallResult2::Call(Box::new(func)) }
     }
 }
 
@@ -215,14 +292,14 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
 #[must_use]
 pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
     call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    result: MockCallResult<Res>,
+    result: MockCallResult3<Arg0, Arg1, Arg2, Res>,
 }
 impl <Arg0, Arg1, Arg2, Res> Expectation3<Arg0, Arg1, Arg2, Res> {
     fn check(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2) -> Res {
         self.call_match.arg0.matches(arg0).unwrap();
         self.call_match.arg1.matches(arg1).unwrap();
         self.call_match.arg2.matches(arg2).unwrap();
-        self.result.get()
+        self.result.get(arg0, arg1, arg2)
     }
 }
 impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
@@ -242,11 +319,16 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return(self, result: Res) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, result: MockCallResult::Return(result) }
+        Expectation3 { call_match: self, result: MockCallResult3::Return(result) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, result: MockCallResult::Panic(msg) }
+        Expectation3 { call_match: self, result: MockCallResult3::Panic(msg) }
+    }
+
+    pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
+            where F: Fn(&Arg0, &Arg1, &Arg2) -> Res + 'static {
+        Expectation3 { call_match: self, result: MockCallResult3::Call(Box::new(func)) }
     }
 }
 
@@ -282,7 +364,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
 #[must_use]
 pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    result: MockCallResult<Res>,
+    result: MockCallResult4<Arg0, Arg1, Arg2, Arg3, Res>,
 }
 impl <Arg0, Arg1, Arg2, Arg3, Res> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn check(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2, arg3: &Arg3) -> Res {
@@ -290,7 +372,7 @@ impl <Arg0, Arg1, Arg2, Arg3, Res> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
         self.call_match.arg1.matches(arg1).unwrap();
         self.call_match.arg2.matches(arg2).unwrap();
         self.call_match.arg3.matches(arg3).unwrap();
-        self.result.get()
+        self.result.get(arg0, arg1, arg2, arg3)
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
@@ -311,11 +393,16 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_return(self, result: Res) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, result: MockCallResult::Return(result) }
+        Expectation4 { call_match: self, result: MockCallResult4::Return(result) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, result: MockCallResult::Panic(msg) }
+        Expectation4 { call_match: self, result: MockCallResult4::Panic(msg) }
+    }
+
+    pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
+            where F: Fn(&Arg0, &Arg1, &Arg2, &Arg3) -> Res + 'static {
+        Expectation4 { call_match: self, result: MockCallResult4::Call(Box::new(func)) }
     }
 }
 
