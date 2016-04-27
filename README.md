@@ -1,17 +1,19 @@
 
-master|0.2.2
---|--
-[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers)|[![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.2.2)](https://travis-ci.org/kriomant/mockers)
+| master | 0.2.2 |
+| ------ | ----- |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.2.2)](https://travis-ci.org/kriomant/mockers) |
 
 # Mockers
 
 Mocking library for Rust.
 
+Inspired by Google Mock library for C++.
+
 ## Limitations
 
 For now it is not a full-featured mocking library, but just
 a prototype to gather feedback. For example, only methods with
-two or less arguments are supported, non-'static lifetimes are not
+four or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin, so **nightly Rust
@@ -116,7 +118,11 @@ test test_make_hotter ... FAILED
 failures:
 
 ---- test_make_hotter stdout ----
-	thread 'test_make_hotter' panicked at 'Unexpected call of `get_temperature`, no calls are expected', /Users/kriomant/Dropbox/Projects/mockers/src/lib.rs:254
+	thread 'test_make_hotter' panicked at '
+Unexpected call to `AirConditioner#0.get_temperature`
+
+There are not active expectations for same method call
+', /Users/kriomant/Dropbox/Projects/mockers/src/lib.rs:733
 note: Run with `RUST_BACKTRACE=1` for a backtrace.
 
 
@@ -156,7 +162,14 @@ Start tests again:
 ```
 …
 ---- test_make_hotter stdout ----
-	thread 'test_make_hotter' panicked at 'called `Result::unwrap()` on an `Err` value: "36 is not equal to 4"', ../src/libcore/result.rs:746
+	thread 'test_make_hotter' panicked at '
+Unexpected call to `AirConditioner#0.num`
+
+Here are active expectations for same method call:
+
+  Expectation `AirConditioner#0.set_temperature_20(4)`:
+    Arg #0: 36 is not equal to 4
+', ../src/libcore/result.rs:733
 …
 ```
 

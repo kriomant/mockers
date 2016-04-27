@@ -94,8 +94,11 @@ fn test_le_matcher_match() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
     scenario.expect(mock.num_call(le(2)).and_return(()));
-    scenario.expect(mock.num_call(le(2)).and_return(()));
     mock.num(1);
+
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.num_call(le(2)).and_return(()));
     mock.num(2);
 }
 
@@ -132,8 +135,11 @@ fn test_ge_matcher_match() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
     scenario.expect(mock.num_call(ge(2)).and_return(()));
-    scenario.expect(mock.num_call(ge(2)).and_return(()));
     mock.num(2);
+
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+    scenario.expect(mock.num_call(ge(2)).and_return(()));
     mock.num(3);
 }
 
@@ -156,7 +162,7 @@ fn test_not_matcher_match() {
 }
 
 #[test]
-#[should_panic(expected="2 matches (but shouldn\\'t): lt(2)")]
+#[should_panic(expected="2 matches (but shouldn\'t): lt(2)")]
 fn test_not_matcher_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -242,7 +248,7 @@ fn test_arg_macro_match() {
 }
 
 #[test]
-#[should_panic(expected="None isn\\'t matched by Some(_)")]
+#[should_panic(expected="None isn\'t matched by Some(_)")]
 fn test_arg_macro_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -278,7 +284,7 @@ fn test_check_macro_match() {
 }
 
 #[test]
-#[should_panic(expected="None doesn\\'t satisfy to |t: &Option<u32>| t.is_some()")]
+#[should_panic(expected="None doesn\'t satisfy to |t: &Option<u32>| t.is_some()")]
 fn test_check_macro_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();

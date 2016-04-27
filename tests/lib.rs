@@ -29,7 +29,8 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="Unexpected call of `A#0::foo`, `A#0::bar(2)` call is expected")]
+#[should_panic(expected="Unexpected call to `A#0.foo`\n\n\
+                         There are no active expectations for same method call")]
 fn test_unit() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -99,7 +100,8 @@ fn test_value_self_method() {
 }
 
 #[test]
-#[should_panic(expected="Unexpected call of `amock::foo`, `amock::bar(2)` call is expected")]
+#[should_panic(expected="Unexpected call to `amock.foo`\n\n\
+                         There are no active expectations for same method call")]
 fn test_named_mock() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_named_mock::<A>("amock".to_owned());
@@ -129,4 +131,28 @@ fn test_expect_and_call() {
     // This expectation will never be satisfied.
     scenario.expect(mock.ask_call(2).and_call(|arg| { arg+1 }));
     assert_eq!(mock.ask(2), 3);
+}
+
+#[test]
+fn test_expect_is_unordered() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.foo_call().and_return(()));
+    scenario.expect(mock.bar_call(2).and_return(()));
+
+    mock.bar(2);
+    mock.foo();
+}
+
+#[test]
+#[should_panic(expect="Call to `A#0::foo()` is already performed")]
+fn test_expect_consumes_one_call_only() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.foo_call().and_return(()));
+
+    mock.foo();
+    mock.foo();
 }
