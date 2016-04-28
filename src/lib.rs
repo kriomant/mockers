@@ -80,15 +80,38 @@ impl<Arg0, Arg1, Arg2, Arg3, T> MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
     }
 }
 
-pub trait Expectation {
+pub trait CallMatch {
     fn matches(&self, call: &Call) -> bool;
     fn matches_target(&self, call: &Call) -> bool;
-    fn is_satisfied(&self) -> bool;
-    fn satisfy(&mut self, call: &Call) -> *mut u8;
     fn validate(&self, call: &Call) -> Vec<Result<(), String>>;
     fn get_mock_id(&self) -> usize;
     fn get_method_name(&self) -> &'static str;
     fn describe(&self) -> String;
+}
+
+pub trait Expectation {
+    fn call_match(&self) -> &CallMatch;
+    fn is_satisfied(&self) -> bool;
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8;
+    fn describe(&self) -> String;
+}
+
+pub struct ExpectationNever<CM: CallMatch> {
+    call_match: CM,
+}
+impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
+    }
+    fn is_satisfied(&self) -> bool {
+        true
+    }
+    fn satisfy(&mut self, _call: &Call, mock_name: &str) -> *mut u8 {
+        panic!("{}.{} should never be called", mock_name, self.call_match().get_method_name());
+    }
+    fn describe(&self) -> String {
+        format!("{} should never be called", self.call_match.describe())
+    }
 }
 
 #[must_use]
@@ -106,6 +129,27 @@ impl<Res> CallMatch0<Res> {
             _phantom: PhantomData
         }
     }
+
+    fn get_args(call: &Call) -> &() {
+        unsafe { std::mem::transmute(call.args_ptr) }
+    }
+}
+impl<Res> CallMatch for CallMatch0<Res> {
+    fn matches_target(&self, call: &Call) -> bool {
+        self.mock_id == call.mock_id &&
+        self.method_name == call.method_name
+    }
+    fn matches(&self, call: &Call) -> bool {
+        self.matches_target(call)
+    }
+    fn validate(&self, _call: &Call) -> Vec<Result<(), String>> {
+        vec![]
+    }
+    fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_method_name(&self) -> &'static str { self.method_name }
+    fn describe(&self) -> String {
+        format!("{}()", self.method_name)
+    }
 }
 
 #[must_use]
@@ -114,27 +158,25 @@ pub struct Expectation0<Res> {
     result: Option<MockCallResult0<Res>>,
 }
 impl<Res> Expectation for Expectation0<Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.call_match.mock_id == call.mock_id &&
-        self.call_match.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        self.matches_target(call)
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, _call: &Call) -> *mut u8 {
-        let result = self.result.take().unwrap();
-        Box::into_raw(Box::new(result.get())) as *mut u8
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+        match self.result.take() {
+            Some(result) => {
+                let _args = CallMatch0::<Res>::get_args(call);
+                Box::into_raw(Box::new(result.get())) as *mut u8
+            },
+            None => {
+                panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
+            }
+        }
     }
-    fn validate(&self, _call: &Call) -> Vec<Result<(), String>> {
-        vec![]
-    }
-    fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
     fn describe(&self) -> String {
-        format!("{}()", self.get_method_name())
+        self.call_match.describe()
     }
 }
 impl<Res> CallMatch0<Res> {
@@ -149,6 +191,10 @@ impl<Res> CallMatch0<Res> {
     pub fn and_call<F>(self, func: F) -> Expectation0<Res>
             where F: Fn() -> Res + 'static {
         Expectation0 { call_match: self, result: Some(MockCallResult0::Call(Box::new(func))) }
+    }
+
+    pub fn never(self) -> ExpectationNever<Self> {
+        ExpectationNever { call_match: self }
     }
 }
 
@@ -169,22 +215,15 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
             _phantom: PhantomData
         }
     }
-}
 
-#[must_use]
-pub struct Expectation1<Arg0, Res> {
-    call_match: CallMatch1<Arg0, Res>,
-    result: Option<MockCallResult1<Arg0, Res>>,
-}
-impl<Arg0, Res> Expectation1<Arg0, Res> {
     fn get_args(call: &Call) -> &(Arg0,) {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 }
-impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
+impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
     fn matches_target(&self, call: &Call) -> bool {
-        self.call_match.mock_id == call.mock_id &&
-        self.call_match.method_name == call.method_name
+        self.mock_id == call.mock_id &&
+        self.method_name == call.method_name
     }
     fn matches(&self, call: &Call) -> bool {
         if !self.matches_target(call) {
@@ -192,25 +231,45 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
         }
 
         let args = Self::get_args(call);
-        self.call_match.arg0.matches(&args.0).is_ok()
+        self.arg0.matches(&args.0).is_ok()
+    }
+    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
+        let args = Self::get_args(call);
+        vec![ self.arg0.matches(&args.0) ]
+    }
+    fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_method_name(&self) -> &'static str { self.method_name }
+    fn describe(&self) -> String {
+        format!("{}({})", self.get_method_name(),
+                          self.arg0.describe())
+    }
+}
+
+#[must_use]
+pub struct Expectation1<Arg0, Res> {
+    call_match: CallMatch1<Arg0, Res>,
+    result: Option<MockCallResult1<Arg0, Res>>,
+}
+impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call) -> *mut u8 {
-        let result = self.result.take().unwrap();
-        let args = Self::get_args(call);
-        Box::into_raw(Box::new(result.get(&args.0))) as *mut u8
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+        match self.result.take() {
+            Some(result) => {
+                let args = CallMatch1::<Arg0, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(&args.0))) as *mut u8
+            },
+            None => {
+                panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
+            }
+        }
     }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
-        vec![ self.call_match.arg0.matches(&args.0) ]
-    }
-    fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
     fn describe(&self) -> String {
-        format!("{}({})", self.get_method_name(),
-                          self.call_match.arg0.describe())
+        self.call_match.describe()
     }
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
@@ -249,22 +308,15 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
             _phantom: PhantomData
         }
     }
-}
 
-#[must_use]
-pub struct Expectation2<Arg0, Arg1, Res> {
-    call_match: CallMatch2<Arg0, Arg1, Res>,
-    result: Option<MockCallResult2<Arg0, Arg1, Res>>,
-}
-impl <Arg0, Arg1, Res> Expectation2<Arg0, Arg1, Res> {
     fn get_args(call: &Call) -> &(Arg0, Arg1) {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 }
-impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
+impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
     fn matches_target(&self, call: &Call) -> bool {
-        self.call_match.mock_id == call.mock_id &&
-        self.call_match.method_name == call.method_name
+        self.mock_id == call.mock_id &&
+        self.method_name == call.method_name
     }
     fn matches(&self, call: &Call) -> bool {
         if !self.matches_target(call) {
@@ -272,28 +324,48 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
         }
 
         let args = Self::get_args(call);
-        self.call_match.arg0.matches(&args.0).is_ok() &&
-        self.call_match.arg1.matches(&args.1).is_ok()
+        self.arg0.matches(&args.0).is_ok() &&
+        self.arg1.matches(&args.1).is_ok()
+    }
+    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
+        let args = Self::get_args(call);
+        vec![ self.arg0.matches(&args.0),
+              self.arg1.matches(&args.1) ]
+    }
+    fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_method_name(&self) -> &'static str { self.method_name }
+    fn describe(&self) -> String {
+        format!("{}({}, {})", self.get_method_name(),
+                              self.arg0.describe(),
+                              self.arg1.describe())
+    }
+}
+
+#[must_use]
+pub struct Expectation2<Arg0, Arg1, Res> {
+    call_match: CallMatch2<Arg0, Arg1, Res>,
+    result: Option<MockCallResult2<Arg0, Arg1, Res>>,
+}
+impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call) -> *mut u8 {
-        let result = self.result.take().unwrap();
-        let args = Self::get_args(call);
-        Box::into_raw(Box::new(result.get(&args.0, &args.1))) as *mut u8
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+        match self.result.take() {
+            Some(result) => {
+                let args = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(&args.0, &args.1))) as *mut u8
+            },
+            None => {
+                panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
+            }
+        }
     }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
-        vec![ self.call_match.arg0.matches(&args.0),
-              self.call_match.arg1.matches(&args.1) ]
-    }
-    fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
     fn describe(&self) -> String {
-        format!("{}({}, {})", self.get_method_name(),
-                              self.call_match.arg0.describe(),
-                              self.call_match.arg1.describe())
+        self.call_match.describe()
     }
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
@@ -336,23 +408,15 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
             _phantom: PhantomData
         }
     }
-}
 
-
-#[must_use]
-pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
-    call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    result: Option<MockCallResult3<Arg0, Arg1, Arg2, Res>>,
-}
-impl <Arg0, Arg1, Arg2, Res> Expectation3<Arg0, Arg1, Arg2, Res> {
     fn get_args(call: &Call) -> &(Arg0, Arg1, Arg2) {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 }
-impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
+impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
     fn matches_target(&self, call: &Call) -> bool {
-        self.call_match.mock_id == call.mock_id &&
-        self.call_match.method_name == call.method_name
+        self.mock_id == call.mock_id &&
+        self.method_name == call.method_name
     }
     fn matches(&self, call: &Call) -> bool {
         if !self.matches_target(call) {
@@ -360,31 +424,51 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
         }
 
         let args = Self::get_args(call);
-        self.call_match.arg0.matches(&args.0).is_ok() &&
-        self.call_match.arg1.matches(&args.1).is_ok() &&
-        self.call_match.arg2.matches(&args.2).is_ok()
+        self.arg0.matches(&args.0).is_ok() &&
+        self.arg1.matches(&args.1).is_ok() &&
+        self.arg2.matches(&args.2).is_ok()
+    }
+    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
+        let args = Self::get_args(call);
+        vec![ self.arg0.matches(&args.0),
+              self.arg1.matches(&args.1),
+              self.arg2.matches(&args.2) ]
+    }
+    fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_method_name(&self) -> &'static str { self.method_name }
+    fn describe(&self) -> String {
+        format!("{}({}, {}, {})", self.get_method_name(),
+                                  self.arg0.describe(),
+                                  self.arg1.describe(),
+                                  self.arg2.describe())
+    }
+}
+
+#[must_use]
+pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
+    call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
+    result: Option<MockCallResult3<Arg0, Arg1, Arg2, Res>>,
+}
+impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call) -> *mut u8 {
-        let result = self.result.take().unwrap();
-        let args = Self::get_args(call);
-        Box::into_raw(Box::new(result.get(&args.0, &args.1, &args.2))) as *mut u8
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+        match self.result.take() {
+            Some(result) => {
+                let args = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(&args.0, &args.1, &args.2))) as *mut u8
+            },
+            None => {
+                panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
+            }
+        }
     }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
-        vec![ self.call_match.arg0.matches(&args.0),
-              self.call_match.arg1.matches(&args.1),
-              self.call_match.arg2.matches(&args.2) ]
-    }
-    fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
     fn describe(&self) -> String {
-        format!("{}({}, {}, {})", self.get_method_name(),
-                                  self.call_match.arg0.describe(),
-                                  self.call_match.arg1.describe(),
-                                  self.call_match.arg2.describe())
+        self.call_match.describe()
     }
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
@@ -429,22 +513,15 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
             _phantom: PhantomData
         }
     }
-}
 
-#[must_use]
-pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-    call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    result: Option<MockCallResult4<Arg0, Arg1, Arg2, Arg3, Res>>,
-}
-impl <Arg0, Arg1, Arg2, Arg3, Res> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn get_args(call: &Call) -> &(Arg0, Arg1, Arg2, Arg3) {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 }
-impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
+impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn matches_target(&self, call: &Call) -> bool {
-        self.call_match.mock_id == call.mock_id &&
-        self.call_match.method_name == call.method_name
+        self.mock_id == call.mock_id &&
+        self.method_name == call.method_name
     }
     fn matches(&self, call: &Call) -> bool {
         if !self.matches_target(call) {
@@ -452,35 +529,54 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
         }
 
         let args = Self::get_args(call);
-        self.call_match.arg0.matches(&args.0).is_ok() &&
-        self.call_match.arg1.matches(&args.1).is_ok() &&
-        self.call_match.arg2.matches(&args.2).is_ok() &&
-        self.call_match.arg3.matches(&args.3).is_ok()
+        self.arg0.matches(&args.0).is_ok() &&
+        self.arg1.matches(&args.1).is_ok() &&
+        self.arg2.matches(&args.2).is_ok() &&
+        self.arg3.matches(&args.3).is_ok()
+    }
+    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
+        let args = Self::get_args(call);
+        vec![ self.arg0.matches(&args.0),
+              self.arg1.matches(&args.1),
+              self.arg2.matches(&args.2),
+              self.arg3.matches(&args.3) ]
+    }
+    fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_method_name(&self) -> &'static str { self.method_name }
+    fn describe(&self) -> String {
+        format!("{}({}, {}, {}, {})", self.get_method_name(),
+                                      self.arg0.describe(),
+                                      self.arg1.describe(),
+                                      self.arg2.describe(),
+                                      self.arg3.describe())
+    }
+}
+
+#[must_use]
+pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
+    call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
+    result: Option<MockCallResult4<Arg0, Arg1, Arg2, Arg3, Res>>,
+}
+impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
+    fn call_match(&self) -> &CallMatch {
+        &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call) -> *mut u8 {
-        let result = self.result.take().unwrap();
-        let args = Self::get_args(call);
-        Box::into_raw(Box::new(result.get(&args.0, &args.1,
-                                          &args.2, &args.3))) as *mut u8
+    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+        match self.result.take() {
+            Some(result) => {
+                let args = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(&args.0, &args.1, &args.2, &args.3))) as *mut u8
+            },
+            None => {
+                panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
+            }
+        }
     }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
-        vec![ self.call_match.arg0.matches(&args.0),
-              self.call_match.arg1.matches(&args.1),
-              self.call_match.arg2.matches(&args.2),
-              self.call_match.arg3.matches(&args.3) ]
-    }
-    fn get_mock_id(&self) -> usize { self.call_match.mock_id }
-    fn get_method_name(&self) -> &'static str { self.call_match.method_name }
     fn describe(&self) -> String {
-        format!("{}({}, {}, {}, {})", self.get_method_name(),
-                                      self.call_match.arg0.describe(),
-                                      self.call_match.arg1.describe(),
-                                      self.call_match.arg2.describe(),
-                                      self.call_match.arg3.describe())
+        self.call_match.describe()
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
@@ -627,8 +723,8 @@ impl Drop for Scenario {
         if active_expectations.peek().is_some() {
             let mut s = String::from("Expected calls are not performed:\n");
             for expectation in active_expectations {
-                let mock_name = mock_names.get(&expectation.get_mock_id()).unwrap();
-                s.push_str(&format!("`{}::{}`\n", mock_name, expectation.describe()));
+                let mock_name = mock_names.get(&expectation.call_match().get_mock_id()).unwrap();
+                s.push_str(&format!("`{}.{}`\n", mock_name, expectation.describe()));
             }
             panic!(s);
         }
@@ -646,19 +742,15 @@ impl ScenarioInternals {
     pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
         if self.expectations.is_empty() {
             let mock_name = self.mock_names.get(&mock_id).unwrap();
-            panic!("\nUnexpected call to `{}::{}`, no calls are expected", mock_name, method_name);
+            panic!("\nUnexpected call to `{}.{}`, no calls are expected", mock_name, method_name);
         }
 
         let call = Call { mock_id: mock_id, method_name: method_name, args_ptr: args_ptr };
 
         for expectation in self.expectations.iter_mut().rev() {
-            if expectation.matches(&call) {
-                if expectation.is_satisfied() {
-                    let mock_name = self.mock_names.get(&mock_id).unwrap();
-                    panic!("Call to `{}::{}` is already performed", mock_name, expectation.describe());
-                }
-
-                return expectation.satisfy(&call);
+            if expectation.call_match().matches(&call) {
+                let mock_name = self.mock_names.get(&mock_id).unwrap();
+                return expectation.satisfy(&call, mock_name);
             }
         }
 
@@ -671,14 +763,14 @@ impl ScenarioInternals {
         let mut msg = String::new();
         msg.push_str(&format!("\nUnexpected call to `{}.{}`\n\n", mock_name, method_name));
         for expectation in self.expectations.iter().rev() {
-            if !expectation.is_satisfied() && expectation.matches_target(&call) {
+            if !expectation.is_satisfied() && expectation.call_match().matches_target(&call) {
                 if first_match {
                     msg.push_str(&format!("Here are active expectations for same method call:\n"));
                     first_match = false;
                 }
 
                 msg.push_str(&format!("\n  Expectation `{}.{}`:\n", mock_name, expectation.describe()));
-                for (index, res) in expectation.validate(&call).iter().enumerate() {
+                for (index, res) in expectation.call_match().validate(&call).iter().enumerate() {
                     match res {
                         &Err(ref err) => msg.push_str(&format!("    Arg #{}: {}\n", index, err)),
                         &Ok(()) => ()

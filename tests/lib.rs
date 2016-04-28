@@ -66,7 +66,7 @@ fn test_arg_match_success() {
 
 
 #[test]
-#[should_panic(expected="Expected calls are not performed:\n`A#0::bar(_)`\n")]
+#[should_panic(expected="Expected calls are not performed:\n`A#0.bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -146,7 +146,7 @@ fn test_expect_is_unordered() {
 }
 
 #[test]
-#[should_panic(expect="Call to `A#0::foo()` is already performed")]
+#[should_panic(expect="A#0.foo was already called earlier")]
 fn test_expect_consumes_one_call_only() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -154,5 +154,24 @@ fn test_expect_consumes_one_call_only() {
     scenario.expect(mock.foo_call().and_return(()));
 
     mock.foo();
+    mock.foo();
+}
+
+#[test]
+fn test_never_satisfied() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.foo_call().never());
+}
+
+#[test]
+#[should_panic(expect="A#0.foo should never be called")]
+fn test_never_not_satisfied() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.foo_call().never());
+
     mock.foo();
 }
