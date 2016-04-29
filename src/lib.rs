@@ -9,77 +9,77 @@ use std::boxed::FnBox;
 
 pub mod matchers;
 
-enum MockCallResult0<T> {
+enum Action0<T> {
     Return(T),
     Panic(String),
     Call(Box<FnBox() -> T>),
 }
-impl<T> MockCallResult0<T> {
-    fn get(self) -> T {
+impl<T> Action0<T> {
+    fn call(self) -> T {
         match self {
-            MockCallResult0::Return(value) => value,
-            MockCallResult0::Panic(msg) => panic!(msg),
-            MockCallResult0::Call(func) => func(),
+            Action0::Return(value) => value,
+            Action0::Panic(msg) => panic!(msg),
+            Action0::Call(func) => func(),
         }
     }
 }
 
-enum MockCallResult1<Arg0, T> {
+enum Action1<Arg0, T> {
     Return(T),
     Panic(String),
     Call(Box<FnBox(Arg0) -> T>),
 }
-impl<Arg0, T> MockCallResult1<Arg0, T> {
-    fn get(self, arg0: Arg0) -> T {
+impl<Arg0, T> Action1<Arg0, T> {
+    fn call(self, arg0: Arg0) -> T {
         match self {
-            MockCallResult1::Return(value) => value,
-            MockCallResult1::Panic(msg) => panic!(msg),
-            MockCallResult1::Call(func) => func.call_box((arg0,)),
+            Action1::Return(value) => value,
+            Action1::Panic(msg) => panic!(msg),
+            Action1::Call(func) => func.call_box((arg0,)),
         }
     }
 }
 
-enum MockCallResult2<Arg0, Arg1, T> {
+enum Action2<Arg0, Arg1, T> {
     Return(T),
     Panic(String),
     Call(Box<FnBox(Arg0, Arg1) -> T>),
 }
-impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
-    fn get(self, arg0: Arg0, arg1: Arg1) -> T {
+impl<Arg0, Arg1, T> Action2<Arg0, Arg1, T> {
+    fn call(self, arg0: Arg0, arg1: Arg1) -> T {
         match self {
-            MockCallResult2::Return(value) => value,
-            MockCallResult2::Panic(msg) => panic!(msg),
-            MockCallResult2::Call(func) => func.call_box((arg0, arg1)),
+            Action2::Return(value) => value,
+            Action2::Panic(msg) => panic!(msg),
+            Action2::Call(func) => func.call_box((arg0, arg1)),
         }
     }
 }
 
-enum MockCallResult3<Arg0, Arg1, Arg2, T> {
+enum Action3<Arg0, Arg1, Arg2, T> {
     Return(T),
     Panic(String),
     Call(Box<FnBox(Arg0, Arg1, Arg2) -> T>),
 }
-impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
-    fn get(self, arg0: Arg0, arg1: Arg1, arg2: Arg2) -> T {
+impl<Arg0, Arg1, Arg2, T> Action3<Arg0, Arg1, Arg2, T> {
+    fn call(self, arg0: Arg0, arg1: Arg1, arg2: Arg2) -> T {
         match self {
-            MockCallResult3::Return(value) => value,
-            MockCallResult3::Panic(msg) => panic!(msg),
-            MockCallResult3::Call(func) => func.call_box((arg0, arg1, arg2)),
+            Action3::Return(value) => value,
+            Action3::Panic(msg) => panic!(msg),
+            Action3::Call(func) => func.call_box((arg0, arg1, arg2)),
         }
     }
 }
 
-enum MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
+enum Action4<Arg0, Arg1, Arg2, Arg3, T> {
     Return(T),
     Panic(String),
     Call(Box<FnBox(Arg0, Arg1, Arg2, Arg3) -> T>),
 }
-impl<Arg0, Arg1, Arg2, Arg3, T> MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
-    fn get(self, arg0: Arg0, arg1: Arg1, arg2: Arg2, arg3: Arg3) -> T {
+impl<Arg0, Arg1, Arg2, Arg3, T> Action4<Arg0, Arg1, Arg2, Arg3, T> {
+    fn call(self, arg0: Arg0, arg1: Arg1, arg2: Arg2, arg3: Arg3) -> T {
         match self {
-            MockCallResult4::Return(value) => value,
-            MockCallResult4::Panic(msg) => panic!(msg),
-            MockCallResult4::Call(func) => func.call_box((arg0, arg1, arg2, arg3)),
+            Action4::Return(value) => value,
+            Action4::Panic(msg) => panic!(msg),
+            Action4::Call(func) => func.call_box((arg0, arg1, arg2, arg3)),
         }
     }
 }
@@ -159,20 +159,20 @@ impl<Res> CallMatch for CallMatch0<Res> {
 #[must_use]
 pub struct Expectation0<Res> {
     call_match: CallMatch0<Res>,
-    result: Option<MockCallResult0<Res>>,
+    action: Option<Action0<Res>>,
 }
 impl<Res> Expectation for Expectation0<Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.result.is_none()
+        self.action.is_none()
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
-        match self.result.take() {
+        match self.action.take() {
             Some(result) => {
                 let _args = CallMatch0::<Res>::get_args(call);
-                Box::into_raw(Box::new(result.get())) as *mut u8
+                Box::into_raw(Box::new(result.call())) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -185,16 +185,16 @@ impl<Res> Expectation for Expectation0<Res> {
 }
 impl<Res> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
-        Expectation0 { call_match: self, result: Some(MockCallResult0::Return(result)) }
+        Expectation0 { call_match: self, action: Some(Action0::Return(result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation0<Res> {
-        Expectation0 { call_match: self, result: Some(MockCallResult0::Panic(msg)) }
+        Expectation0 { call_match: self, action: Some(Action0::Panic(msg)) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation0<Res>
             where F: FnOnce() -> Res + 'static {
-        Expectation0 { call_match: self, result: Some(MockCallResult0::Call(Box::new(func))) }
+        Expectation0 { call_match: self, action: Some(Action0::Call(Box::new(func))) }
     }
 
     pub fn never(self) -> ExpectationNever<Self> {
@@ -256,20 +256,20 @@ impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
 #[must_use]
 pub struct Expectation1<Arg0, Res> {
     call_match: CallMatch1<Arg0, Res>,
-    result: Option<MockCallResult1<Arg0, Res>>,
+    action: Option<Action1<Arg0, Res>>,
 }
 impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.result.is_none()
+        self.action.is_none()
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
-        match self.result.take() {
+        match self.action.take() {
             Some(result) => {
                 let args = CallMatch1::<Arg0, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(args.0))) as *mut u8
+                Box::into_raw(Box::new(result.call(args.0))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -282,16 +282,16 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, result: Some(MockCallResult1::Return(result)) }
+        Expectation1 { call_match: self, action: Some(Action1::Return(result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, result: Some(MockCallResult1::Panic(msg)) }
+        Expectation1 { call_match: self, action: Some(Action1::Panic(msg)) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
             where F: FnOnce(Arg0) -> Res + 'static {
-        Expectation1 { call_match: self, result: Some(MockCallResult1::Call(Box::new(func))) }
+        Expectation1 { call_match: self, action: Some(Action1::Call(Box::new(func))) }
     }
 }
 
@@ -356,20 +356,20 @@ impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
 #[must_use]
 pub struct Expectation2<Arg0, Arg1, Res> {
     call_match: CallMatch2<Arg0, Arg1, Res>,
-    result: Option<MockCallResult2<Arg0, Arg1, Res>>,
+    action: Option<Action2<Arg0, Arg1, Res>>,
 }
 impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.result.is_none()
+        self.action.is_none()
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
-        match self.result.take() {
+        match self.action.take() {
             Some(result) => {
                 let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(arg0, arg1))) as *mut u8
+                Box::into_raw(Box::new(result.call(arg0, arg1))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -382,16 +382,16 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, result: Some(MockCallResult2::Return(result)) }
+        Expectation2 { call_match: self, action: Some(Action2::Return(result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, result: Some(MockCallResult2::Panic(msg)) }
+        Expectation2 { call_match: self, action: Some(Action2::Panic(msg)) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
             where F: FnOnce(Arg0, Arg1) -> Res + 'static {
-        Expectation2 { call_match: self, result: Some(MockCallResult2::Call(Box::new(func))) }
+        Expectation2 { call_match: self, action: Some(Action2::Call(Box::new(func))) }
     }
 }
 
@@ -463,20 +463,20 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
 #[must_use]
 pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
     call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    result: Option<MockCallResult3<Arg0, Arg1, Arg2, Res>>,
+    action: Option<Action3<Arg0, Arg1, Arg2, Res>>,
 }
 impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.result.is_none()
+        self.action.is_none()
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
-        match self.result.take() {
+        match self.action.take() {
             Some(result) => {
                 let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(arg0, arg1, arg2))) as *mut u8
+                Box::into_raw(Box::new(result.call(arg0, arg1, arg2))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -489,16 +489,16 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return(self, result: Res) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, result: Some(MockCallResult3::Return(result)) }
+        Expectation3 { call_match: self, action: Some(Action3::Return(result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, result: Some(MockCallResult3::Panic(msg)) }
+        Expectation3 { call_match: self, action: Some(Action3::Panic(msg)) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
             where F: FnOnce(Arg0, Arg1, Arg2) -> Res + 'static {
-        Expectation3 { call_match: self, result: Some(MockCallResult3::Call(Box::new(func))) }
+        Expectation3 { call_match: self, action: Some(Action3::Call(Box::new(func))) }
     }
 }
 
@@ -575,20 +575,20 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg
 #[must_use]
 pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    result: Option<MockCallResult4<Arg0, Arg1, Arg2, Arg3, Res>>,
+    action: Option<Action4<Arg0, Arg1, Arg2, Arg3, Res>>,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.result.is_none()
+        self.action.is_none()
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
-        match self.result.take() {
+        match self.action.take() {
             Some(result) => {
                 let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(arg0, arg1, arg2, arg3))) as *mut u8
+                Box::into_raw(Box::new(result.call(arg0, arg1, arg2, arg3))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -601,16 +601,16 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_return(self, result: Res) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, result: Some(MockCallResult4::Return(result)) }
+        Expectation4 { call_match: self, action: Some(Action4::Return(result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, result: Some(MockCallResult4::Panic(msg)) }
+        Expectation4 { call_match: self, action: Some(Action4::Panic(msg)) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
             where F: FnOnce(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
-        Expectation4 { call_match: self, result: Some(MockCallResult4::Call(Box::new(func))) }
+        Expectation4 { call_match: self, action: Some(Action4::Call(Box::new(func))) }
     }
 }
 
