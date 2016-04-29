@@ -14,6 +14,7 @@ pub trait A {
     fn ask(&self, arg: u32) -> u32;
     fn consume(self);
     fn consume_result(&self) -> String;
+    fn consume_arg(&self, arg: String) -> String;
 }
 
 mock!{
@@ -27,6 +28,7 @@ mock!{
         fn ask(&self, arg: u32) -> u32;
         fn consume(self);
         fn consume_result(&self) -> String;
+        fn consume_arg(&self, arg: String) -> String;
     }
 }
 
@@ -198,5 +200,16 @@ fn test_consume_call_result() {
     scenario.expect(mock.consume_result_call().and_call(move || { result }));
 
     assert_eq!(mock.consume_result(), "ho-ho");
+}
+
+#[test]
+fn test_consume_argument() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.consume_arg_call(ANY).and_call(|arg| { arg }));
+
+    let arg = "ho-ho".to_owned();
+    assert_eq!(mock.consume_arg(arg), "ho-ho");
 }
 

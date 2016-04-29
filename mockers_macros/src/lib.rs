@@ -363,7 +363,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
 ///     let args = (foo, bar);
 ///     let args_ptr: *const u8 = unsafe { std::mem::transmute(&args) };
 ///     let result_ptr: *mut u8 =
-///         self.scenario.borrow_mut().call(self.mock_id, 0 /* mock_id */, args_ptr);
+///         self.scenario.borrow_mut().verify(self.mock_id, 0 /* mock_id */, args_ptr);
 ///     let result: Box<u8> = unsafe { Box::from_raw(result_ptr as *mut u8) };
 ///     *result;
 /// }
@@ -390,9 +390,12 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
     call_match_args.push(P(return_type.clone()));
 
     let fn_mock = quote_block!(cx, {
-        let args = $args_tuple;
-        let args_ptr: *const u8 = unsafe { std::mem::transmute(&args) };
-        let result_ptr: *mut u8 = self.scenario.borrow_mut().call(self.mock_id, $method_name, args_ptr);
+        let args = Box::new($args_tuple);
+        let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
+        let call = ::mockers::Call { mock_id: self.mock_id,
+                                     method_name: $method_name,
+                                     args_ptr: args_ptr };
+        let result_ptr: *mut u8 = self.scenario.borrow_mut().verify(call);
         let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
         *result
     }).unwrap();

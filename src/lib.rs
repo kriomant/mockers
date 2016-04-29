@@ -1,4 +1,5 @@
 #![feature(fnbox)]
+#![feature(box_patterns)]
 
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -26,10 +27,10 @@ impl<T> MockCallResult0<T> {
 enum MockCallResult1<Arg0, T> {
     Return(T),
     Panic(String),
-    Call(Box<FnBox(&Arg0) -> T>),
+    Call(Box<FnBox(Arg0) -> T>),
 }
 impl<Arg0, T> MockCallResult1<Arg0, T> {
-    fn get(self, arg0: &Arg0) -> T {
+    fn get(self, arg0: Arg0) -> T {
         match self {
             MockCallResult1::Return(value) => value,
             MockCallResult1::Panic(msg) => panic!(msg),
@@ -41,10 +42,10 @@ impl<Arg0, T> MockCallResult1<Arg0, T> {
 enum MockCallResult2<Arg0, Arg1, T> {
     Return(T),
     Panic(String),
-    Call(Box<FnBox(&Arg0, &Arg1) -> T>),
+    Call(Box<FnBox(Arg0, Arg1) -> T>),
 }
 impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
-    fn get(self, arg0: &Arg0, arg1: &Arg1) -> T {
+    fn get(self, arg0: Arg0, arg1: Arg1) -> T {
         match self {
             MockCallResult2::Return(value) => value,
             MockCallResult2::Panic(msg) => panic!(msg),
@@ -56,10 +57,10 @@ impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
 enum MockCallResult3<Arg0, Arg1, Arg2, T> {
     Return(T),
     Panic(String),
-    Call(Box<FnBox(&Arg0, &Arg1, &Arg2) -> T>),
+    Call(Box<FnBox(Arg0, Arg1, Arg2) -> T>),
 }
 impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
-    fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2) -> T {
+    fn get(self, arg0: Arg0, arg1: Arg1, arg2: Arg2) -> T {
         match self {
             MockCallResult3::Return(value) => value,
             MockCallResult3::Panic(msg) => panic!(msg),
@@ -71,10 +72,10 @@ impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
 enum MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
     Return(T),
     Panic(String),
-    Call(Box<FnBox(&Arg0, &Arg1, &Arg2, &Arg3) -> T>),
+    Call(Box<FnBox(Arg0, Arg1, Arg2, Arg3) -> T>),
 }
 impl<Arg0, Arg1, Arg2, Arg3, T> MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
-    fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2, arg3: &Arg3) -> T {
+    fn get(self, arg0: Arg0, arg1: Arg1, arg2: Arg2, arg3: Arg3) -> T {
         match self {
             MockCallResult4::Return(value) => value,
             MockCallResult4::Panic(msg) => panic!(msg),
@@ -95,7 +96,7 @@ pub trait CallMatch {
 pub trait Expectation {
     fn call_match(&self) -> &CallMatch;
     fn is_satisfied(&self) -> bool;
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8;
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8;
     fn describe(&self) -> String;
 }
 
@@ -109,7 +110,7 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     fn is_satisfied(&self) -> bool {
         true
     }
-    fn satisfy(&mut self, _call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, _call: Call, mock_name: &str) -> *mut u8 {
         panic!("{}.{} should never be called", mock_name, self.call_match().get_method_name());
     }
     fn describe(&self) -> String {
@@ -133,8 +134,8 @@ impl<Res> CallMatch0<Res> {
         }
     }
 
-    fn get_args(call: &Call) -> &() {
-        unsafe { std::mem::transmute(call.args_ptr) }
+    fn get_args(call: Call) -> Box<()> {
+        unsafe { Box::from_raw(call.args_ptr as *mut ()) }
     }
 }
 impl<Res> CallMatch for CallMatch0<Res> {
@@ -167,7 +168,7 @@ impl<Res> Expectation for Expectation0<Res> {
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.result.take() {
             Some(result) => {
                 let _args = CallMatch0::<Res>::get_args(call);
@@ -219,8 +220,12 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
         }
     }
 
-    fn get_args(call: &Call) -> &(Arg0,) {
+    fn get_args_ref(call: &Call) -> &mut (Arg0,) {
         unsafe { std::mem::transmute(call.args_ptr) }
+    }
+
+    fn get_args(call: Call) -> Box<(Arg0,)> {
+        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0,)) }
     }
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
@@ -233,11 +238,11 @@ impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
             return false;
         }
 
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok()
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         vec![ self.arg0.matches(&args.0) ]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
@@ -260,11 +265,11 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.result.take() {
             Some(result) => {
                 let args = CallMatch1::<Arg0, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(&args.0))) as *mut u8
+                Box::into_raw(Box::new(result.get(args.0))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -285,7 +290,7 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
-            where F: FnOnce(&Arg0) -> Res + 'static {
+            where F: FnOnce(Arg0) -> Res + 'static {
         Expectation1 { call_match: self, result: Some(MockCallResult1::Call(Box::new(func))) }
     }
 }
@@ -312,8 +317,12 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
         }
     }
 
-    fn get_args(call: &Call) -> &(Arg0, Arg1) {
+    fn get_args_ref(call: &Call) -> &mut (Arg0, Arg1) {
         unsafe { std::mem::transmute(call.args_ptr) }
+    }
+
+    fn get_args(call: Call) -> Box<(Arg0, Arg1)> {
+        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1)) }
     }
 }
 impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
@@ -326,12 +335,12 @@ impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
             return false;
         }
 
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
         self.arg1.matches(&args.1).is_ok()
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         vec![ self.arg0.matches(&args.0),
               self.arg1.matches(&args.1) ]
     }
@@ -356,11 +365,11 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.result.take() {
             Some(result) => {
-                let args = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(&args.0, &args.1))) as *mut u8
+                let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(arg0, arg1))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -381,7 +390,7 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
-            where F: FnOnce(&Arg0, &Arg1) -> Res + 'static {
+            where F: FnOnce(Arg0, Arg1) -> Res + 'static {
         Expectation2 { call_match: self, result: Some(MockCallResult2::Call(Box::new(func))) }
     }
 }
@@ -412,8 +421,12 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
         }
     }
 
-    fn get_args(call: &Call) -> &(Arg0, Arg1, Arg2) {
+    fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2) {
         unsafe { std::mem::transmute(call.args_ptr) }
+    }
+
+    fn get_args(call: Call) -> Box<(Arg0, Arg1, Arg2)> {
+        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1, Arg2)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
@@ -426,13 +439,13 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
             return false;
         }
 
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
         self.arg1.matches(&args.1).is_ok() &&
         self.arg2.matches(&args.2).is_ok()
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         vec![ self.arg0.matches(&args.0),
               self.arg1.matches(&args.1),
               self.arg2.matches(&args.2) ]
@@ -459,11 +472,11 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.result.take() {
             Some(result) => {
-                let args = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(&args.0, &args.1, &args.2))) as *mut u8
+                let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(arg0, arg1, arg2))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -484,7 +497,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
-            where F: FnOnce(&Arg0, &Arg1, &Arg2) -> Res + 'static {
+            where F: FnOnce(Arg0, Arg1, Arg2) -> Res + 'static {
         Expectation3 { call_match: self, result: Some(MockCallResult3::Call(Box::new(func))) }
     }
 }
@@ -517,8 +530,12 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
         }
     }
 
-    fn get_args(call: &Call) -> &(Arg0, Arg1, Arg2, Arg3) {
+    fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2, Arg3) {
         unsafe { std::mem::transmute(call.args_ptr) }
+    }
+
+    fn get_args(call: Call) -> Box<(Arg0, Arg1, Arg2, Arg3)> {
+        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1, Arg2, Arg3)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
@@ -531,14 +548,14 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg
             return false;
         }
 
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
         self.arg1.matches(&args.1).is_ok() &&
         self.arg2.matches(&args.2).is_ok() &&
         self.arg3.matches(&args.3).is_ok()
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args(call);
+        let args = Self::get_args_ref(call);
         vec![ self.arg0.matches(&args.0),
               self.arg1.matches(&args.1),
               self.arg2.matches(&args.2),
@@ -567,11 +584,11 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
     fn is_satisfied(&self) -> bool {
         self.result.is_none()
     }
-    fn satisfy(&mut self, call: &Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.result.take() {
             Some(result) => {
-                let args = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                Box::into_raw(Box::new(result.get(&args.0, &args.1, &args.2, &args.3))) as *mut u8
+                let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+                Box::into_raw(Box::new(result.get(arg0, arg1, arg2, arg3))) as *mut u8
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -592,7 +609,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
-            where F: FnOnce(&Arg0, &Arg1, &Arg2, &Arg3) -> Res + 'static {
+            where F: FnOnce(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
         Expectation4 { call_match: self, result: Some(MockCallResult4::Call(Box::new(func))) }
     }
 }
@@ -735,25 +752,23 @@ impl Drop for Scenario {
 }
 
 pub struct Call {
-    mock_id: usize,
-    method_name: &'static str,
-    args_ptr: *const u8,
+    pub mock_id: usize,
+    pub method_name: &'static str,
+    pub args_ptr: *const u8,
 }
 
 impl ScenarioInternals {
     /// Verify call performed on mock object
-    pub fn call(&mut self, mock_id: usize, method_name: &'static str, args_ptr: *const u8) -> *mut u8 {
+    pub fn verify(&mut self, call: Call) -> *mut u8 {
         if self.expectations.is_empty() {
-            let mock_name = self.mock_names.get(&mock_id).unwrap();
-            panic!("\nUnexpected call to `{}.{}`, no calls are expected", mock_name, method_name);
+            let mock_name = self.mock_names.get(&call.mock_id).unwrap();
+            panic!("\nUnexpected call to `{}.{}`, no calls are expected", mock_name, call.method_name);
         }
-
-        let call = Call { mock_id: mock_id, method_name: method_name, args_ptr: args_ptr };
 
         for expectation in self.expectations.iter_mut().rev() {
             if expectation.call_match().matches(&call) {
-                let mock_name = self.mock_names.get(&mock_id).unwrap();
-                return expectation.satisfy(&call, mock_name);
+                let mock_name = self.mock_names.get(&call.mock_id).unwrap();
+                return expectation.satisfy(call, mock_name);
             }
         }
 
@@ -761,10 +776,10 @@ impl ScenarioInternals {
         // because of unexpected argument values. So check active expectations
         // with matching target (i.e. mock and method) and validate arguments.
         let mut first_match = true;
-        let mock_name = self.mock_names.get(&mock_id).unwrap();
+        let mock_name = self.mock_names.get(&call.mock_id).unwrap();
 
         let mut msg = String::new();
-        msg.push_str(&format!("\nUnexpected call to `{}.{}`\n\n", mock_name, method_name));
+        msg.push_str(&format!("\nUnexpected call to `{}.{}`\n\n", mock_name, call.method_name));
         for expectation in self.expectations.iter().rev() {
             if !expectation.is_satisfied() && expectation.call_match().matches_target(&call) {
                 if first_match {
