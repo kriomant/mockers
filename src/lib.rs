@@ -1,14 +1,17 @@
+#![feature(fnbox)]
+
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::boxed::FnBox;
 
 pub mod matchers;
 
 enum MockCallResult0<T> {
     Return(T),
     Panic(String),
-    Call(Box<Fn() -> T>),
+    Call(Box<FnBox() -> T>),
 }
 impl<T> MockCallResult0<T> {
     fn get(self) -> T {
@@ -23,14 +26,14 @@ impl<T> MockCallResult0<T> {
 enum MockCallResult1<Arg0, T> {
     Return(T),
     Panic(String),
-    Call(Box<Fn(&Arg0) -> T>),
+    Call(Box<FnBox(&Arg0) -> T>),
 }
 impl<Arg0, T> MockCallResult1<Arg0, T> {
     fn get(self, arg0: &Arg0) -> T {
         match self {
             MockCallResult1::Return(value) => value,
             MockCallResult1::Panic(msg) => panic!(msg),
-            MockCallResult1::Call(func) => func(arg0),
+            MockCallResult1::Call(func) => func.call_box((arg0,)),
         }
     }
 }
@@ -38,14 +41,14 @@ impl<Arg0, T> MockCallResult1<Arg0, T> {
 enum MockCallResult2<Arg0, Arg1, T> {
     Return(T),
     Panic(String),
-    Call(Box<Fn(&Arg0, &Arg1) -> T>),
+    Call(Box<FnBox(&Arg0, &Arg1) -> T>),
 }
 impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
     fn get(self, arg0: &Arg0, arg1: &Arg1) -> T {
         match self {
             MockCallResult2::Return(value) => value,
             MockCallResult2::Panic(msg) => panic!(msg),
-            MockCallResult2::Call(func) => func(arg0, arg1),
+            MockCallResult2::Call(func) => func.call_box((arg0, arg1)),
         }
     }
 }
@@ -53,14 +56,14 @@ impl<Arg0, Arg1, T> MockCallResult2<Arg0, Arg1, T> {
 enum MockCallResult3<Arg0, Arg1, Arg2, T> {
     Return(T),
     Panic(String),
-    Call(Box<Fn(&Arg0, &Arg1, &Arg2) -> T>),
+    Call(Box<FnBox(&Arg0, &Arg1, &Arg2) -> T>),
 }
 impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
     fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2) -> T {
         match self {
             MockCallResult3::Return(value) => value,
             MockCallResult3::Panic(msg) => panic!(msg),
-            MockCallResult3::Call(func) => func(arg0, arg1, arg2),
+            MockCallResult3::Call(func) => func.call_box((arg0, arg1, arg2)),
         }
     }
 }
@@ -68,14 +71,14 @@ impl<Arg0, Arg1, Arg2, T> MockCallResult3<Arg0, Arg1, Arg2, T> {
 enum MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
     Return(T),
     Panic(String),
-    Call(Box<Fn(&Arg0, &Arg1, &Arg2, &Arg3) -> T>),
+    Call(Box<FnBox(&Arg0, &Arg1, &Arg2, &Arg3) -> T>),
 }
 impl<Arg0, Arg1, Arg2, Arg3, T> MockCallResult4<Arg0, Arg1, Arg2, Arg3, T> {
     fn get(self, arg0: &Arg0, arg1: &Arg1, arg2: &Arg2, arg3: &Arg3) -> T {
         match self {
             MockCallResult4::Return(value) => value,
             MockCallResult4::Panic(msg) => panic!(msg),
-            MockCallResult4::Call(func) => func(arg0, arg1, arg2, arg3),
+            MockCallResult4::Call(func) => func.call_box((arg0, arg1, arg2, arg3)),
         }
     }
 }
@@ -189,7 +192,7 @@ impl<Res> CallMatch0<Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation0<Res>
-            where F: Fn() -> Res + 'static {
+            where F: FnOnce() -> Res + 'static {
         Expectation0 { call_match: self, result: Some(MockCallResult0::Call(Box::new(func))) }
     }
 
@@ -282,7 +285,7 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
-            where F: Fn(&Arg0) -> Res + 'static {
+            where F: FnOnce(&Arg0) -> Res + 'static {
         Expectation1 { call_match: self, result: Some(MockCallResult1::Call(Box::new(func))) }
     }
 }
@@ -378,7 +381,7 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
-            where F: Fn(&Arg0, &Arg1) -> Res + 'static {
+            where F: FnOnce(&Arg0, &Arg1) -> Res + 'static {
         Expectation2 { call_match: self, result: Some(MockCallResult2::Call(Box::new(func))) }
     }
 }
@@ -481,7 +484,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
-            where F: Fn(&Arg0, &Arg1, &Arg2) -> Res + 'static {
+            where F: FnOnce(&Arg0, &Arg1, &Arg2) -> Res + 'static {
         Expectation3 { call_match: self, result: Some(MockCallResult3::Call(Box::new(func))) }
     }
 }
@@ -589,7 +592,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
-            where F: Fn(&Arg0, &Arg1, &Arg2, &Arg3) -> Res + 'static {
+            where F: FnOnce(&Arg0, &Arg1, &Arg2, &Arg3) -> Res + 'static {
         Expectation4 { call_match: self, result: Some(MockCallResult4::Call(Box::new(func))) }
     }
 }

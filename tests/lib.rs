@@ -13,6 +13,7 @@ pub trait A {
     fn modify(&mut self);
     fn ask(&self, arg: u32) -> u32;
     fn consume(self);
+    fn consume_result(&self) -> String;
 }
 
 mock!{
@@ -25,6 +26,7 @@ mock!{
         fn modify(&mut self);
         fn ask(&self, arg: u32) -> u32;
         fn consume(self);
+        fn consume_result(&self) -> String;
     }
 }
 
@@ -175,3 +177,26 @@ fn test_never_not_satisfied() {
 
     mock.foo();
 }
+
+#[test]
+fn test_consume_result() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    let result = "ho-ho".to_owned();
+    scenario.expect(mock.consume_result_call().and_return(result));
+
+    assert_eq!(mock.consume_result(), "ho-ho");
+}
+
+#[test]
+fn test_consume_call_result() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    let result = "ho-ho".to_owned();
+    scenario.expect(mock.consume_result_call().and_call(move || { result }));
+
+    assert_eq!(mock.consume_result(), "ho-ho");
+}
+
