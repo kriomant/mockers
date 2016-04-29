@@ -3,6 +3,9 @@
 
 extern crate mockers;
 
+use std::rc::Rc;
+use std::panic::AssertUnwindSafe;
+
 use mockers::Scenario;
 use mockers::matchers::{ANY, lt};
 
@@ -15,6 +18,7 @@ pub trait A {
     fn consume(self);
     fn consume_result(&self) -> String;
     fn consume_arg(&self, arg: String) -> String;
+    fn consume_rc(&self, arg: Rc<usize>);
 }
 
 mock!{
@@ -29,6 +33,7 @@ mock!{
         fn consume(self);
         fn consume_result(&self) -> String;
         fn consume_arg(&self, arg: String) -> String;
+        fn consume_rc(&self, arg: Rc<usize>);
     }
 }
 
@@ -211,5 +216,24 @@ fn test_consume_argument() {
 
     let arg = "ho-ho".to_owned();
     assert_eq!(mock.consume_arg(arg), "ho-ho");
+}
+
+#[test]
+fn test_arguments_are_dropped_on_panic() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    let arg = Rc::new(0);
+    let weak = Rc::downgrade(&arg);
+    assert!(weak.upgrade().is_some());
+
+    let mock_ref = AssertUnwindSafe(&mock);
+    let result = std::panic::catch_unwind(|| {
+        // This will cause panic, because there is no matching
+        // expectation. Argument must be dropped during unwinding.
+        mock_ref.consume_rc(arg);
+    });
+    assert!(result.is_err());
+    assert!(weak.upgrade().is_none());
 }
 

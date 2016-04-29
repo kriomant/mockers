@@ -386,15 +386,22 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
     if tuple_values.len() < args.len() { return None }
     let args_tuple = cx.expr_tuple(sp, tuple_values);
 
+    let args_type: Vec<P<Ty>> = args.iter().map(|a| a.ty.clone()).collect();
+    let args_tuple_type: P<Ty> = cx.ty(sp, TyKind::Tup(args_type));
+
     let mut call_match_args: Vec<_> = args.iter().map(|arg| arg.ty.clone()).collect();
     call_match_args.push(P(return_type.clone()));
 
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
         let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
+        let destroy = Box::new(|args_to_destroy| {
+            unsafe { Box::from_raw(args_to_destroy as *mut $args_tuple_type) };
+        });
         let call = ::mockers::Call { mock_id: self.mock_id,
                                      method_name: $method_name,
-                                     args_ptr: args_ptr };
+                                     args_ptr: args_ptr,
+                                     destroy: destroy };
         let result_ptr: *mut u8 = self.scenario.borrow_mut().verify(call);
         let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
         *result

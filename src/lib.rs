@@ -134,8 +134,8 @@ impl<Res> CallMatch0<Res> {
         }
     }
 
-    fn get_args(call: Call) -> Box<()> {
-        unsafe { Box::from_raw(call.args_ptr as *mut ()) }
+    fn get_args(mut call: Call) -> Box<()> {
+        unsafe { Box::from_raw(call.take_args() as *mut ()) }
     }
 }
 impl<Res> CallMatch for CallMatch0<Res> {
@@ -224,8 +224,8 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 
-    fn get_args(call: Call) -> Box<(Arg0,)> {
-        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0,)) }
+    fn get_args(mut call: Call) -> Box<(Arg0,)> {
+        unsafe { Box::from_raw(call.take_args() as *mut (Arg0,)) }
     }
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
@@ -321,8 +321,8 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 
-    fn get_args(call: Call) -> Box<(Arg0, Arg1)> {
-        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1)) }
+    fn get_args(mut call: Call) -> Box<(Arg0, Arg1)> {
+        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1)) }
     }
 }
 impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
@@ -425,8 +425,8 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 
-    fn get_args(call: Call) -> Box<(Arg0, Arg1, Arg2)> {
-        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1, Arg2)) }
+    fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2)> {
+        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1, Arg2)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
@@ -534,8 +534,8 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
         unsafe { std::mem::transmute(call.args_ptr) }
     }
 
-    fn get_args(call: Call) -> Box<(Arg0, Arg1, Arg2, Arg3)> {
-        unsafe { Box::from_raw(call.args_ptr as *mut (Arg0, Arg1, Arg2, Arg3)) }
+    fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2, Arg3)> {
+        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1, Arg2, Arg3)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
@@ -755,6 +755,19 @@ pub struct Call {
     pub mock_id: usize,
     pub method_name: &'static str,
     pub args_ptr: *const u8,
+    pub destroy: Box<Fn(*const u8)>,
+}
+impl Call {
+    pub fn take_args(&mut self) -> *const u8 {
+        std::mem::replace(&mut self.args_ptr, std::ptr::null())
+    }
+}
+impl Drop for Call {
+    fn drop(&mut self) {
+        if !self.args_ptr.is_null() {
+            (*self.destroy)(self.args_ptr);
+        }
+    }
 }
 
 impl ScenarioInternals {
