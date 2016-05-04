@@ -273,3 +273,18 @@ fn test_times_not_satisfied_more() {
     mock.baz();
     mock.baz();
 }
+
+#[test]
+#[should_panic(expected="`A#0.foo() must be called 2 times, called 1 times`")]
+fn test_checkpoint() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.foo_call().and_return_clone(()).times(2));
+
+    mock.foo();
+
+    scenario.checkpoint();
+
+    mock.foo();
+}

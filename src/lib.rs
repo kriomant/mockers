@@ -1073,6 +1073,26 @@ impl Scenario {
         self.internals.borrow_mut().expectations.push(Box::new(call));
     }
 
+    pub fn checkpoint(&mut self) {
+        self.verify_expectations();
+        self.internals.borrow_mut().expectations.clear();
+    }
+
+    fn verify_expectations(&mut self) {
+        let int = self.internals.borrow();
+        let expectations = &int.expectations;
+        let mock_names = &int.mock_names;
+        let mut active_expectations = expectations.iter().filter(|e| !e.is_satisfied()).peekable();
+        if active_expectations.peek().is_some() {
+            let mut s = String::from("Some expectations are not satisfied:\n");
+            for expectation in active_expectations {
+                let mock_name = mock_names.get(&expectation.call_match().get_mock_id()).unwrap();
+                s.push_str(&format!("`{}.{}`\n", mock_name, expectation.describe()));
+            }
+            panic!(s);
+        }
+    }
+
     fn register_name(&mut self, mock_id: usize, name: String) {
         let mut int = self.internals.borrow_mut();
         if int.allocated_names.contains(&name) {
@@ -1107,18 +1127,7 @@ impl Drop for Scenario {
             return;
         }
 
-        let int = self.internals.borrow();
-        let expectations = &int.expectations;
-        let mock_names = &int.mock_names;
-        let mut active_expectations = expectations.iter().filter(|e| !e.is_satisfied()).peekable();
-        if active_expectations.peek().is_some() {
-            let mut s = String::from("Some expectations are not satisfied:\n");
-            for expectation in active_expectations {
-                let mock_name = mock_names.get(&expectation.call_match().get_mock_id()).unwrap();
-                s.push_str(&format!("`{}.{}`\n", mock_name, expectation.describe()));
-            }
-            panic!(s);
-        }
+        self.verify_expectations();
     }
 }
 
