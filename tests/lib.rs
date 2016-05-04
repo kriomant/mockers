@@ -75,7 +75,7 @@ fn test_arg_match_success() {
 
 
 #[test]
-#[should_panic(expected="Expected calls are not performed:\n`A#0.bar(_)`\n")]
+#[should_panic(expected="Some expectations are not satisfied:\n`A#0.bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock::<A>();
@@ -237,3 +237,39 @@ fn test_arguments_are_dropped_on_panic() {
     assert!(weak.upgrade().is_none());
 }
 
+#[test]
+fn test_times_satisfied() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
+
+    mock.baz();
+    mock.baz();
+}
+
+#[test]
+#[should_panic(expected="Some expectations are not satisfied:
+`A#0.baz() must be called 2 times, called 1 times`
+")]
+fn test_times_not_satisfied_less() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
+
+    mock.baz();
+}
+
+#[test]
+#[should_panic(expected="A#0.baz was already called 2 times of 2 expected, extra call is unexpected")]
+fn test_times_not_satisfied_more() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock::<A>();
+
+    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
+
+    mock.baz();
+    mock.baz();
+    mock.baz();
+}
