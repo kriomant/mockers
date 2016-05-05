@@ -94,6 +94,17 @@ Note that you have to duplicate trait definition inside `mock!`
 macro. This is because compiler plugins work at code AST level
 and can't get trait information by it's name.
 
+Alternatively you can just add derive attribute to trait:
+
+```rust
+// src/lib.rs
+
+#[derive(Mock)]
+pub trait AirConditioner {
+  …
+}
+```
+
 It is all ready now, lets write test:
 
 ```rust

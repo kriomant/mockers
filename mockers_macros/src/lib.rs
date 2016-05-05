@@ -5,17 +5,16 @@ extern crate rustc_plugin;
 
 use rustc_plugin::Registry;
 use syntax::abi::Abi;
-use syntax::ast::{TokenTree, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
+use syntax::ast::{TokenTree, Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
-                  PathParameters, TyParamBound, Defaultness, DUMMY_NODE_ID};
+                  PathParameters, TyParamBound, Defaultness, MetaItem, DUMMY_NODE_ID};
 use syntax::codemap::{Span, respan};
-use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager};
+use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, SyntaxExtension,
+                        Annotatable};
 use syntax::parse::parser::PathStyle;
-use syntax::parse::token;
-use syntax::parse::token::keywords;
-use syntax::parse::token::Token;
+use syntax::parse::token::{self, keywords, Token, intern};
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 use syntax::print::pprust;
@@ -25,6 +24,53 @@ use syntax::ext::build::AstBuilder;
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
     reg.register_macro("mock", generate_mock);
+    reg.register_macro("mock", generate_mock);
+    reg.register_syntax_extension(intern("derive_Mock"),
+                                  SyntaxExtension::MultiDecorator(Box::new(derive_mock)));
+}
+
+#[allow(unused)]
+pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item: &Annotatable,
+                   push: &mut FnMut(Annotatable)) {
+    let (ident, subitems) = match ann_item {
+        &Annotatable::Item(ref item) =>
+            match item.node {
+                ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
+                    if unsafety != Unsafety::Normal {
+                        cx.span_err(span, "Unsafe traits are not supported yet");
+                        return;
+                    }
+
+                    if generics.is_parameterized() {
+                        cx.span_err(span, "Parametrized traits are not supported yet");
+                        return;
+                    }
+
+                    assert!(param_bounds.is_empty());
+
+                    (item.ident, subitems)
+                },
+                _ => {
+                    cx.span_err(span, "Deriving Mock is possible for traits only");
+                    return;
+                }
+            },
+        &Annotatable::TraitItem(_) | &Annotatable::ImplItem(_) => {
+            cx.span_err(span, "Deriving Mock is possible for traits only");
+            return;
+        }
+    };
+    let mock_ident = cx.ident_of(&format!("{}Mock", ident.name.as_str()));
+    let trait_path = cx.path_ident(span, ident);
+
+    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, &subitems);
+    for item in generated_items {
+        let item = item.map(|mut it| {
+            it.attrs.push(quote_attr!(cx, #[cfg(test)]));
+            it
+        });
+        push(Annotatable::Item(item));
+    }
 }
 
 fn generate_mock(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
@@ -97,7 +143,8 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                         identifier: item.ident,
                         parameters: PathParameters::none(),
                     });
-                    generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems)
+                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems);
+                    MacEager::items(SmallVector::many(generated_items))
                 },
                 _ => {
                     cx.span_err(sp, "Trait definition expected");
@@ -125,7 +172,7 @@ struct GeneratedMethods {
 
 fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                            mock_ident: Ident, trait_path: &Path,
-                           members: &[TraitItem]) -> Box<MacResult + 'static> {
+                           members: &[TraitItem]) -> Vec<P<Item>> {
     let mut impl_methods = Vec::with_capacity(members.len());
     let mut trait_impl_methods = Vec::with_capacity(members.len());
 
@@ -209,11 +256,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
         }
     ).unwrap();
 
-    MacEager::items(SmallVector::many(vec![struct_item,
-                                           mock_impl_item,
-                                           impl_item,
-                                           trait_impl_item,
-                                           mocked_impl_item]))
+    vec![struct_item, mock_impl_item, impl_item,
+         trait_impl_item, mocked_impl_item]
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
