@@ -24,7 +24,7 @@ is required**. It was tested to work with *1.10.0-nightly (8da2bcac5 2016-04-28)
 ## Usage at a glance
 
 This is a very short introduction to show what is possible and
-how it looks. Read [User Guide](doc/index.md) for details.
+how it looks. Read [User Guide] for details.
 
 Use nightly Rust:
 
@@ -79,7 +79,7 @@ mod test {
       scenario.expect(cond.get_temperature_call().and_return(16));
       scenario.expect(cond.make_hotter_call(4).and_return(()));
 
-      air::set_temperature_20(&cond);
+      set_temperature_20(&cond);
   }
 }
 ```
