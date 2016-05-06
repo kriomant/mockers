@@ -63,7 +63,7 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
     let mock_ident = cx.ident_of(&format!("{}Mock", ident.name.as_str()));
     let trait_path = cx.path_ident(span, ident);
 
-    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, &subitems);
+    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, &subitems, true);
     for item in generated_items {
         let item = item.map(|mut it| {
             it.attrs.push(quote_attr!(cx, #[cfg(test)]));
@@ -143,7 +143,7 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                         identifier: item.ident,
                         parameters: PathParameters::none(),
                     });
-                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems);
+                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems, false);
                     MacEager::items(SmallVector::many(generated_items))
                 },
                 _ => {
@@ -172,7 +172,7 @@ struct GeneratedMethods {
 
 fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                            mock_ident: Ident, trait_path: &Path,
-                           members: &[TraitItem]) -> Vec<P<Item>> {
+                           members: &[TraitItem], local: bool) -> Vec<P<Item>> {
     let mut impl_methods = Vec::with_capacity(members.len());
     let mut trait_impl_methods = Vec::with_capacity(members.len());
 
@@ -237,6 +237,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                                                  cx.ty_ident(sp, mock_ident),
                                                  trait_impl_methods));
 
+    let mocked_class_name = pprust::path_to_string(trait_path);
+
     let mock_impl_item = quote_item!(cx,
         impl ::mockers::Mock for $mock_ident {
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
@@ -245,19 +247,26 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                     mock_id: id,
                 }
             }
+
+            fn mocked_class_name() -> &'static str {
+                $mocked_class_name
+            }
         }
     ).unwrap();
 
-    let mocked_class_name = pprust::path_to_string(trait_path);
     let mocked_impl_item = quote_item!(cx,
         impl ::mockers::Mocked for &'static $trait_path {
             type MockImpl = $mock_ident;
-            fn class_name() -> &'static str { $mocked_class_name }
         }
     ).unwrap();
 
-    vec![struct_item, mock_impl_item, impl_item,
-         trait_impl_item, mocked_impl_item]
+    if local {
+        vec![struct_item, mock_impl_item, impl_item,
+             trait_impl_item, mocked_impl_item]
+    } else {
+        vec![struct_item, mock_impl_item, impl_item,
+             trait_impl_item]
+    }
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,

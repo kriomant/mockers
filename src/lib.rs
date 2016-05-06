@@ -1013,13 +1013,11 @@ impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
 
 pub trait Mock {
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
+    fn mocked_class_name() -> &'static str;
 }
 
 pub trait Mocked {
     type MockImpl: Mock;
-
-    /// Returns name of mocked class
-    fn class_name() -> &'static str;
 }
 
 pub struct ScenarioInternals {
@@ -1049,18 +1047,26 @@ impl Scenario {
         }
     }
 
-    pub fn create_mock<T: ?Sized>(&mut self) -> <&'static T as Mocked>::MockImpl
-            where &'static T: Mocked {
+    pub fn create_mock<T: Mock>(&mut self) -> T {
         let mock_id = self.get_next_mock_id();
-        self.generate_name_for_class(mock_id, <&'static T as Mocked>::class_name());
-        <&'static T as Mocked>::MockImpl::new(mock_id, self.internals.clone())
+        self.generate_name_for_class(mock_id, T::mocked_class_name());
+        T::new(mock_id, self.internals.clone())
     }
 
-    pub fn create_named_mock<T: ?Sized>(&mut self, name: String) -> <&'static T as Mocked>::MockImpl
-            where &'static T: Mocked {
+    pub fn create_named_mock<T: Mock>(&mut self, name: String) -> T {
         let mock_id = self.get_next_mock_id();
         self.register_name(mock_id, name);
-        <&'static T as Mocked>::MockImpl::new(mock_id, self.internals.clone())
+        T::new(mock_id, self.internals.clone())
+    }
+
+    pub fn create_mock_for<T: ?Sized>(&mut self) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        self.create_mock::<<&'static T as Mocked>::MockImpl>()
+    }
+
+    pub fn create_named_mock_for<T: ?Sized>(&mut self, name: String) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        self.create_named_mock::<<&'static T as Mocked>::MockImpl>(name)
     }
 
     fn get_next_mock_id(&mut self) -> usize {

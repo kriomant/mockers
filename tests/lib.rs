@@ -1,4 +1,4 @@
-#![feature(plugin)]
+#![feature(plugin, custom_derive)]
 #![plugin(mockers_macros)]
 
 extern crate mockers;
@@ -9,6 +9,7 @@ use std::panic::AssertUnwindSafe;
 use mockers::Scenario;
 use mockers::matchers::{ANY, lt};
 
+#[derive(Mock)]
 pub trait A {
     fn foo(&self);
     fn bar(&self, arg: u32);
@@ -22,7 +23,7 @@ pub trait A {
 }
 
 mock!{
-    AMock,
+    AMockByMacro,
     self,
     trait A {
         fn foo(&self);
@@ -42,7 +43,7 @@ mock!{
                          There are no active expectations for same method call")]
 fn test_unit() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(2).and_return(()));
     mock.foo();
 }
@@ -50,7 +51,7 @@ fn test_unit() {
 #[test]
 fn test_return() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.baz_call().and_return(2));
     assert_eq!(2, mock.baz());
 }
@@ -60,7 +61,7 @@ fn test_return() {
 #[should_panic(expected="4 is not less than 3")]
 fn test_arg_match_failure() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(4);
 }
@@ -68,7 +69,7 @@ fn test_arg_match_failure() {
 #[test]
 fn test_arg_match_success() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(2);
 }
@@ -78,7 +79,7 @@ fn test_arg_match_success() {
 #[should_panic(expected="Some expectations are not satisfied:\n`A#0.bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(ANY).and_return(()));
 }
 
@@ -87,7 +88,7 @@ fn test_expected_call_not_performed() {
 #[should_panic(expected="boom!")]
 fn test_panic_result() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.foo_call().and_panic("boom!".to_owned()));
     mock.foo();
 }
@@ -95,7 +96,7 @@ fn test_panic_result() {
 #[test]
 fn test_mut_self_method() {
     let mut scenario = Scenario::new();
-    let mut mock = scenario.create_mock::<A>();
+    let mut mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.modify_call().and_return(()));
     mock.modify();
 }
@@ -103,7 +104,7 @@ fn test_mut_self_method() {
 #[test]
 fn test_value_self_method() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.consume_call().and_return(()));
     mock.consume();
 }
@@ -113,7 +114,7 @@ fn test_value_self_method() {
                          There are no active expectations for same method call")]
 fn test_named_mock() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_named_mock::<A>("amock".to_owned());
+    let mock = scenario.create_named_mock_for::<A>("amock".to_owned());
     scenario.expect(mock.bar_call(2).and_return(()));
     mock.foo();
 }
@@ -125,7 +126,7 @@ fn test_named_mock() {
 #[should_panic(expected="caboom!")]
 fn test_failed_with_remaining_expectations() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
     scenario.expect(mock.bar_call(2).and_return(()));
@@ -135,7 +136,7 @@ fn test_failed_with_remaining_expectations() {
 #[test]
 fn test_expect_and_call() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
     scenario.expect(mock.ask_call(2).and_call(|arg| { arg+1 }));
@@ -145,7 +146,7 @@ fn test_expect_and_call() {
 #[test]
 fn test_expect_is_unordered() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return(()));
     scenario.expect(mock.bar_call(2).and_return(()));
@@ -158,7 +159,7 @@ fn test_expect_is_unordered() {
 #[should_panic(expect="A#0.foo was already called earlier")]
 fn test_expect_consumes_one_call_only() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return(()));
 
@@ -169,7 +170,7 @@ fn test_expect_consumes_one_call_only() {
 #[test]
 fn test_never_satisfied() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().never());
 }
@@ -178,7 +179,7 @@ fn test_never_satisfied() {
 #[should_panic(expect="A#0.foo should never be called")]
 fn test_never_not_satisfied() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().never());
 
@@ -188,7 +189,7 @@ fn test_never_not_satisfied() {
 #[test]
 fn test_consume_result() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
     scenario.expect(mock.consume_result_call().and_return(result));
@@ -199,7 +200,7 @@ fn test_consume_result() {
 #[test]
 fn test_consume_call_result() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
     scenario.expect(mock.consume_result_call().and_call(move || { result }));
@@ -210,7 +211,7 @@ fn test_consume_call_result() {
 #[test]
 fn test_consume_argument() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.consume_arg_call(ANY).and_call(|arg| { arg }));
 
@@ -221,7 +222,7 @@ fn test_consume_argument() {
 #[test]
 fn test_arguments_are_dropped_on_panic() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     let arg = Rc::new(0);
     let weak = Rc::downgrade(&arg);
@@ -240,7 +241,7 @@ fn test_arguments_are_dropped_on_panic() {
 #[test]
 fn test_times_satisfied() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
 
@@ -254,7 +255,7 @@ fn test_times_satisfied() {
 ")]
 fn test_times_not_satisfied_less() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
 
@@ -265,7 +266,7 @@ fn test_times_not_satisfied_less() {
 #[should_panic(expected="A#0.baz was already called 2 times of 2 expected, extra call is unexpected")]
 fn test_times_not_satisfied_more() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
 
@@ -278,7 +279,7 @@ fn test_times_not_satisfied_more() {
 #[should_panic(expected="`A#0.foo() must be called 2 times, called 1 times`")]
 fn test_checkpoint() {
     let mut scenario = Scenario::new();
-    let mock = scenario.create_mock::<A>();
+    let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_clone(()).times(2));
 
@@ -287,4 +288,10 @@ fn test_checkpoint() {
     scenario.checkpoint();
 
     mock.foo();
+}
+
+#[test]
+fn test_create_mock() {
+    let mut scenario = Scenario::new();
+    let _mock = scenario.create_mock::<AMockByMacro>();
 }
