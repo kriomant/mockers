@@ -19,7 +19,7 @@ four or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin, so **nightly Rust
-is required**. It was tested to work with *1.10.0-nightly (645dd013a 2016-04-24)*.
+is required**. It was tested to work with *1.10.0-nightly (8da2bcac5 2016-04-28)*.
 
 ## Usage at a glance
 
