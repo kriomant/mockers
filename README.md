@@ -9,6 +9,8 @@ Mocking library for Rust.
 
 Inspired by Google Mock library for C++.
 
+[User Guide]
+
 ## Limitations
 
 For now it is not a full-featured mocking library, but just
@@ -19,41 +21,43 @@ supported and so on.
 Mocking magic is implemented using compiler plugin, so **nightly Rust
 is required**. It was tested to work with *1.10.0-nightly (645dd013a 2016-04-24)*.
 
-## Usage
+## Usage at a glance
 
-First of all, you must use *nighly* Rust:
+This is a very short introduction to show what is possible and
+how it looks. Read [User Guide](doc/index.md) for details.
+
+Use nightly Rust:
 
 ```sh
 $ multirust override nighly
 ```
 
-Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
+Cargo.toml:
 
 ```toml
 [dependencies]
-mockers = "0.2.2"
+mockers_macros = "0.2.2"
 
 [dev-dependencies]
-mockers_macros = "0.2.2"
+mockers = "0.2.2"
 ```
 
-Say we have `air` crate with some trait and method using this trait:
+src/lib.rs:
 
 ```rust
-// src/lib.rs
-#![crate_name = "air"]
+#![feature(plugin, custom_derive)]
+#![plugin(mockers_macros)]
 
+#[cfg(test)] extern crate mockers;
+
+#[derive(Mock)]
 pub trait AirConditioner {
-    // Note that `make_*` methods receive `&self`
-    // and not `&mut self` as they should. This is due
-    // to current limitation. It it not inherent and will
-    // be lifted in the future.
-    fn make_hotter(&self, by: i16);
-    fn make_cooler(&self, by: i16);
+    fn make_hotter(&mut self, by: i16);
+    fn make_cooler(&mut self, by: i16);
     fn get_temperature(&self) -> i16;
 }
 
-pub fn set_temperature_20(cond: &airconditioner) {
+pub fn set_temperature_20(cond: &mut AirConditioner) {
     let t = cond.get_temperature();
     if t < 20 {
         cond.make_hotter(20 + t);
@@ -61,60 +65,22 @@ pub fn set_temperature_20(cond: &airconditioner) {
         cond.make_cooler(t - 20);
     }
 }
-```
 
-Import `mockers` crate and `mockers_macros` compiler plugin into test crate:
+#[cfg(test)]
+mod test {
+  use super::*;
+  use mockers::Scenario;
 
-```rust
-// tests/lib.rs
+  #[test]
+  fn test_set_temperature_20() {
+      let mut scenario = Scenario::new();
+      let cond = scenario.create_mock_for::<AirConditioner>();
 
-#![feature(plugin)]
-#![plugin(mockers_macros)]
+      scenario.expect(cond.get_temperature_call().and_return(16));
+      scenario.expect(cond.make_hotter_call(4).and_return(()));
 
-extern crate air;
-extern crate mockers;
-```
-
-Now create mock type for some trait:
-
-```rust
-mock!{
-    AirConditionerMock,
-    air, // This is mocked trait's package.
-         // Use `self` to mock local trait.
-    trait AirConditioner {
-        fn make_hotter(&self, by: i16);
-        fn make_cooler(&self, by: i16);
-        fn get_temperature(&self) -> i16;
-    }
-}
-```
-
-Note that you have to duplicate trait definition inside `mock!`
-macro. This is because compiler plugins work at code AST level
-and can't get trait information by it's name.
-
-Alternatively you can just add derive attribute to trait:
-
-```rust
-// src/lib.rs
-
-#[derive(Mock)]
-pub trait AirConditioner {
-  …
-}
-```
-
-It is all ready now, lets write test:
-
-```rust
-use mockers::Scenario;
-
-#[test]
-fn test_make_hotter() {
-    let mut scenario = Scenario::new();
-    let cond = scenario.create_mock::<AirConditioner>();
-    air::set_temperature_20(&cond);
+      air::set_temperature_20(&cond);
+  }
 }
 ```
 
@@ -122,117 +88,32 @@ Run tests:
 
 ```
 $ cargo test
-…
+   Compiling air v0.1.0 (file:///Users/kriomant/Temp/air)
+     Running target/debug/air-b2c5f8b6920cb30a
+
 running 1 test
-test test_make_hotter ... FAILED
+test test::test_set_temperature_20 ... FAILED
 
 failures:
 
----- test_make_hotter stdout ----
-	thread 'test_make_hotter' panicked at '
-Unexpected call to `AirConditioner#0.get_temperature`
+---- test::test_set_temperature_20 stdout ----
+	thread 'test::test_set_temperature_20' panicked at '
+Unexpected call to `AirConditioner#0.make_hotter`
 
-There are not active expectations for same method call
-', /Users/kriomant/Dropbox/Projects/mockers/src/lib.rs:733
+Here are active expectations for same method call:
+
+  Expectation `AirConditioner#0.make_hotter(4)`:
+    Arg #0: 36 is not equal to 4
+'
 note: Run with `RUST_BACKTRACE=1` for a backtrace.
 
 
 failures:
-    test_make_hotter
+    test::test_set_temperature_20
 
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
 
-       error test failed
-```
-
-Seems like call to `get_temperature` was not planned by scenario.
-Lets start writing scenario:
-
-```rust
-#[test]
-fn test_make_hotter() {
-    let mut scenario = Scenario::new();
-    let cond = scenario.create_mock::<AirConditioner>();
-
-    // Expect that conditioner will be asked for temperature
-    // and return 16.
-    scenario.expect(cond.get_temperature_call().and_return(16));
-
-    // Expect temperature will be set higher by 4.
-    // Event `()` result must be specified explicitly currently.
-    scenario.expect(cond.make_hotter_call(4).and_return(()));
-
-    mocked::set_temperature_20(&cond);
-}
-```
-
-Note that we used `_call` suffix when specifying expected method calls.
-
-Start tests again:
-
-```
-…
----- test_make_hotter stdout ----
-	thread 'test_make_hotter' panicked at '
-Unexpected call to `AirConditioner#0.num`
-
-Here are active expectations for same method call:
-
-  Expectation `AirConditioner#0.set_temperature_20(4)`:
-    Arg #0: 36 is not equal to 4
-', ../src/libcore/result.rs:733
-…
-```
-
-Oops, seems we have a bug in `set_temperature_20` function. Fix it and test again:
-
-```
-…
-running 1 test
-test test_make_hotter ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured
-…
-```
-
-## Argument matchers
-
-`*_call` mock methods receive argument matchers as parameters. Any value
-of required type (which implements `Eq`) can be used as matcher,
-in this case it is just compared to actual argument value.
-
-You can use `arg!` macro to match argument values against pattern:
-
-```rust
-#[macro_use(arg)]
-…
-scenario.expect(mock.method_receiving_option_call(arg!(Some(_))).and_return(()));
-```
-
-Basic matchers (comparison: `eq`, `ne`, `gt`, …; logical: `not`, `or`, `and`)
-are available in `matchers` module.
-Specialized matchers (like `is_empty` or `contains`) will be available soon.
-
-You may easily create ad-hoc matchers using `check` method:
-```rust
-use mockers::matchers::check;
-scenario.expect(mock.method(check(|x: &Option<u32>| x.is_some()))
-                    .and_return(()));
-```
-
-Unfortunately, you can't create polymorphic checker this way (i.e. checker
-which may be used for `Option<T>` for any `T`). You have to write own
-struct and `MatchArg` implementation in order to do that.
-
-Use `check!` macro instead of `check` function to get slightly more
-informative error message:
-
-```rust
-#[macro_use(check)]
-extern crate mockers;
-
-scenario.expect(mock.method(check!(|x: &Option<u32>| x.is_some()))
-                    .and_return(()));
+error: test failed
 ```
 
 ## License
@@ -240,3 +121,5 @@ scenario.expect(mock.method(check!(|x: &Option<u32>| x.is_some()))
 Copyright © 2016 Mikhail Trishchenkov
 
 Distributed under the [MIT License](LICENSE).
+
+[User Guide]: doc/guide.md
