@@ -39,7 +39,7 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="Unexpected call to `A#0.foo`\n\n\
+#[should_panic(expected="Unexpected call to `A#0.foo()`\n\n\
                          There are no active expectations for same method call")]
 fn test_unit() {
     let mut scenario = Scenario::new();
@@ -110,7 +110,7 @@ fn test_value_self_method() {
 }
 
 #[test]
-#[should_panic(expected="Unexpected call to `amock.foo`\n\n\
+#[should_panic(expected="Unexpected call to `amock.foo()`\n\n\
                          There are no active expectations for same method call")]
 fn test_named_mock() {
     let mut scenario = Scenario::new();
@@ -294,4 +294,13 @@ fn test_checkpoint() {
 fn test_create_mock() {
     let mut scenario = Scenario::new();
     let _mock = scenario.create_mock::<AMockByMacro>();
+}
+
+#[test]
+#[should_panic(expected="Unexpected call to `A#0.bar(12)`")]
+fn test_format_args() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    mock.bar(12);
 }

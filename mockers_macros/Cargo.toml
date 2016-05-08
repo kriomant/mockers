@@ -7,6 +7,9 @@ repository = "https://github.com/kriomant/mockers"
 keywords = ["mock", "test"]
 license = "MIT"
 
+[dependencies]
+itertools = "0.4.13"
+
 [lib]
 name = "mockers_macros"
 plugin = true

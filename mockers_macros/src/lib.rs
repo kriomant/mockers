@@ -2,6 +2,7 @@
 
 extern crate syntax;
 extern crate rustc_plugin;
+extern crate itertools;
 
 use rustc_plugin::Registry;
 use syntax::abi::Abi;
@@ -20,6 +21,7 @@ use syntax::util::small_vector::SmallVector;
 use syntax::print::pprust;
 
 use syntax::ext::build::AstBuilder;
+use itertools::Itertools;
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
@@ -445,16 +447,26 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
     let mut call_match_args: Vec<_> = args.iter().map(|arg| arg.ty.clone()).collect();
     call_match_args.push(P(return_type.clone()));
 
+    let args_format_str = std::iter::repeat("{:?}").take(args.len()).join(", ");
+    let args_tuple_fields: Vec<_> = (0..args.len()).map(|i| {
+        cx.expr_tup_field_access(sp, quote_expr!(cx, _args_ref), i)
+    }).collect();
+
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
         let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
         fn destroy(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut $args_tuple_type) };
         }
+        fn format_args(args_ptr: *const u8) -> String {
+            let _args_ref: &$args_tuple_type = unsafe { std::mem::transmute(args_ptr) };
+            format!($args_format_str, $args_tuple_fields)
+        }
         let call = ::mockers::Call { mock_id: self.mock_id,
                                      method_name: $method_name,
                                      args_ptr: args_ptr,
-                                     destroy: destroy };
+                                     destroy: destroy,
+                                     format_args: format_args };
         let result_ptr: *mut u8 = self.scenario.borrow_mut().verify(call);
         let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
         *result

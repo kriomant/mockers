@@ -1142,6 +1142,7 @@ pub struct Call {
     pub method_name: &'static str,
     pub args_ptr: *const u8,
     pub destroy: fn(*const u8),
+    pub format_args: fn(*const u8) -> String,
 }
 impl Call {
     pub fn take_args(&mut self) -> *const u8 {
@@ -1161,7 +1162,8 @@ impl ScenarioInternals {
     pub fn verify(&mut self, call: Call) -> *mut u8 {
         if self.expectations.is_empty() {
             let mock_name = self.mock_names.get(&call.mock_id).unwrap();
-            panic!("\nUnexpected call to `{}.{}`, no calls are expected", mock_name, call.method_name);
+            panic!("\nUnexpected call to `{}.{}({})`, no calls are expected",
+                   mock_name, call.method_name, (call.format_args)(call.args_ptr));
         }
 
         for expectation in self.expectations.iter_mut().rev() {
@@ -1178,7 +1180,8 @@ impl ScenarioInternals {
         let mock_name = self.mock_names.get(&call.mock_id).unwrap();
 
         let mut msg = String::new();
-        msg.push_str(&format!("\nUnexpected call to `{}.{}`\n\n", mock_name, call.method_name));
+        msg.push_str(&format!("\nUnexpected call to `{}.{}({})`\n\n",
+                     mock_name, call.method_name, (call.format_args)(call.args_ptr)));
         for expectation in self.expectations.iter().rev() {
             if !expectation.is_satisfied() && expectation.call_match().matches_target(&call) {
                 if first_match {
