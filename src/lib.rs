@@ -1141,7 +1141,7 @@ pub struct Call {
     pub mock_id: usize,
     pub method_name: &'static str,
     pub args_ptr: *const u8,
-    pub destroy: Box<Fn(*const u8)>,
+    pub destroy: fn(*const u8),
 }
 impl Call {
     pub fn take_args(&mut self) -> *const u8 {
@@ -1151,7 +1151,7 @@ impl Call {
 impl Drop for Call {
     fn drop(&mut self) {
         if !self.args_ptr.is_null() {
-            (*self.destroy)(self.args_ptr);
+            (self.destroy)(self.args_ptr);
         }
     }
 }

@@ -448,9 +448,9 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
         let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
-        let destroy = Box::new(|args_to_destroy| {
+        fn destroy(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut $args_tuple_type) };
-        });
+        }
         let call = ::mockers::Call { mock_id: self.mock_id,
                                      method_name: $method_name,
                                      args_ptr: args_ptr,
