@@ -1,8 +1,11 @@
-
 use super::MatchArg;
 
+use std;
 use std::marker::PhantomData;
 use std::fmt::Debug;
+use collections::range::RangeArgument;
+
+use collections::fmt::Write;
 
 pub use self::ext::*;
 
@@ -88,6 +91,42 @@ simple_matcher!(eq, EqMatchArg, ==, "not equal to", PartialEq);
 simple_matcher!(ne, NeMatchArg, !=, "equal to", PartialEq);
 simple_matcher!(ge, GeMatchArg, >=, "not greater than or equal to", PartialOrd);
 simple_matcher!(gt, GtMatchArg,  >, "not greater than", PartialOrd);
+
+pub struct RangeMatchArg<T: Ord + Debug, R: RangeArgument<T>> {
+    range: R,
+    _phantom: PhantomData<T>,
+}
+impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
+    fn format_range(&self) -> Result<String, std::fmt::Error> {
+        let mut range_str = String::new();
+        if let Some(s) = self.range.start() {
+            try!(write!(range_str, "{:?}", s));
+        }
+        try!(write!(range_str, ".."));
+        if let Some(e) = self.range.end() {
+            try!(write!(range_str, "{:?}", e));
+        }
+        Ok(range_str)
+    }
+}
+impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        let matches_start = self.range.start().map(|s| arg >= s).unwrap_or(true);
+        let matches_end = self.range.end().map(|e| arg < e).unwrap_or(true);
+        if matches_start && matches_end {
+            Ok(())
+        } else {
+            Err(format!("{:?} is not in range {}", arg, self.format_range().unwrap()))
+        }
+    }
+
+    fn describe(&self) -> String {
+        format!("in_range({})", self.format_range().unwrap())
+    }
+}
+pub fn in_range<T: Ord + Debug, R: RangeArgument<T>>(range: R) -> RangeMatchArg<T, R> {
+    RangeMatchArg { range: range, _phantom: PhantomData }
+}
 
 pub struct NotMatchArg<T: Debug, M: MatchArg<T>>(M, PhantomData<T>);
 impl<T: Debug, M: MatchArg<T>> MatchArg<T> for NotMatchArg<T, M> {

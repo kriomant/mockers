@@ -1,5 +1,8 @@
 #![feature(fnbox)]
 #![feature(box_patterns)]
+#![feature(collections, collections_range)]
+
+extern crate collections;
 
 use std::marker::PhantomData;
 use std::rc::Rc;

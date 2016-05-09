@@ -281,3 +281,35 @@ fn test_check_macro_mismatch() {
     scenario.expect(mock.cmplx_call(check!(|t:&Option<u32>| t.is_some())).and_return(()));
     mock.cmplx(None);
 }
+
+#[test]
+fn test_range_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.bar_call(in_range(1..4)).and_return(()));
+
+    mock.bar(2);
+}
+
+#[test]
+#[should_panic(expect="4 is not in range 1..4")]
+fn test_range_edge_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.bar_call(in_range(1..4)).and_return(()));
+
+    mock.bar(4);
+}
+
+#[test]
+#[should_panic(expect="5 is not in range 1..4")]
+fn test_range_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.bar_call(in_range(1..4)).and_return(()));
+
+    mock.bar(5);
+}
