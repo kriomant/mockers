@@ -376,3 +376,13 @@ fn test_sequence_times_invalid() {
     mock.foo();
     mock.bar(4);
 }
+
+#[test]
+fn test_return_default() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.baz_call().and_return_default().times(1));
+
+    assert_eq!(mock.baz(), 0);
+}
