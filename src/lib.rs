@@ -165,10 +165,21 @@ impl<Arg0, Arg1, Arg2, Arg3, T: Clone> ActionClone4<Arg0, Arg1, Arg2, Arg3, T> {
 }
 
 pub trait CallMatch {
-    fn matches(&self, call: &Call) -> bool;
-    fn matches_target(&self, call: &Call) -> bool;
+    fn matches_args(&self, call: &Call) -> bool;
+    fn matches(&self, call: &Call) -> bool {
+        self.matches_target(call) && self.matches_args(call)
+    }
+    fn matches_target(&self, call: &Call) -> bool {
+        self.get_mock_id() == call.mock_id &&
+        self.get_method_name() == call.method_name
+    }
+    fn matches_method(&self, call: &Call) -> bool {
+        self.get_mock_type_id() == call.mock_type_id &&
+        self.get_method_name() == call.method_name
+    }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>>;
     fn get_mock_id(&self) -> usize;
+    fn get_mock_type_id(&self) -> usize;
     fn get_method_name(&self) -> &'static str;
     fn describe(&self) -> String;
 }
@@ -201,14 +212,16 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
 #[must_use]
 pub struct CallMatch0<Res> {
     mock_id: usize,
+    mock_type_id: usize,
     method_name: &'static str,
 
     _phantom: PhantomData<Res>,
 }
 impl<Res> CallMatch0<Res> {
-    pub fn new(mock_id: usize, method_name: &'static str) -> Self {
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str) -> Self {
         CallMatch0 {
             mock_id: mock_id,
+            mock_type_id: mock_type_id,
             method_name: method_name,
             _phantom: PhantomData
         }
@@ -219,17 +232,16 @@ impl<Res> CallMatch0<Res> {
     }
 }
 impl<Res> CallMatch for CallMatch0<Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.mock_id == call.mock_id &&
-        self.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        self.matches_target(call)
+    fn matches_args(&self, call: &Call) -> bool {
+        assert!(call.mock_type_id == self.mock_type_id &&
+                call.method_name == self.method_name);
+        true
     }
     fn validate(&self, _call: &Call) -> Vec<Result<(), String>> {
         vec![]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_mock_type_id(&self) -> usize { self.mock_type_id }
     fn get_method_name(&self) -> &'static str { self.method_name }
     fn describe(&self) -> String {
         format!("{}()", self.method_name)
@@ -344,15 +356,17 @@ impl<Res: Clone> CallMatch0<Res> {
 #[must_use]
 pub struct CallMatch1<Arg0, Res> {
     mock_id: usize,
+    mock_type_id: usize,
     method_name: &'static str,
     arg0: Box<MatchArg<Arg0>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
-    pub fn new(mock_id: usize, method_name: &'static str, arg0: Box<MatchArg<Arg0>>) -> Self {
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str, arg0: Box<MatchArg<Arg0>>) -> Self {
         CallMatch1 {
             mock_id: mock_id,
+            mock_type_id: mock_type_id,
             method_name: method_name,
             arg0: arg0,
             _phantom: PhantomData
@@ -368,14 +382,9 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
     }
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.mock_id == call.mock_id &&
-        self.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        if !self.matches_target(call) {
-            return false;
-        }
+    fn matches_args(&self, call: &Call) -> bool {
+        assert!(call.mock_type_id == self.mock_type_id &&
+                call.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok()
@@ -385,6 +394,7 @@ impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
         vec![ self.arg0.matches(&args.0) ]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_mock_type_id(&self) -> usize { self.mock_type_id }
     fn get_method_name(&self) -> &'static str { self.method_name }
     fn describe(&self) -> String {
         format!("{}({})", self.get_method_name(),
@@ -496,6 +506,7 @@ impl<Arg0, Res: Clone> CallMatch1<Arg0, Res> {
 #[must_use]
 pub struct CallMatch2<Arg0, Arg1, Res> {
     mock_id: usize,
+    mock_type_id: usize,
     method_name: &'static str,
     arg0: Box<MatchArg<Arg0>>,
     arg1: Box<MatchArg<Arg1>>,
@@ -503,11 +514,12 @@ pub struct CallMatch2<Arg0, Arg1, Res> {
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
-    pub fn new(mock_id: usize, method_name: &'static str,
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
                arg0: Box<MatchArg<Arg0>>,
                arg1: Box<MatchArg<Arg1>>) -> Self {
         CallMatch2 {
             mock_id: mock_id,
+            mock_type_id: mock_type_id,
             method_name: method_name,
             arg0: arg0,
             arg1: arg1,
@@ -524,14 +536,9 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     }
 }
 impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.mock_id == call.mock_id &&
-        self.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        if !self.matches_target(call) {
-            return false;
-        }
+    fn matches_args(&self, call: &Call) -> bool {
+        assert!(call.mock_type_id == self.mock_type_id &&
+                call.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -543,6 +550,7 @@ impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
               self.arg1.matches(&args.1) ]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_mock_type_id(&self) -> usize { self.mock_type_id }
     fn get_method_name(&self) -> &'static str { self.method_name }
     fn describe(&self) -> String {
         format!("{}({}, {})", self.get_method_name(),
@@ -656,6 +664,7 @@ impl<Arg0, Arg1, Res: Clone> CallMatch2<Arg0, Arg1, Res> {
 #[must_use]
 pub struct CallMatch3<Arg0, Arg1, Arg2, Res> {
     mock_id: usize,
+    mock_type_id: usize,
     method_name: &'static str,
     arg0: Box<MatchArg<Arg0>>,
     arg1: Box<MatchArg<Arg1>>,
@@ -664,12 +673,13 @@ pub struct CallMatch3<Arg0, Arg1, Arg2, Res> {
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn new(mock_id: usize, method_name: &'static str,
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
                arg0: Box<MatchArg<Arg0>>,
                arg1: Box<MatchArg<Arg1>>,
                arg2: Box<MatchArg<Arg2>>) -> Self {
         CallMatch3 {
             mock_id: mock_id,
+            mock_type_id: mock_type_id,
             method_name: method_name,
             arg0: arg0,
             arg1: arg1,
@@ -687,14 +697,9 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     }
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.mock_id == call.mock_id &&
-        self.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        if !self.matches_target(call) {
-            return false;
-        }
+    fn matches_args(&self, call: &Call) -> bool {
+        assert!(call.mock_type_id == self.mock_type_id &&
+                call.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -708,6 +713,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
               self.arg2.matches(&args.2) ]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_mock_type_id(&self) -> usize { self.mock_type_id }
     fn get_method_name(&self) -> &'static str { self.method_name }
     fn describe(&self) -> String {
         format!("{}({}, {}, {})", self.get_method_name(),
@@ -822,6 +828,7 @@ impl<Arg0, Arg1, Arg2, Res: Clone> CallMatch3<Arg0, Arg1, Arg2, Res> {
 #[must_use]
 pub struct CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     mock_id: usize,
+    mock_type_id: usize,
     method_name: &'static str,
     arg0: Box<MatchArg<Arg0>>,
     arg1: Box<MatchArg<Arg1>>,
@@ -831,13 +838,14 @@ pub struct CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn new(mock_id: usize, method_name: &'static str,
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
                arg0: Box<MatchArg<Arg0>>,
                arg1: Box<MatchArg<Arg1>>,
                arg2: Box<MatchArg<Arg2>>,
                arg3: Box<MatchArg<Arg3>>) -> Self {
         CallMatch4 {
             mock_id: mock_id,
+            mock_type_id: mock_type_id,
             method_name: method_name,
             arg0: arg0,
             arg1: arg1,
@@ -856,14 +864,9 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn matches_target(&self, call: &Call) -> bool {
-        self.mock_id == call.mock_id &&
-        self.method_name == call.method_name
-    }
-    fn matches(&self, call: &Call) -> bool {
-        if !self.matches_target(call) {
-            return false;
-        }
+    fn matches_args(&self, call: &Call) -> bool {
+        assert!(call.mock_type_id == self.mock_type_id &&
+                call.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -879,6 +882,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg
               self.arg3.matches(&args.3) ]
     }
     fn get_mock_id(&self) -> usize { self.mock_id }
+    fn get_mock_type_id(&self) -> usize { self.mock_type_id }
     fn get_method_name(&self) -> &'static str { self.method_name }
     fn describe(&self) -> String {
         format!("{}({}, {}, {}, {})", self.get_method_name(),
@@ -1144,6 +1148,7 @@ impl Drop for Scenario {
 
 pub struct Call {
     pub mock_id: usize,
+    pub mock_type_id: usize,
     pub method_name: &'static str,
     pub args_ptr: *const u8,
     pub destroy: fn(*const u8),
@@ -1211,7 +1216,6 @@ impl ScenarioInternals {
         // No expectations exactly matching call are found. However this may be
         // because of unexpected argument values. So check active expectations
         // with matching target (i.e. mock and method) and validate arguments.
-        let mut first_match = true;
         let mock_name = self.mock_names.get(&call.mock_id).unwrap();
 
         let mut msg = String::new();
@@ -1226,16 +1230,17 @@ impl ScenarioInternals {
             panic!(msg);
         }
 
+        let mut target_first_match = true;
         for expectation in self.expectations.iter().rev() {
             if !expectation.is_satisfied() && expectation.call_match().matches_target(&call) {
-                if first_match {
+                if target_first_match {
                     write!(&mut msg, concat!(colored!(green: "note: "),
                                             "here are active expectations for {}.{}\n"),
                                      mock_name, call.method_name).unwrap();
-                    first_match = false;
+                    target_first_match = false;
                 }
 
-                msg.push_str(&format!("\n  expectation `{}.{}`:\n", mock_name, expectation.describe()));
+                write!(&mut msg, "\n  expectation `{}.{}`:\n", mock_name, expectation.describe()).unwrap();
                 for (index, res) in expectation.call_match().validate(&call).iter().enumerate() {
                     match res {
                         &Err(ref err) =>
@@ -1247,8 +1252,29 @@ impl ScenarioInternals {
             }
         }
 
-        if first_match {
-            msg.push_str(&format!("there are no active expectations for same method call\n"));
+        if target_first_match {
+            write!(&mut msg, concat!(colored!(green: "note: "), "there are no active expectations for {}.{}\n"),
+                   mock_name, call.method_name).unwrap();
+        }
+
+        let mut method_first_match = true;
+        for expectation in self.expectations.iter().rev() {
+            if !expectation.is_satisfied() &&
+               !expectation.call_match().matches_target(&call) &&
+               expectation.call_match().matches_method(&call) &&
+               expectation.call_match().matches_args(&call) {
+
+                if method_first_match {
+                    msg.push_str(concat!(colored!(green: "note: "),
+                                        "there are matching expectations for another mock objects\n"));
+                    method_first_match = false;
+                }
+
+                let other_mock_id = &expectation.call_match().get_mock_id();
+                let other_mock_name = self.mock_names.get(other_mock_id).unwrap();
+                write!(&mut msg, concat!("\n  expectation `", colored!(bold: "{}"), ".{}`\n"),
+                       other_mock_name, expectation.describe()).unwrap();
+            }
         }
 
         msg.push('\n');

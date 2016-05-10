@@ -31,6 +31,13 @@ pub fn plugin_registrar(reg: &mut Registry) {
                                   SyntaxExtension::MultiDecorator(Box::new(derive_mock)));
 }
 
+/// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
+/// unique type ID. It is added to both call matchers produced by
+/// `*_call` methods and to `Call` structure created by mocked method.
+/// It is same to use call matcher for inspecting call object only when
+/// both mock type ID and method name match.
+static mut next_mock_type_id: usize = 0;
+
 #[allow(unused)]
 pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item: &Annotatable,
                    push: &mut FnMut(Annotatable)) {
@@ -286,10 +293,16 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
         }
     };
 
+    let mock_type_id = unsafe {
+        let id = next_mock_type_id;
+        next_mock_type_id += 1;
+        id
+    };
+
     let trait_impl_method = generate_trait_impl_method(
-            cx, sp, method_ident,
+            cx, sp, mock_type_id, method_ident,
             self_kind, args, &return_type);
-    let impl_method = generate_impl_method(cx, sp, method_ident, args, &return_type);
+    let impl_method = generate_impl_method(cx, sp, mock_type_id, method_ident, args, &return_type);
 
     if let (Some(tim), Some(im)) = (trait_impl_method, impl_method) {
         Some(GeneratedMethods {
@@ -319,7 +332,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
 ///                                Box::new(arg0))
 /// }
 /// ```
-fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
+fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                         method_ident: Ident, args: &[Arg],
                         return_type: &Ty) -> Option<ImplItem> {
     // For each argument generate...
@@ -327,6 +340,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
     let mut inputs = Vec::<Arg>::new();
     let mut new_args = Vec::<P<Expr>>::new();
     new_args.push(cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
+    new_args.push(quote_expr!(cx, $mock_type_id));
     new_args.push(cx.expr_str(sp, method_ident.name.as_str()));
     for (i, arg) in args.iter().enumerate() {
         let arg_type = &arg.ty;
@@ -424,7 +438,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span,
 /// }
 /// ```
 /// where constant marked with "mock_id" is unique trait method ID.
-fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
+fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                               method_ident: Ident, self_kind: &SelfKind,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
     let method_name = method_ident.name.as_str();
@@ -463,6 +477,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span,
             format!($args_format_str, $args_tuple_fields)
         }
         let call = ::mockers::Call { mock_id: self.mock_id,
+                                     mock_type_id: $mock_type_id,
                                      method_name: $method_name,
                                      args_ptr: args_ptr,
                                      destroy: destroy,

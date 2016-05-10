@@ -302,3 +302,18 @@ fn test_format_args() {
 
     mock.bar(12);
 }
+
+// When no matching expectation found for call, expectations
+// for other mock object of the same type must be checked.
+#[test]
+// Message without ANSI codes is "expectation `A#0.bar(12)`"
+#[should_panic(expected="expectation `\x1b[1mA#0\x1b[0m.bar(12)`")]
+fn test_check_other_mock_object_expectations() {
+    let mut scenario = Scenario::new();
+    let mock0 = scenario.create_mock_for::<A>();
+    let mock1 = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock0.bar_call(12).and_return(()));
+
+    mock1.bar(12);
+}
