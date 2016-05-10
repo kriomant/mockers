@@ -305,8 +305,21 @@ let _temp = cond.get_temperature();
 cond.make_hotter(2);
 ```
 
-Ability to order expectations will be added in the future.
-In some cases checkpoints will be sufficient (see below).
+If you want to verify that calls are made in specific order, you may
+use `Sequence` like this:
+
+```rust
+use mockers::Sequence;
+…
+
+let mut seq = Sequence::new();
+seq.expect(cond.get_temperature_call().and_return(16));
+seq.expect(cond.make_hotter_call(4).and_return(()));
+scenario.expect(seq);
+
+let _temp = cond.get_temperature();
+cond.make_hotter(2);
+```
 
 ### Matching calls
 

@@ -1020,6 +1020,44 @@ impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
     }
 }
 
+pub struct Sequence {
+    expectations: Vec<Box<Expectation>>,
+}
+impl Sequence {
+    pub fn new() -> Self {
+        Sequence { expectations: Vec::new() }
+    }
+
+    pub fn expect<E: Expectation + 'static>(&mut self, expectation: E) {
+        assert!(!expectation.is_satisfied());
+        self.expectations.push(Box::new(expectation));
+    }
+}
+impl Expectation for Sequence {
+    fn call_match(&self) -> &CallMatch {
+        self.expectations[0].call_match()
+    }
+    fn is_satisfied(&self) -> bool {
+        self.expectations.is_empty()
+    }
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+        let (res, remove) = {
+            let exp = &mut self.expectations[0];
+            let res = exp.satisfy(call, mock_name);
+            (res, exp.is_satisfied())
+        };
+
+        if remove {
+            self.expectations.remove(0);
+        }
+
+        res
+    }
+    fn describe(&self) -> String {
+        self.expectations[0].describe()
+    }
+}
+
 pub trait Mock {
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
     fn mocked_class_name() -> &'static str;

@@ -6,7 +6,7 @@ extern crate mockers;
 use std::rc::Rc;
 use std::panic::AssertUnwindSafe;
 
-use mockers::Scenario;
+use mockers::{Scenario, Sequence};
 use mockers::matchers::{ANY, lt};
 
 #[derive(Mock)]
@@ -154,7 +154,7 @@ fn test_expect_is_unordered() {
 }
 
 #[test]
-#[should_panic(expect="A#0.foo was already called earlier")]
+#[should_panic(expected="A#0.foo was already called earlier")]
 fn test_expect_consumes_one_call_only() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -174,7 +174,7 @@ fn test_never_satisfied() {
 }
 
 #[test]
-#[should_panic(expect="A#0.foo should never be called")]
+#[should_panic(expected="A#0.foo should never be called")]
 fn test_never_not_satisfied() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -316,4 +316,63 @@ fn test_check_other_mock_object_expectations() {
     scenario.expect(mock0.bar_call(12).and_return(()));
 
     mock1.bar(12);
+}
+
+#[test]
+fn test_sequence() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    let mut seq = Sequence::new();
+    seq.expect(mock.foo_call().and_return(()));
+    seq.expect(mock.bar_call(4).and_return(()));
+    scenario.expect(seq);
+
+    mock.foo();
+    mock.bar(4);
+}
+
+#[test]
+#[should_panic(expected="unexpected call to `A#0.bar(4)`")]
+fn test_sequence_invalid_order() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    let mut seq = Sequence::new();
+    seq.expect(mock.foo_call().and_return(()));
+    seq.expect(mock.bar_call(4).and_return(()));
+    scenario.expect(seq);
+
+    mock.bar(4);
+    mock.foo();
+}
+
+#[test]
+fn test_sequence_times() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    let mut seq = Sequence::new();
+    seq.expect(mock.foo_call().and_return_clone(()).times(2));
+    seq.expect(mock.bar_call(4).and_return(()));
+    scenario.expect(seq);
+
+    mock.foo();
+    mock.foo();
+    mock.bar(4);
+}
+
+#[test]
+#[should_panic(expected="unexpected call to `A#0.bar(4)`")]
+fn test_sequence_times_invalid() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    let mut seq = Sequence::new();
+    seq.expect(mock.foo_call().and_return_clone(()).times(2));
+    seq.expect(mock.bar_call(4).and_return(()));
+    scenario.expect(seq);
+
+    mock.foo();
+    mock.bar(4);
 }
