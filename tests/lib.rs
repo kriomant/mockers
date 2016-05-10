@@ -39,8 +39,7 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="Unexpected call to `A#0.foo()`\n\n\
-                         There are no active expectations for same method call")]
+#[should_panic(expected="unexpected call to `A#0.foo()`")]
 fn test_unit() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -110,8 +109,7 @@ fn test_value_self_method() {
 }
 
 #[test]
-#[should_panic(expected="Unexpected call to `amock.foo()`\n\n\
-                         There are no active expectations for same method call")]
+#[should_panic(expected="unexpected call to `amock.foo()`")]
 fn test_named_mock() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_named_mock_for::<A>("amock".to_owned());
@@ -297,7 +295,7 @@ fn test_create_mock() {
 }
 
 #[test]
-#[should_panic(expected="Unexpected call to `A#0.bar(12)`")]
+#[should_panic(expected="unexpected call to `A#0.bar(12)`")]
 fn test_format_args() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
