@@ -8,9 +8,10 @@ use collections::range::RangeArgument;
 use collections::fmt::Write;
 
 pub use self::ext::*;
+pub use self::option::*;
 
 mod ext;
-
+mod option;
 
 pub struct MatchAny;
 impl ToString for MatchAny {

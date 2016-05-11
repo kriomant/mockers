@@ -313,3 +313,56 @@ fn test_range_mismatch() {
 
     mock.bar(5);
 }
+
+#[test]
+fn test_none_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.cmplx_call(none()).and_return(()));
+
+    mock.cmplx(None);
+}
+
+#[test]
+#[should_panic(expected="Some(2) is not equal to None")]
+fn test_none_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.cmplx_call(none()).and_return(()));
+
+    mock.cmplx(Some(2));
+}
+
+#[test]
+fn test_some_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.cmplx_call(some(gt(3))).and_return(()));
+
+    mock.cmplx(Some(4));
+}
+
+#[test]
+#[should_panic(expected="is None")]
+fn test_some_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.cmplx_call(some(gt(3))).and_return(()));
+
+    mock.cmplx(None);
+}
+
+#[test]
+#[should_panic(expected="2 is not greater than 3")]
+fn test_some_inner_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.cmplx_call(some(gt(3))).and_return(()));
+
+    mock.cmplx(Some(2));
+}
