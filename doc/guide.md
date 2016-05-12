@@ -417,4 +417,24 @@ let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned())
 
 There is also corresponding `create_named_mock` method for external trait mock.
 
+## Error messages
+
+*Mockers* library tries to produce helpful error messages. It highlights key moments so you can easily spot problem.
+And it provides additional information which may help you to resolve this problem:
+
+![highlighted output](highlight.png)
+
+When no matching expectation found for call on some mock object, it will search other mock objects of the same type for matching expectation. This helps to diagnose common problem when expectation is added for invalid mock object:
+
+```
+error: unexpected call to `AirConditioner#1.get_temperature()`
+
+note: there are no active expectations for AirConditioner#1.get_temperature
+note: there are matching expectations for another mock objects
+
+  expectation `AirConditioner#0.get_temperature()`
+```
+
+If your test fails and you can't **quickly** understand why, please tell me about your case and we will think how diagnostics can be improved.
+
 [Google Mock]: https://github.com/google/googletest/blob/master/googlemock/README.md

@@ -100,12 +100,14 @@ failures:
 
 ---- test::test_set_temperature_20 stdout ----
 	thread 'test::test_set_temperature_20' panicked at '
-Unexpected call to `AirConditioner#0.make_hotter`
 
-Here are active expectations for same method call:
+error: unexpected call to `AirConditioner#0.make_hotter(36)`
 
-  Expectation `AirConditioner#0.make_hotter(4)`:
-    Arg #0: 36 is not equal to 4
+note: here are active expectations for AirConditioner#0.make_hotter
+
+  expectation `AirConditioner#0.make_hotter(4)`:
+    arg #0: 36 is not equal to 4
+
 '
 note: Run with `RUST_BACKTRACE=1` for a backtrace.
 
