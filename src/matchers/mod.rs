@@ -9,9 +9,11 @@ use collections::fmt::Write;
 
 pub use self::ext::*;
 pub use self::option::*;
+pub use self::result::*;
 
 mod ext;
 mod option;
+mod result;
 
 pub struct MatchAny;
 impl ToString for MatchAny {

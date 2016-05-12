@@ -366,3 +366,72 @@ fn test_some_inner_mismatch() {
 
     mock.cmplx(Some(2));
 }
+
+#[derive(Mock)]
+trait ResultTest {
+    fn func(&self, arg: Result<usize, &'static str>);
+}
+
+#[test]
+fn test_err_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(err("Boom")).and_return(()));
+
+    mock.func(Err("Boom"));
+}
+
+#[test]
+#[should_panic(expected="Ok(2) is not Err")]
+fn test_err_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(err(ANY)).and_return(()));
+
+    mock.func(Ok(2));
+}
+
+#[test]
+#[should_panic(expected="\"Boom\" is not equal to \"Oops\"")]
+fn test_err_inner_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(err("Oops")).and_return(()));
+
+    mock.func(Err("Boom"));
+}
+
+#[test]
+fn test_ok_match() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(ok(gt(3))).and_return(()));
+
+    mock.func(Ok(4));
+}
+
+#[test]
+#[should_panic(expected="Err(\"Boom\") is not Ok")]
+fn test_ok_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(ok(gt(3))).and_return(()));
+
+    mock.func(Err("Boom"));
+}
+
+#[test]
+#[should_panic(expected="2 is not greater than 3")]
+fn test_ok_inner_mismatch() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<ResultTest>();
+
+    scenario.expect(mock.func_call(ok(gt(3))).and_return(()));
+
+    mock.func(Ok(2));
+}
