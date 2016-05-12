@@ -218,6 +218,8 @@ This is why we can pass value `4` to `make_hotter_call`.
     cond.make_hotter_call(and(gt(3), lt(10)).and_return(());
     ```
 
+  * `none`, `some`, `ok`, `err` matchers for `Option` and `Result`
+
 You can also use function returning `bool` to match argument:
 
 ```rust
