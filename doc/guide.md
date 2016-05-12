@@ -212,13 +212,24 @@ This is why we can pass value `4` to `make_hotter_call`.
     cond.make_hotter_call(le(5)).and_return(());
     ```
 
+  * `in_range` will check whether value is contained in range:
+    ```rust
+    use mockers::matchers::in_range;
+    cond.make_hotter_call(in_range(1..)).and_return(());
+    cond.make_hotter_call(in_range(10..20)).and_return(());
+    ```
+
   * `not`, `and`, `or` will combine other matchers:
     ```rust
     use mockers::matchers::{gt, lt};
-    cond.make_hotter_call(and(gt(3), lt(10)).and_return(());
+    cond.make_hotter_call(and(gt(3), lt(10))).and_return(());
     ```
 
   * `none`, `some`, `ok`, `err` matchers for `Option` and `Result`
+    ```rust
+    use mockers::matchers::{some, lt};
+    cond.opt_call(some(gt(3))).and_return(());
+    ```
 
 You can also use function returning `bool` to match argument:
 
@@ -261,7 +272,8 @@ there are others:
 
   * `call_match.and_panic(msg)` will panic with given message;
   * `call_match.and_call(|arg| { arg + 1 })` will call provided closure and
-    returns its result.
+    returns its result;
+  * `call_match.and_return_default()` will create and return default value for types implementing `Default`.
 
 ### Expecting no calls
 
