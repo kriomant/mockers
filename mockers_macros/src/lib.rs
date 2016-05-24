@@ -388,7 +388,8 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let body_expr = cx.expr_call(sp, cx.expr_path(new_method_path), new_args);
     let body = cx.block(sp, vec![], Some(body_expr));
     let mut ainputs = inputs.clone();
-    ainputs.insert(0, Arg::new_self(sp, Mutability::Immutable, keywords::SelfValue.ident()));
+    let explicit_self = respan(sp, SelfKind::Region(None, Mutability::Immutable, keywords::SelfValue.ident()));
+    ainputs.insert(0, Arg::from_self(explicit_self.clone(), sp, Mutability::Immutable));
 
     let call_sig = MethodSig {
         unsafety: Unsafety::Normal,
@@ -400,7 +401,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             variadic: false,
         }),
         generics: generics,
-        explicit_self: respan(sp, SelfKind::Region(None, Mutability::Immutable, expect_method_name)),
+        explicit_self: explicit_self,
     };
 
     let impl_subitem = ImplItem {
@@ -466,6 +467,12 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         cx.expr_tup_field_access(sp, quote_expr!(cx, _args_ref), i)
     }).collect();
 
+    let self_ident = match self_kind {
+        &SelfKind::Static => unreachable!(),
+        &SelfKind::Value(ident) => ident,
+        &SelfKind::Region(_, _, ident) => ident,
+        &SelfKind::Explicit(_, ident) => ident,
+    };
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
         let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
@@ -476,13 +483,13 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             let _args_ref: &$args_tuple_type = unsafe { std::mem::transmute(args_ptr) };
             format!($args_format_str, $args_tuple_fields)
         }
-        let call = ::mockers::Call { mock_id: self.mock_id,
+        let call = ::mockers::Call { mock_id: $self_ident.mock_id,
                                      mock_type_id: $mock_type_id,
                                      method_name: $method_name,
                                      args_ptr: args_ptr,
                                      destroy: destroy,
                                      format_args: format_args };
-        let result_ptr: *mut u8 = self.scenario.borrow_mut().verify(call);
+        let result_ptr: *mut u8 = $self_ident.scenario.borrow_mut().verify(call);
         let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
         *result
     }).unwrap();
@@ -494,7 +501,8 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         };
         cx.arg(sp, ident.node, a.ty.clone())
     }).collect();
-    impl_args.insert(0, Arg::new_self(sp, Mutability::Immutable, keywords::SelfValue.ident()));
+    let explicit_self = respan(sp, self_kind.clone());
+    impl_args.insert(0, Arg::from_self(explicit_self.clone(), sp, Mutability::Immutable));
     let impl_sig = MethodSig {
         unsafety: Unsafety::Normal,
         constness: Constness::NotConst,
@@ -505,7 +513,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             variadic: false,
         }),
         generics: Generics::default(),
-        explicit_self: respan(sp, self_kind.clone()),
+        explicit_self: explicit_self,
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,

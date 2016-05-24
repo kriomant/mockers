@@ -16,10 +16,10 @@ Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mockers_macros = "0.4.0"
+mockers_macros = "0.4.1"
 
 [dev-dependencies]
-mockers = "0.4.0"
+mockers = "0.4.1"
 ```
 
 Now you are ready to start testing.
