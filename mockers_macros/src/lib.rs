@@ -11,7 +11,7 @@ use syntax::ast::{TokenTree, Item, ItemKind, TraitItemKind, Unsafety, Constness,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   PathParameters, TyParamBound, Defaultness, MetaItem, DUMMY_NODE_ID};
-use syntax::codemap::{Span, respan};
+use syntax::codemap::{Span, Spanned, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, SyntaxExtension,
                         Annotatable};
 use syntax::parse::parser::PathStyle;
@@ -203,16 +203,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                 cx.span_err(member.span, "parametrized trait methods are not supported");
                 continue;
             }
-            match sig.explicit_self.node {
-                SelfKind::Value(_) |
-                SelfKind::Region(None, _, _) => (),
-                _ => {
-                    cx.span_err(member.span, "only methods with implicit `self` (`self`, `&self` or `&mut self`) are supported");
-                    continue;
-                }
-            }
 
-            if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.explicit_self.node, &sig.decl) {
+            if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl) {
                 impl_methods.push(methods.impl_method);
                 trait_impl_methods.push(methods.trait_impl_method);
             }
@@ -279,9 +271,24 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
-                          method_ident: Ident, self_kind: &SelfKind,
-                          decl: &FnDecl) -> Option<GeneratedMethods> {
+                          method_ident: Ident, decl: &FnDecl) -> Option<GeneratedMethods> {
+    match decl.get_self() {
+        Some(Spanned { span: _, node: SelfKind::Value(..)}) |
+        Some(Spanned { span: _, node: SelfKind::Region(..)}) => {},
+
+        Some(Spanned { span: sp_arg, node: SelfKind::Explicit(..)}) => {
+            cx.span_err(sp_arg, "methods with explicit `self` are not supported");
+            return None;
+        },
+
+        None => {
+            cx.span_err(sp, "only non-static methods (with `self`, `&self` or `&mut self` argument) are supported");
+            return None;
+        }
+    };
+
     // Arguments without `&self`.
+    let self_arg = &decl.inputs[0];
     let args = &decl.inputs[1..];
 
     let return_type = match decl.output {
@@ -301,7 +308,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
 
     let trait_impl_method = generate_trait_impl_method(
             cx, sp, mock_type_id, method_ident,
-            self_kind, args, &return_type);
+            &self_arg, args, &return_type);
     let impl_method = generate_impl_method(cx, sp, mock_type_id, method_ident, args, &return_type);
 
     if let (Some(tim), Some(im)) = (trait_impl_method, impl_method) {
@@ -388,8 +395,10 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let body_expr = cx.expr_call(sp, cx.expr_path(new_method_path), new_args);
     let body = cx.block(sp, vec![], Some(body_expr));
     let mut ainputs = inputs.clone();
-    let explicit_self = respan(sp, SelfKind::Region(None, Mutability::Immutable, keywords::SelfValue.ident()));
-    ainputs.insert(0, Arg::from_self(explicit_self.clone(), sp, Mutability::Immutable));
+
+    let self_arg = Arg::from_self(respan(sp, SelfKind::Region(None, Mutability::Immutable)),
+                                  respan(sp, keywords::SelfValue.ident()));
+    ainputs.insert(0, self_arg.clone());
 
     let call_sig = MethodSig {
         unsafety: Unsafety::Normal,
@@ -401,7 +410,6 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             variadic: false,
         }),
         generics: generics,
-        explicit_self: explicit_self,
     };
 
     let impl_subitem = ImplItem {
@@ -440,7 +448,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 /// ```
 /// where constant marked with "mock_id" is unique trait method ID.
 fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
-                              method_ident: Ident, self_kind: &SelfKind,
+                              method_ident: Ident, self_arg: &Arg,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
     let method_name = method_ident.name.as_str();
     // Generate expression returning tuple of all method arguments.
@@ -467,12 +475,13 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         cx.expr_tup_field_access(sp, quote_expr!(cx, _args_ref), i)
     }).collect();
 
-    let self_ident = match self_kind {
-        &SelfKind::Static => unreachable!(),
-        &SelfKind::Value(ident) => ident,
-        &SelfKind::Region(_, _, ident) => ident,
-        &SelfKind::Explicit(_, ident) => ident,
+    let self_ident = if let PatKind::Ident(_, spanned_ident, _) = self_arg.pat.node {
+        spanned_ident.node
+    } else {
+        cx.span_err(sp, "Patterns for `self` argument are not supported");
+        return None;
     };
+
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
         let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
@@ -501,8 +510,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         };
         cx.arg(sp, ident.node, a.ty.clone())
     }).collect();
-    let explicit_self = respan(sp, self_kind.clone());
-    impl_args.insert(0, Arg::from_self(explicit_self.clone(), sp, Mutability::Immutable));
+    impl_args.insert(0, self_arg.clone());
     let impl_sig = MethodSig {
         unsafety: Unsafety::Normal,
         constness: Constness::NotConst,
@@ -513,7 +521,6 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             variadic: false,
         }),
         generics: Generics::default(),
-        explicit_self: explicit_self,
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
