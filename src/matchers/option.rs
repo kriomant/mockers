@@ -10,9 +10,9 @@ pub fn none<T>() -> Option<T> { None }
 pub struct MatchSome<T, M: MatchArg<T>>(M, PhantomData<T>);
 impl<T: Debug, M: MatchArg<T>> MatchArg<Option<T>> for MatchSome<T, M> {
     fn matches(&self, option: &Option<T>) -> Result<(), String> {
-        match option {
-            &Some(ref value) => self.0.matches(value),
-            &None => Err(format!("is None")),
+        match *option {
+            Some(ref value) => self.0.matches(value),
+            None => Err("is None".to_owned()),
         }
     }
     fn describe(&self) -> String { format!("some({})", self.0.describe()) }

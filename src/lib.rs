@@ -217,7 +217,7 @@ impl<Res: Clone + 'static> CallMatch0<Res> {
 }
 impl<Res: Default + 'static> CallMatch0<Res> {
     pub fn and_return_default(self) -> Reaction0<Res> {
-        Reaction0 { call_match: self, action: Box::new(|| Res::default()) }
+        Reaction0 { call_match: self, action: Box::new(Res::default) }
     }
 }
 
@@ -242,7 +242,7 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
     }
 
     fn get_args_ref(call: &Call) -> &mut (Arg0,) {
-        unsafe { std::mem::transmute(call.args_ptr) }
+        unsafe { &mut *(call.args_ptr as *mut (Arg0,)) }
     }
 
     fn get_args(mut call: Call) -> Box<(Arg0,)> {
@@ -399,7 +399,7 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     }
 
     fn get_args_ref(call: &Call) -> &mut (Arg0, Arg1) {
-        unsafe { std::mem::transmute(call.args_ptr) }
+        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1)) }
     }
 
     fn get_args(mut call: Call) -> Box<(Arg0, Arg1)> {
@@ -563,7 +563,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     }
 
     fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2) {
-        unsafe { std::mem::transmute(call.args_ptr) }
+        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1, Arg2)) }
     }
 
     fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2)> {
@@ -732,7 +732,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     }
 
     fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2, Arg3) {
-        unsafe { std::mem::transmute(call.args_ptr) }
+        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1, Arg2, Arg3)) }
     }
 
     fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2, Arg3)> {
@@ -899,6 +899,7 @@ impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
     }
 }
 
+#[derive(Default)]
 pub struct Sequence {
     expectations: Vec<Box<Expectation>>,
 }
@@ -1049,6 +1050,10 @@ impl Scenario {
     }
 }
 
+impl Default for Scenario {
+    fn default() -> Self { Self::new() }
+}
+
 impl Drop for Scenario {
     fn drop(&mut self) {
         // Test is already failed, so it isn't necessary to check remaining
@@ -1159,11 +1164,11 @@ impl ScenarioInternals {
 
                 write!(&mut msg, "\n  expectation `{}.{}`:\n", mock_name, expectation.describe()).unwrap();
                 for (index, res) in expectation.call_match().validate(&call).iter().enumerate() {
-                    match res {
-                        &Err(ref err) =>
+                    match *res {
+                        Err(ref err) =>
                             write!(&mut msg, concat!("    arg #{}: ", colored!(bold: "{}"), "\n"),
                                    index, err).unwrap(),
-                        &Ok(()) => ()
+                        Ok(()) => ()
                     }
                 }
             }

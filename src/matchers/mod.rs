@@ -114,8 +114,8 @@ impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
 }
 impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
     fn matches(&self, arg: &T) -> Result<(), String> {
-        let matches_start = self.range.start().map(|s| arg >= s).unwrap_or(true);
-        let matches_end = self.range.end().map(|e| arg < e).unwrap_or(true);
+        let matches_start = self.range.start().map_or(false, |s| arg >= s);
+        let matches_end = self.range.end().map_or(true, |e| arg < e);
         if matches_start && matches_end {
             Ok(())
         } else {

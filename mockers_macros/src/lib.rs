@@ -41,8 +41,8 @@ static mut next_mock_type_id: usize = 0;
 #[allow(unused)]
 pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item: &Annotatable,
                    push: &mut FnMut(Annotatable)) {
-    let (ident, subitems) = match ann_item {
-        &Annotatable::Item(ref item) =>
+    let (ident, subitems) = match *ann_item {
+        Annotatable::Item(ref item) =>
             match item.node {
                 ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
                     if unsafety != Unsafety::Normal {
@@ -64,7 +64,7 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
                     return;
                 }
             },
-        &Annotatable::TraitItem(_) | &Annotatable::ImplItem(_) => {
+        Annotatable::TraitItem(_) | Annotatable::ImplItem(_) => {
             cx.span_err(span, "Deriving Mock is possible for traits only");
             return;
         }
@@ -72,7 +72,7 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
     let mock_ident = cx.ident_of(&format!("{}Mock", ident.name.as_str()));
     let trait_path = cx.path_ident(span, ident);
 
-    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, &subitems, true);
+    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, subitems, true);
     for item in generated_items {
         let item = item.map(|mut it| {
             it.attrs.push(quote_attr!(cx, #[cfg(test)]));
@@ -152,7 +152,7 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                         identifier: item.ident,
                         parameters: PathParameters::none(),
                     });
-                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, &trait_subitems, false);
+                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, trait_subitems, false);
                     MacEager::items(SmallVector::many(generated_items))
                 },
                 _ => {
@@ -273,8 +273,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
                           method_ident: Ident, decl: &FnDecl) -> Option<GeneratedMethods> {
     match decl.get_self() {
-        Some(Spanned { span: _, node: SelfKind::Value(..)}) |
-        Some(Spanned { span: _, node: SelfKind::Region(..)}) => {},
+        Some(Spanned { node: SelfKind::Value(..), ..}) |
+        Some(Spanned { node: SelfKind::Region(..), ..}) => {},
 
         Some(Spanned { span: sp_arg, node: SelfKind::Explicit(..)}) => {
             cx.span_err(sp_arg, "methods with explicit `self` are not supported");
@@ -308,7 +308,7 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
 
     let trait_impl_method = generate_trait_impl_method(
             cx, sp, mock_type_id, method_ident,
-            &self_arg, args, &return_type);
+            self_arg, args, &return_type);
     let impl_method = generate_impl_method(cx, sp, mock_type_id, method_ident, args, &return_type);
 
     if let (Some(tim), Some(im)) = (trait_impl_method, impl_method) {
@@ -446,7 +446,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 ///     *result;
 /// }
 /// ```
-/// where constant marked with "mock_id" is unique trait method ID.
+/// where constant marked with `mock_id` is unique trait method ID.
 fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                               method_ident: Ident, self_arg: &Arg,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
