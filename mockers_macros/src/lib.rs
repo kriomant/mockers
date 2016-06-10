@@ -84,9 +84,9 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
 
 fn generate_mock(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
     match args {
-        [TokenTree::Token(_, Token::Ident(mock_ident)),
-         TokenTree::Token(comma_span, Token::Comma),
-         rest..] => {
+        &[TokenTree::Token(_, Token::Ident(mock_ident)),
+          TokenTree::Token(comma_span, Token::Comma),
+          ref rest..] => {
             let trait_sp = sp.trim_start(comma_span).unwrap();
             generate_mock_for_trait_tokens(cx, trait_sp, mock_ident, rest)
         }
