@@ -6,7 +6,7 @@ extern crate itertools;
 
 use rustc_plugin::Registry;
 use syntax::abi::Abi;
-use syntax::ast::{TokenTree, Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
+use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
@@ -14,11 +14,13 @@ use syntax::ast::{TokenTree, Item, ItemKind, TraitItemKind, Unsafety, Constness,
 use syntax::codemap::{Span, Spanned, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, SyntaxExtension,
                         Annotatable};
+use syntax::feature_gate::AttributeType;
 use syntax::parse::parser::PathStyle;
 use syntax::parse::token::{self, keywords, Token, intern};
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 use syntax::print::pprust;
+use syntax::tokenstream::TokenTree;
 
 use syntax::ext::build::AstBuilder;
 use itertools::Itertools;
@@ -26,9 +28,10 @@ use itertools::Itertools;
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
     reg.register_macro("mock", generate_mock);
-    reg.register_macro("mock", generate_mock);
+
     reg.register_syntax_extension(intern("derive_Mock"),
                                   SyntaxExtension::MultiDecorator(Box::new(derive_mock)));
+    reg.register_attribute("derive_Mock".to_owned(), AttributeType::Whitelisted);
 }
 
 /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
@@ -393,7 +396,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let new_method_path = quote_path!(cx, ::mockers::$call_match_ident::new);
     let body_expr = cx.expr_call(sp, cx.expr_path(new_method_path), new_args);
-    let body = cx.block(sp, vec![], Some(body_expr));
+    let body = cx.block_expr(body_expr);
     let mut ainputs = inputs.clone();
 
     let self_arg = Arg::from_self(respan(sp, SelfKind::Region(None, Mutability::Immutable)),

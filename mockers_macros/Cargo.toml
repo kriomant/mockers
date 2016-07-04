@@ -1,6 +1,6 @@
 [package]
 name = "mockers_macros"
-version = "0.4.3"
+version = "0.4.4"
 description = "Compiler plugin for 'mockers' mocking library"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 repository = "https://github.com/kriomant/mockers"
