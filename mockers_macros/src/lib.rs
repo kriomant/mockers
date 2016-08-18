@@ -297,10 +297,6 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
     let return_type = match decl.output {
         FunctionRetTy::Default(span) => cx.ty(span, TyKind::Tup(vec![])),
         FunctionRetTy::Ty(ref ty) => ty.clone(),
-        FunctionRetTy::None(span) => {
-            cx.span_err(span, "Diverging functions are not supported yet");
-            return None
-        }
     };
 
     let mock_type_id = unsafe {
