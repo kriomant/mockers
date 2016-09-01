@@ -194,7 +194,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
                 cx.span_err(member.span, "unsafe trait methods are not supported");
                 continue;
             }
-            if sig.constness != Constness::NotConst {
+            if sig.constness.node != Constness::NotConst {
                 cx.span_err(member.span, "const trait methods are not supported");
                 continue;
             }
@@ -382,6 +382,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let output = quote_ty!(cx, $ret_type); //cx.ty_path(ret_type.clone());
     let expect_method_name = cx.ident_of(&format!("{}_call", method_ident.name.as_str()));
     let generics = Generics {
+        span: sp,
         lifetimes: vec![],
         ty_params: P::from_vec(arg_matcher_types),
         where_clause: WhereClause {
@@ -401,7 +402,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let call_sig = MethodSig {
         unsafety: Unsafety::Normal,
-        constness: Constness::NotConst,
+        constness: respan(sp, Constness::NotConst),
         abi: Abi::Rust,
         decl: P(FnDecl {
             inputs: ainputs,
@@ -512,7 +513,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     impl_args.insert(0, self_arg.clone());
     let impl_sig = MethodSig {
         unsafety: Unsafety::Normal,
-        constness: Constness::NotConst,
+        constness: respan(sp, Constness::NotConst),
         abi: Abi::Rust,
         decl: P(FnDecl {
             inputs: impl_args,
