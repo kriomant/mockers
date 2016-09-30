@@ -28,10 +28,17 @@ is required**. It was tested to work with *1.11.0-nightly (1ab87b65a 2016-07-02)
 This is a very short introduction to show what is possible and
 how it looks. Read [User Guide] for details.
 
-Use nightly Rust:
+This library requires nightly Rust.  
 
-```sh
-$ multirust override nighly
+For multirust, run the following command:
+```
+$ multirust override nightly
+```
+
+Or if you're using rustup:
+
+```
+$ rustup override set nightly
 ```
 
 Cargo.toml:
