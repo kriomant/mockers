@@ -95,7 +95,7 @@ mod test {
 
 Run tests:
 
-```rust
+```
 $ cargo test
    Compiling air v0.1.0 (file:///Users/kriomant/Temp/air)
      Running target/debug/air-b2c5f8b6920cb30a
