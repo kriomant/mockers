@@ -83,12 +83,12 @@ mod test {
   #[test]
   fn test_set_temperature_20() {
       let mut scenario = Scenario::new();
-      let cond = scenario.create_mock_for::<AirConditioner>();
+      let mut cond = scenario.create_mock_for::<AirConditioner>();
 
       scenario.expect(cond.get_temperature_call().and_return(16));
       scenario.expect(cond.make_hotter_call(4).and_return(()));
 
-      set_temperature_20(&cond);
+      set_temperature_20(&mut cond);
   }
 }
 ```
