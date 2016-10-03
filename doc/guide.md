@@ -197,7 +197,7 @@ In this case we just use a fixed value to verify the call, but expectations are
 not limited to that.
 
 For every parameter `arg: T` of the original method, the corresponding `_call` method
-has an `arg: M where M: MatchArg<T>` parameter, i.e. it received matcher for
+has an `arg: M where M: MatchArg<T>` parameter, i.e. it receives a matcher for an
 argument of type `T`.
 
 Any type `T` which implements `Eq` automatically implements `MatchArg<T>`.
