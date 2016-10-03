@@ -6,13 +6,21 @@ It is inspired by [Google Mock].
 
 ## Getting Started
 
-First you need to know is that mocking magic is implemented using compiler plugin, so **nightly Rust is required**. Thus you may want to run
+First you need to know that the mocking magic is implemented as a compiler plugin, so **nightly Rust is required**. Thus you may want to run
 
 ```sh
 $ multirust override nightly
 ```
 
-Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
+or
+
+```sh
+$ rustup override set nightly
+```
+
+if you use [rustup](http://rustup.rs/).
+
+Next, add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -28,7 +36,7 @@ Now you are ready to start testing.
 
 ### Basics
 
-Say we have `air` crate with some trait and method using this trait:
+Say we have an `air` crate with some trait and a function using this trait:
 
 ```rust
 // src/lib.rs
@@ -50,7 +58,7 @@ pub fn set_temperature_20(cond: &mut AirConditioner) {
 }
 ```
 
-Import `mockers` crate and `mockers_macros` compiler plugin:
+Import the `mockers` crate and the `mockers_macros` compiler plugin:
 
 ```rust
 // src/lib.rs
@@ -63,7 +71,7 @@ Import `mockers` crate and `mockers_macros` compiler plugin:
 …
 ```
 
-Now derive `Mock` implementation for trait:
+Now derive a `Mock` implementation from the trait:
 
 ```rust
 #[derive(Mock)]
@@ -130,18 +138,18 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
 error: test failed
 ```
 
-Seems we have a problem, which is clearly explained: we expected
+Seems like we have a problem, which is clearly explained: we expected
 that `make_hotter` will be called with value `4` and in fact it
 was called with value `36`. We found bug in our function.
 
-Lets examine test content line by line.
+Lets examine the test content line by line.
 
 ```rust
 let mut scenario = Scenario::new();
 ```
 
-Here we create `Scenario` instance, which tracks all mock objects
-and expectations. When scenario object is destroyed it checks
+Here we create a `Scenario` instance, which tracks all mock objects
+and expectations. When the scenario object is destroyed it checks
 that all expectations are satisfied and fails otherwise.
 
 ```rust
@@ -150,27 +158,27 @@ scenario.expect(cond.get_temperature_call().and_return(16));
 scenario.expect(cond.make_hotter_call(4).and_return(()));
 ```
 
-Here we create mock object which implements `AirConditioner` trait and
-add expectations. Note that concrete mock type is not specified, in fact
-`#[derive(Mock)]` clause will generate `AirConditionerMock` struct, i.e.
-it just adds `Mock` suffix to trait name. But this is implementation detail,
-don't rely on it.
+Here we create a mock object which implements the `AirConditioner` trait and
+add expectations. Note that the concrete mock type is not specified. In fact the
+`#[derive(Mock)]` clause will generate an `AirConditionerMock` struct, i.e.
+it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
+Don't rely on it.
 
-In addition to methods from `AirConditioner` trait mock object has second
-set of methods which are named after trait methods, but with added
+In addition to methods from the `AirConditioner` trait, the mock object has a second
+set of methods which are named after trait methods, but with an additional
 `_call` suffix.
 
-In this case, for example, we have `get_temperature` method used by tested code
-and `get_temperature_call` method used by testing code for creating expectation.
+In this case, for example, these are the `get_temperature` method used by the tested code
+and the `get_temperature_call` method used by the testing code for creating expectations.
 
-`*_call` methods return "call matcher" objects which are used by scenario
-to find expectation matching performed call. But it isn't yet expectation
-because we didn't specified reaction to this call.
+`*_call` methods return "call matcher" objects which are used by the scenario
+to find expectations matching the performed call. But it isn't an expectation yet,
+because we didn't specify any reaction to this call.
 
-So we call `.and_return(16)` and get expectation object, which now may be
-added to scenario with `scenario.expect(…)`.
+So we call `.and_return(16)` and get an expectation object, which may now be
+added to the scenario with `scenario.expect(…)`.
 
-Finally, function under testing is runned:
+Finally we run the function under test:
 
 ```rust
 set_temperature_20(&mut cond);
@@ -178,26 +186,26 @@ set_temperature_20(&mut cond);
 
 ### Argument Matchers
 
-Look at expectation from previous example:
+Consider the expectation from the previous example:
 
 ```rust
 cond.make_hotter_call(4).and_return(())
 ```
 
-`*_call` methods have the same number of arguments as original method does.
-In this case we just use fixed value to verify call, but expectations are
-not limited to them.
+`*_call` methods have the same number of arguments as the original method.
+In this case we just use a fixed value to verify the call, but expectations are
+not limited to that.
 
-For every parameter `arg: T` of original method corresponding `_call` method
-has `arg: M where M: MatchArg<T>` parameter, i.e. it received matcher for
+For every parameter `arg: T` of the original method, the corresponding `_call` method
+has an `arg: M where M: MatchArg<T>` parameter, i.e. it received matcher for
 argument of type `T`.
 
-Any type `T` which implements `Eq` automatically implements `MatchArg<T>`
-and it matches argument by checking it for equality to specified value.
+Any type `T` which implements `Eq` automatically implements `MatchArg<T>`.
+The arguments get matched by checking for equality with the specified value.
 
-This is why we can pass value `4` to `make_hotter_call`.
+This is why we can pass the value `4` to `make_hotter_call`.
 
-`matchers` module contains other matchers which may be useful:
+The `matchers` module contains other matchers which may be useful:
 
   * `ANY` will match any value:
     ```rust
@@ -205,14 +213,14 @@ This is why we can pass value `4` to `make_hotter_call`.
     cond.make_hotter_call(ANY).and_return(());
     ```
 
-  * `lt`, `le`, `eq`, `ne`, `ge`, `gt` will compare argument with specified value
+  * `lt`, `le`, `eq`, `ne`, `ge`, `gt` will compare the argument with a specified value
     using `<`, `<=`, `==`, `!=`, `>=` and `>` respectively:
     ```rust
     use mockers::matchers::le;
     cond.make_hotter_call(le(5)).and_return(());
     ```
 
-  * `in_range` will check whether value is contained in range:
+  * `in_range` will check whether the value is contained in range:
     ```rust
     use mockers::matchers::in_range;
     cond.make_hotter_call(in_range(1..)).and_return(());
@@ -231,18 +239,18 @@ This is why we can pass value `4` to `make_hotter_call`.
     cond.opt_call(some(gt(3))).and_return(());
     ```
 
-You can also use function returning `bool` to match argument:
+You can also use a function returning `bool` to match an argument:
 
 ```rust
 use mockers::matchers::check;
 cond.make_hotter_call(check(|t: usize| t > 4)).and_return(());
 ```
 
-While provided named matcher will produce nice error message in case
-of argument value mismatch, like ```4 is not greater than 5```, checking
-with function will produce non-informative ```<custom function>```.
+While the provided named matchers will produce nice error messages in case
+of argument value mismatch, like ```4 is not greater than 5```, checks
+using a custom function will produce a non-informative ```<custom function>``` output.
 
-You can improve error message by using `check!` macro instead of `check`
+You can improve the error message by using the `check!` macro instead of the `check`
 function:
 
 ```rust
@@ -253,8 +261,8 @@ cond.make_hotter_call(check!(|t: usize| t > 4)).and_return(());
 In case of failure it produces: ```3 doesn't satisfy to |t: usize| t > 4```,
 which is more useful.
 
-Another useful macro is `arg!` which allows to check whether argument
-matches specified pattern:
+Another useful macro is `arg!`, which allows to check whether an argument
+matches a specified pattern:
 
 ```rust
 #[macro_use(arg)] extern crate mockers;
@@ -266,19 +274,19 @@ case of failure.
 
 ### Reactions
 
-You already know that we have to add reaction to call match to
-create expectation. We have already used `and_return` reaction, but
+You already know that we have to add a reaction to a call match to
+create an expectation. We have already used the `and_return` reaction, but
 there are others:
 
   * `call_match.and_panic(msg)` will panic with given message;
   * `call_match.and_call(|arg| { arg + 1 })` will call provided closure and
     returns its result;
-  * `call_match.and_return_default()` will create and return default value for types implementing `Default`.
+  * `call_match.and_return_default()` will create and return the default value for types implementing `Default`.
 
 ### Expecting no calls
 
-Sometimes you have to ensure that specified call won't be performed.
-You may use `never()` reaction for this:
+Sometimes you have to ensure that a specified call won't be performed.
+You may use the `never()` reaction for this:
 
 ```rust
 scenario.expect(cond.make_hotter_call(ANY).never());
@@ -286,20 +294,20 @@ scenario.expect(cond.make_hotter_call(ANY).never());
 
 ### Expecting several calls
 
-Note that mock call result is passed to `and_return` by value. Obviously
-in common case it may be used just once. This is why specifying such
-reaction creates expectation which will match just one call.
+Note that the mock call result is passed to `and_return` by value. Obviously
+it may be used just once in common case. This is why specifying such a
+reaction creates an expectation which will match just one call.
 
-Same is applied to `and_call`: `FnOnce` closure is used there.
+Same applies when the `and_call`: `FnOnce` closure is used instead.
 
-However, when result type implements `Clone`, it is possible to return
-it's copies several times.
+However, when the result type implements `Clone`, it is possible to return
+its copies several times.
 
-Thus there are additional methods on call matchers: `and_return_clone` and `and_call_clone`.
-They are available only when result type is clonable (or closure is `FnMut`).
+Thus, there are additional methods on call matchers: `and_return_clone` and `and_call_clone`.
+They are available only when the result type is clonable (or the closure is `FnMut`).
 
-Calling these methods won't return expectation, because now it is not clear
-now many times call must be matched. So you have to additionally call `times`
+Calling these methods won't return an expectation, because it is not clear
+yet, how many times a call must be matched. So you have to additionally call `times`
 on it:
 
 ```rust
@@ -308,7 +316,7 @@ scenario.expect(cond.get_temperature_call().and_return_clone(16).times(2));
 
 ### Order of calls
 
-Order in which calls are made is not important, expectations are not ordered.
+The order in which calls are made is not important, expectations are not ordered.
 Thus following will succeed:
 
 ```rust
@@ -346,8 +354,8 @@ scenario.expect(cond.make_hotter_call(4).and_return(()));
 cond.make_hotter(4);
 ```
 
-Here `4` matches both `4` and `ANY`. The rule is that most recent
-matching expectation is used. This allows to mock more general
+Here `4` matches both `4` and `ANY`. The rule is that the most recent
+matching expectation is used. This allows to mock the general
 behavior first and then override it for some specific values.
 
 ### Checkpoints
@@ -366,17 +374,17 @@ scenario.expect(cond.make_hotter_call(5).and_return(()));
 cond.make_hotter(5);
 ```
 
-There is implicit checkpoint call when scenario object is destroyed.
+There is an implicit checkpoint call when a scenario object is destroyed.
 
 ### Usage from Test Crate
 
-Using `#[derive(Mock)]` is the easiest way to create mock.
+Using `#[derive(Mock)]` is the easiest way to create a mock.
 
-However sometimes you don't want to have tests-related code in you `src` directory. Or trait you want to mock is from another crate.
+However sometimes you don't want to have tests-related code in your `src` directory. Or a trait you want to mock is from another crate.
 
 (Note that all items produced by `#[derive(Mock)]` are wrapped with #[cfg(test)], so it won't go into your production binary.)
 
-Anyway, this is how you can "mockify" external trait.
+Anyway, this is how you can "mockify" an external trait.
 
 ```rust
 // tests/lib.rs
@@ -411,32 +419,32 @@ fn test() {
 ```
 
 Unfortunately, compiler plugins work on syntax level and
-can't get trait definition just by it's name. So you have
-to copy-paste definition.
+can't infer the trait definition just by its name. So you have
+to copy-paste the definition.
 
 ### Named mockers
 
 By default, when you create mock objects, they are named
-after mocked trait name and their ordinal number. You may see mock name in error message: ```Unexpected call to `AirConditioner#0.make_hotter` ```.
+after the mocked trait name and their ordinal number. You may see a mock name in the error message: ```Unexpected call to `AirConditioner#0.make_hotter` ```.
 
 This may be inconvenient when you have several mock objects
-of same type. Just name them!
+of the same type. Just name them!
 
 ```rust
 let left = scenario.create_named_mock_for::<AirConditioner>("left".to_owned());
 let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned());
 ```
 
-There is also corresponding `create_named_mock` method for external trait mock.
+There is also a corresponding `create_named_mock` method for external trait mocks.
 
 ## Error messages
 
-*Mockers* library tries to produce helpful error messages. It highlights key moments so you can easily spot problem.
+The *Mockers* library tries to produce helpful error messages. It highlights key moments so you can easily spot a problem.
 And it provides additional information which may help you to resolve this problem:
 
 ![highlighted output](highlight.png)
 
-When no matching expectation found for call on some mock object, it will search other mock objects of the same type for matching expectation. This helps to diagnose common problem when expectation is added for invalid mock object:
+When no matching expectation is found for a call on some mock object, it will search other mock objects of the same type for matching expectations. This helps to diagnose common problems when an expectation is added for an invalid mock object:
 
 ```
 error: unexpected call to `AirConditioner#1.get_temperature()`
