@@ -357,6 +357,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         let match_arg_path = quote_path!(cx, ::mockers::MatchArg<$arg_type>);
         arg_matcher_types.push(cx.typaram(sp,
                                           arg_type_ident,
+                                          vec![],
                                           P::from_vec(vec![
                                               cx.typarambound(match_arg_path),
                                               TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
