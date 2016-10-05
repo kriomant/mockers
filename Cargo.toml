@@ -1,0 +1,3 @@
+[workspace]
+members = ["mockers", "mockers_codegen", "mockers_derive", "mockers_macros"]
+
