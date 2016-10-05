@@ -14,4 +14,4 @@ name = "mockers"
 
 [dev-dependencies.mockers_macros]
 version = "0.4.8"
-path = "mockers_macros"
+path = "../mockers_macros"
