@@ -4,6 +4,7 @@ description = "Example of using `mockers` crate with stable Rust using code gene
 version = "0.1.0"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 build = "build.rs"
+publish = false
 
 [build-dependencies.mockers_codegen]
 version = "0.4.7"

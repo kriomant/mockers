@@ -3,6 +3,7 @@ name = "air_macros11"
 description = "Example of using `mockers` crate with 'macros 1.1' nightly Rust features"
 version = "0.1.0"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+publish = false
 
 [dependencies]
 mockers_derive = { version = "0.4.7", path = "../../mockers_derive" }
