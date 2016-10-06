@@ -34,7 +34,7 @@ after_success:
   # measure code coverage and upload to coveralls.io (the verify
   # argument mitigates kcov crashes due to malformed debuginfo, at the
   # cost of some speed <https://github.com/huonw/travis-cargo/issues/12>)
-  - travis-cargo coveralls --no-sudo --verify
+  - (cd mockers && travis-cargo --only nightly coveralls --no-sudo --verify)
 
 env:
   global:
