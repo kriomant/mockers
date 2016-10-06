@@ -1,0 +1,14 @@
+[package]
+name = "air_codegen"
+description = "Example of using `mockers` crate with stable Rust using code generation"
+version = "0.1.0"
+authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+build = "build.rs"
+
+[build-dependencies.mockers_codegen]
+version = "0.4.7"
+path = "../../mockers_codegen"
+features = ["with-syntex"]
+
+[dev-dependencies]
+mockers = { version = "0.4.7", path = "../../mockers" }
