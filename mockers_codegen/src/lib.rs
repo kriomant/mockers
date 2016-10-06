@@ -5,7 +5,7 @@
 #[cfg(feature="with-syntex")] include!(concat!(env!("OUT_DIR"), "/lib.rs"));
 
 #[cfg(not(feature="with-syntex"))] extern crate syntax;
-#[cfg(not(feature="with-syntex"))] include!("lib.rs.in");
+#[cfg(not(feature="with-syntex"))] include!("lib.in.rs");
 
 #[cfg(not(feature = "with-syntex"))]
 extern crate rustc_plugin;
