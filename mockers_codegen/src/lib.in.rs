@@ -7,9 +7,10 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   PathParameters, TyParamBound, TyParamBounds, Defaultness, MetaItem,
                   DUMMY_NODE_ID};
-use syntax::codemap::{Span, Spanned, respan};
+use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
-use syntax::ext::quote::rt::{ToTokens, DUMMY_SP};
+#[cfg(not(feature="with-syntex"))] use syntax::ext::quote::rt::ToTokens;
+#[cfg(feature="with-syntex")] use quasi::ToTokens;
 use syntax::parse::PResult;
 use syntax::parse::parser::{Parser, PathStyle};
 use syntax::parse::token::{self, keywords, Token, intern_and_get_ident, InternedString};
