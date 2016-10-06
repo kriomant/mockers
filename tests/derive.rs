@@ -9,7 +9,7 @@ use mockers::Scenario;
 
 #[derive(Mock)]
 pub trait A {
-    fn foo(&self);
+    fn foo(&self, key: i16, value: i32);
 }
 
 #[test]

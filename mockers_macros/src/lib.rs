@@ -14,6 +14,7 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
 use syntax::codemap::{Span, Spanned, respan};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, SyntaxExtension,
                         Annotatable};
+use syntax::ext::quote::rt::{ToTokens, DUMMY_SP};
 use syntax::feature_gate::AttributeType;
 use syntax::parse::parser::PathStyle;
 use syntax::parse::token::{self, keywords, Token, intern};
@@ -475,6 +476,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let args_tuple_fields: Vec<_> = (0..args.len()).map(|i| {
         cx.expr_tup_field_access(sp, quote_expr!(cx, _args_ref), i)
     }).collect();
+    let args_tuple_fields_sep = comma_sep(&args_tuple_fields);
 
     let self_ident = if let PatKind::Ident(_, spanned_ident, _) = self_arg.pat.node {
         spanned_ident.node
@@ -491,7 +493,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         }
         fn format_args(args_ptr: *const u8) -> String {
             let _args_ref: &$args_tuple_type = unsafe { std::mem::transmute(args_ptr) };
-            format!($args_format_str, $args_tuple_fields)
+            format!($args_format_str, $args_tuple_fields_sep)
         }
         let call = ::mockers::Call { mock_id: $self_ident.mock_id,
                                      mock_type_id: $mock_type_id,
@@ -535,3 +537,18 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     Some(trait_impl_subitem)
 }
+
+struct CommaSep<'a, T: ToTokens + 'a>(&'a [T]);
+impl<'a, T: ToTokens + 'a> ToTokens for CommaSep<'a, T> {
+    fn to_tokens(&self, cx: &ExtCtxt) -> Vec<TokenTree> {
+        let mut v = vec![];
+        for (i, x) in self.0.iter().enumerate() {
+            if i > 0 {
+                v.extend_from_slice(&[TokenTree::Token(DUMMY_SP, token::Comma)]);
+            }
+            v.extend(x.to_tokens(cx));
+        }
+        v
+    }
+}
+fn comma_sep<'a, T: ToTokens + 'a>(items: &'a [T]) -> CommaSep<'a, T> { CommaSep(items) }
