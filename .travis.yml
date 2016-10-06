@@ -1,6 +1,8 @@
 language: rust
 rust:
   - nightly
+  - beta
+  - stable
 
 # necessary for `travis-cargo coveralls --no-sudo`
 addons:
@@ -19,9 +21,14 @@ before_script:
 
 # the main build
 script:
-  - |
-      travis-cargo build &&
-      travis-cargo test
+  - (cd mockers && travis-cargo build)
+  - (cd mockers && travis-cargo --only nightly test)
+  - (cd mockers_macros && travis-cargo --only nightly build)
+  - (cd mockers_derive && travis-cargo --only nightly build)
+  - (cd mockers_codegen && travis-cargo --only nightly build)
+  - (cd mockers_codegen && travis-cargo build -- --features=with-syntex)
+  - (cd examples/air_macro && travis-cargo --only nightly test)
+  - (cd examples/air_codegen && travis-cargo test)
 
 after_success:
   # measure code coverage and upload to coveralls.io (the verify
