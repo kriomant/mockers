@@ -513,9 +513,9 @@ There is also a corresponding `create_named_mock` method for external trait mock
 
 ## Mocking structures
 
-All previous examples assume that you already has some trait and functions you want to test accept this trait.
+All previous examples assume that you already have some trait and functions which accept this trait.
 
-Often you have only concrete struct and functions accepting it:
+Often you only have a concrete struct and functions accepting it:
 
 ```rust
 pub struct AirConditioner { … }
@@ -548,9 +548,9 @@ mod tests {
 }
 ```
 
-`AirConditioner` implementation may go to real hardware, for example, so it is not suitable for testing. It's better to substitute it with mock. Ideally, of course, you should extract trait and make `AirConditioner` implement this trait.
+The `AirConditioner` implementation may access real hardware, for example, so it is not suitable for testing. It's better to substitute it with a mock. Ideally, of course, you should extract a trait and make `AirConditioner` implement this trait.
 
-But if don't want to do it, there is another way:
+But if don't want to do that, there is another way:
 
 ```rust
 #![feature(plugin, custom_derive)]
@@ -603,7 +603,7 @@ mod tests {
 
 ## Error messages
 
-The *Mockers* library tries to produce helpful error messages. It highlights key moments so you can easily spot a problem.
+The *Mockers* library tries to produce helpful error messages. It highlights key operations so you can easily spot a problem.
 And it provides additional information which may help you to resolve this problem:
 
 ![highlighted output](highlight.png)
