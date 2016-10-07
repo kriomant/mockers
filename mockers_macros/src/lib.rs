@@ -82,6 +82,7 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
             it.attrs.push(quote_attr!(cx, #[cfg(test)]));
             it
         });
+        debug_item(&item);
         push(Annotatable::Item(item));
     }
 }
@@ -157,6 +158,9 @@ fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                         parameters: PathParameters::none(),
                     });
                     let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, trait_subitems, false);
+                    for item in &generated_items {
+                        debug_item(item);
+                    }
                     MacEager::items(SmallVector::many(generated_items))
                 },
                 _ => {
@@ -552,3 +556,10 @@ impl<'a, T: ToTokens + 'a> ToTokens for CommaSep<'a, T> {
     }
 }
 fn comma_sep<'a, T: ToTokens + 'a>(items: &'a [T]) -> CommaSep<'a, T> { CommaSep(items) }
+
+#[cfg(feature="debug")]
+fn debug_item(item: &Item) {
+    println!("{}", pprust::item_to_string(item));
+}
+#[cfg(not(feature="debug"))]
+fn debug_item(_: &Item) {}

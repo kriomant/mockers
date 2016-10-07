@@ -13,3 +13,6 @@ itertools = "0.4.13"
 [lib]
 name = "mockers_macros"
 plugin = true
+
+[features]
+debug = []
