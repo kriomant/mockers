@@ -1,32 +1,33 @@
-#![feature(fnbox)]
-#![feature(box_patterns)]
-#![feature(collections, collections_range)]
+#![cfg_attr(feature="nightly", feature(fnbox))]
+#![cfg_attr(feature="nightly", feature(collections, collections_range))]
+// nightly(box_patterns) #![feature(box_patterns)]
 
+#[cfg(feature="nightly")]
 extern crate collections;
 
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::boxed::FnBox;
 
-use collections::fmt::Write;
+use std::fmt::Write;
 
+mod box_fn;
 pub mod matchers;
 
-type Action0<T> = Box<FnBox() -> T>;
+type Action0<T> = box_fn::BoxFn0<T>;
 type ActionClone0<T> = Box<FnMut() -> T>;
 
-type Action1<Arg0, T> = Box<FnBox(Arg0) -> T>;
+type Action1<Arg0, T> = box_fn::BoxFn1<Arg0, T>;
 type ActionClone1<Arg0, T> = Box<FnMut(Arg0) -> T>;
 
-type Action2<Arg0, Arg1, T> = Box<FnBox(Arg0, Arg1) -> T>;
+type Action2<Arg0, Arg1, T> = box_fn::BoxFn2<Arg0, Arg1, T>;
 type ActionClone2<Arg0, Arg1, T> = Box<FnMut(Arg0, Arg1) -> T>;
 
-type Action3<Arg0, Arg1, Arg2, T> = Box<FnBox(Arg0, Arg1, Arg2) -> T>;
+type Action3<Arg0, Arg1, Arg2, T> = box_fn::BoxFn3<Arg0, Arg1, Arg2, T>;
 type ActionClone3<Arg0, Arg1, Arg2, T> = Box<FnMut(Arg0, Arg1, Arg2) -> T>;
 
-type Action4<Arg0, Arg1, Arg2, Arg3, T> = Box<FnBox(Arg0, Arg1, Arg2, Arg3) -> T>;
+type Action4<Arg0, Arg1, Arg2, Arg3, T> = box_fn::BoxFn4<Arg0, Arg1, Arg2, Arg3, T>;
 type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Box<FnMut(Arg0, Arg1, Arg2, Arg3) -> T>;
 
 pub trait CallMatch {
@@ -174,8 +175,9 @@ impl<Res> Expectation for Expectation0<Res> {
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.action.take() {
             Some(action) => {
-                let box () = CallMatch0::<Res>::get_args(call);
-                let result = action();
+                // nightly: let box () = CallMatch0::<Res>::get_args(call);
+                let () = *CallMatch0::<Res>::get_args(call);
+                let result = action.call();
                 Box::into_raw(Box::new(result)) as *mut u8
             },
             None => {
@@ -189,16 +191,16 @@ impl<Res> Expectation for Expectation0<Res> {
 }
 impl<Res: 'static> CallMatch0<Res> {
     pub fn and_return(self, result: Res) -> Expectation0<Res> {
-        Expectation0 { call_match: self, action: Some(Box::new(move || result)) }
+        Expectation0 { call_match: self, action: Some(Action0::new(move || result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation0<Res> {
-        Expectation0 { call_match: self, action: Some(Box::new(move || panic!(msg))) }
+        Expectation0 { call_match: self, action: Some(Action0::new(move || panic!(msg))) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation0<Res>
             where F: FnOnce() -> Res + 'static {
-        Expectation0 { call_match: self, action: Some(Box::new(func)) }
+        Expectation0 { call_match: self, action: Some(Action0::new(func)) }
     }
 
     pub fn never(self) -> ExpectationNever<Self> {
@@ -306,7 +308,8 @@ impl<Arg0, Res: Clone> Expectation for ExpectationTimes1<Arg0, Res> {
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
         }
         self.count += 1;
-        let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
+        // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
+        let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
         let result = (self.action)(arg0);
         Box::into_raw(Box::new(result)) as *mut u8
     }
@@ -331,8 +334,9 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.action.take() {
             Some(action) => {
-                let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
-                let result = action(arg0);
+                // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
+                let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
+                let result = action.call(arg0);
                 Box::into_raw(Box::new(result)) as *mut u8
             },
             None => {
@@ -346,16 +350,16 @@ impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
 }
 impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
     pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, action: Some(Box::new(move |_| result)) }
+        Expectation1 { call_match: self, action: Some(Action1::new(move |_| result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation1<Arg0, Res> {
-        Expectation1 { call_match: self, action: Some(Box::new(move |_| panic!(msg))) }
+        Expectation1 { call_match: self, action: Some(Action1::new(move |_| panic!(msg))) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
             where F: FnOnce(Arg0) -> Res + 'static {
-        Expectation1 { call_match: self, action: Some(Box::new(func)) }
+        Expectation1 { call_match: self, action: Some(Action1::new(func)) }
     }
 }
 impl<Arg0, Res: Clone + 'static> CallMatch1<Arg0, Res> {
@@ -466,7 +470,8 @@ impl<Arg0, Arg1, Res: Clone> Expectation for ExpectationTimes2<Arg0, Arg1, Res> 
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
         }
         self.count += 1;
-        let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+        // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+        let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
         let result = (self.action)(arg0, arg1);
         Box::into_raw(Box::new(result)) as *mut u8
     }
@@ -491,8 +496,9 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.action.take() {
             Some(action) => {
-                let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                let result = action(arg0, arg1);
+                // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+                let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
+                let result = action.call(arg0, arg1);
                 Box::into_raw(Box::new(result)) as *mut u8
             },
             None => {
@@ -506,16 +512,16 @@ impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, action: Some(Box::new(move |_, _| result)) }
+        Expectation2 { call_match: self, action: Some(Action2::new(move |_, _| result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 { call_match: self, action: Some(Box::new(move |_, _| panic!(msg))) }
+        Expectation2 { call_match: self, action: Some(Action2::new(move |_, _| panic!(msg))) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
             where F: FnOnce(Arg0, Arg1) -> Res + 'static {
-        Expectation2 { call_match: self, action: Some(Box::new(func)) }
+        Expectation2 { call_match: self, action: Some(Action2::new(func)) }
     }
 }
 impl<Arg0, Arg1, Res: Clone + 'static> CallMatch2<Arg0, Arg1, Res> {
@@ -633,7 +639,8 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, 
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
         }
         self.count += 1;
-        let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+        // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+        let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
         let result = (self.action)(arg0, arg1, arg2);
         Box::into_raw(Box::new(result)) as *mut u8
     }
@@ -658,8 +665,9 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.action.take() {
             Some(action) => {
-                let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                let result = action(arg0, arg1, arg2);
+                // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+                let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
+                let result = action.call(arg0, arg1, arg2);
                 Box::into_raw(Box::new(result)) as *mut u8
             },
             None => {
@@ -673,16 +681,16 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> 
 }
 impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return(self, result: Res) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, action: Some(Box::new(move |_, _, _| result)) }
+        Expectation3 { call_match: self, action: Some(Action3::new(move |_, _, _| result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 { call_match: self, action: Some(Box::new(move |_, _, _| panic!(msg))) }
+        Expectation3 { call_match: self, action: Some(Action3::new(move |_, _, _| panic!(msg))) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
             where F: FnOnce(Arg0, Arg1, Arg2) -> Res + 'static {
-        Expectation3 { call_match: self, action: Some(Box::new(func)) }
+        Expectation3 { call_match: self, action: Some(Action3::new(func)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Res: Clone + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
@@ -805,7 +813,8 @@ impl<Arg0, Arg1, Arg2, Arg3, Res: Clone> Expectation for ExpectationTimes4<Arg0,
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
         }
         self.count += 1;
-        let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+        // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+        let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
         let result = (self.action)(arg0, arg1, arg2, arg3);
         Box::into_raw(Box::new(result)) as *mut u8
     }
@@ -830,8 +839,9 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
     fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
         match self.action.take() {
             Some(action) => {
-                let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                let result = action(arg0, arg1, arg2, arg3);
+                // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+                let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
+                let result = action.call(arg0, arg1, arg2, arg3);
                 Box::into_raw(Box::new(result)) as *mut u8
             },
             None => {
@@ -845,16 +855,16 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_return(self, result: Res) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, action: Some(Box::new(move |_, _, _, _| result)) }
+        Expectation4 { call_match: self, action: Some(Action4::new(move |_, _, _, _| result)) }
     }
 
     pub fn and_panic(self, msg: String) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 { call_match: self, action: Some(Box::new(move |_, _, _, _| panic!(msg))) }
+        Expectation4 { call_match: self, action: Some(Action4::new(move |_, _, _, _| panic!(msg))) }
     }
 
     pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
             where F: FnOnce(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
-        Expectation4 { call_match: self, action: Some(Box::new(func)) }
+        Expectation4 { call_match: self, action: Some(Action4::new(func)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res: Clone + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {

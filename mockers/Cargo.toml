@@ -15,3 +15,7 @@ name = "mockers"
 [dev-dependencies.mockers_macros]
 version = "0.4.8"
 path = "../mockers_macros"
+
+[features]
+default = ["nightly"]
+nightly = []

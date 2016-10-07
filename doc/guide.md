@@ -50,8 +50,9 @@ Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
 version = "0.4.7"
 features = ["with-syntex"]
 
-[dev-dependencies]
-mockers = "0.4.7"
+[dev-dependencies.mockers]
+version = "0.4.7"
+default-features = false
 ```
 
 Add build script and register it in your `Cargo.toml`:
