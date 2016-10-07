@@ -1,6 +1,8 @@
 language: rust
 rust:
   - nightly
+  - beta
+  - stable
 
 # necessary for `travis-cargo coveralls --no-sudo`
 addons:
@@ -19,15 +21,31 @@ before_script:
 
 # the main build
 script:
-  - |
-      travis-cargo build &&
-      travis-cargo test
+  # This section must be synchronized with 'test.sh' script.
+
+  # `mockers` library itself can be build with any Rust channel
+  # if you turn off default "nightly" feature.
+  - (cd mockers && travis-cargo build -- --no-default-features)
+  # Full-features `mockers` can be build by nightly Rust only.
+  - (cd mockers && travis-cargo --only nightly build)
+  # Tests use `mockers_macros` and thus are only runnable with nightly Rust.
+  - (cd mockers && travis-cargo --only nightly test)
+  # `mockers_macros` and `mockers_derive` use nightly Rust features.
+  - (cd mockers_macros && travis-cargo --only nightly build)
+  - (cd mockers_derive && travis-cargo --only nightly build)
+  # `mockers_codegen` can be build with nightly and with stable Rust
+  # (using `syntex`).
+  - (cd mockers_codegen && travis-cargo --only nightly build)
+  - (cd mockers_codegen && travis-cargo build -- --features=with-syntex)
+  # Examples
+  - (cd examples/air_macro && travis-cargo --only nightly test)
+  - (cd examples/air_codegen && travis-cargo test)
 
 after_success:
   # measure code coverage and upload to coveralls.io (the verify
   # argument mitigates kcov crashes due to malformed debuginfo, at the
   # cost of some speed <https://github.com/huonw/travis-cargo/issues/12>)
-  - travis-cargo coveralls --no-sudo --verify
+  - (cd mockers && travis-cargo --only nightly coveralls --no-sudo --verify)
 
 env:
   global:

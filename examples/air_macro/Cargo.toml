@@ -1,0 +1,12 @@
+[package]
+name = "air_macro"
+description = "Example of using `mockers` crate with nightly Rust plugin support"
+version = "0.1.0"
+authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
+publish = false
+
+[dependencies]
+mockers_macros = { version = "0.4.7", path = "../../mockers_macros" }
+
+[dev-dependencies]
+mockers = { version = "0.4.7", path = "../../mockers" }

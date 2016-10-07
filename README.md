@@ -20,15 +20,16 @@ a prototype to gather feedback. For example, only methods with
 four or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
-Mocking magic is implemented using compiler plugin, so **nightly Rust
-is required**. It was tested to work with *1.14.0-nightly (9c31d76e9 2016-10-03)*.
+Mocking magic is implemented using compiler plugin on nightly Rust
+(it was tested to work with *1.14.0-nightly (9c31d76e9 2016-10-03)*)
+and code generation on stable Rust. See User Guide for details.
 
 ## Usage at a glance
 
 This is a very short introduction to show what is possible and
 how it looks. Read [User Guide] for details.
 
-This library requires nightly Rust.  
+We will use nightly Rust in this example for simplicity.
 
 For multirust, run the following command:
 ```

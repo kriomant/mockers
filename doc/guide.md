@@ -6,7 +6,11 @@ It is inspired by [Google Mock].
 
 ## Getting Started
 
-First you need to know that the mocking magic is implemented as a compiler plugin, so **nightly Rust is required**. Thus you may want to run
+### Nightly Rust
+
+This is the simplest way to use `mockers` library.
+
+Run
 
 ```sh
 $ multirust override nightly
@@ -31,6 +35,65 @@ mockers = "0.4.8"
 ```
 
 Now you are ready to start testing.
+
+This approach is used by [air_macro](../examples/air_macro/) example.
+
+### Stable Rust
+
+You will have to use code generation on stable Rust. It means that types
+you want to mock must live in a separate file which will be processed during build.
+
+Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
+
+```toml
+[build-dependencies.mockers_codegen]
+version = "0.4.7"
+features = ["with-syntex"]
+
+[dev-dependencies.mockers]
+version = "0.4.7"
+default-features = false
+```
+
+Add build script and register it in your `Cargo.toml`:
+
+```rust
+# build.rs
+extern crate mockers_codegen;
+
+use std::env;
+use std::path::Path;
+
+fn main() {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+
+    let src = Path::new("src/types.in.rs");
+    let dst = Path::new(&out_dir).join("types.rs");
+
+    mockers_codegen::expand(&src, &dst).unwrap();
+}
+```
+
+```toml
+# Cargo.toml
+
+[package]
+…
+build = "build.rs"
+```
+
+Now you are ready to start testing.
+
+This approach is used by [air_codegen](../examples/air_codegen/) example.
+
+### "Macros 1.1"
+
+Nightly rust has ["macros 1.1"] feature which will soon be available in stable
+Rust and will replace code generation in most cases.
+
+`mockers` is prepared to use this feature, but unfortunately neither
+`derive` for traits nor `macro!(…)` syntax are supported. I will track
+this feature and will provide support for it as soon as possible.
 
 ## Usage
 
@@ -58,7 +121,7 @@ pub fn set_temperature_20(cond: &mut AirConditioner) {
 }
 ```
 
-Import the `mockers` crate and the `mockers_macros` compiler plugin:
+On nightly, import the `mockers` crate and the `mockers_macros` compiler plugin:
 
 ```rust
 // src/lib.rs
@@ -71,9 +134,20 @@ Import the `mockers` crate and the `mockers_macros` compiler plugin:
 …
 ```
 
-Now derive a `Mock` implementation from the trait:
+On stable, move trait definition the separate file (`src/types.in.rs`) and
+import `mockers` crate:
 
 ```rust
+// src/lib.rs
+
+include!(concat!(env!("OUT_DIR"), "/types.rs"));
+```
+
+```rust
+// src/types.in.rs
+
+#[cfg(test)] extern crate mockers;
+
 #[derive(Mock)]
 pub trait AirConditioner {
     …
@@ -559,3 +633,4 @@ mockers_macros = { version = "0.4.8", features = ["debug"] }
 ```
 
 [Google Mock]: https://github.com/google/googletest/blob/master/googlemock/README.md
+["macros 1.1"]: https://github.com/rust-lang/rust/issues/35900
