@@ -437,6 +437,96 @@ let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned())
 
 There is also a corresponding `create_named_mock` method for external trait mocks.
 
+## Mocking structures
+
+All previous examples assume that you already has some trait and functions you want to test accept this trait.
+
+Often you have only concrete struct and functions accepting it:
+
+```rust
+pub struct AirConditioner { … }
+impl AirConditioner {
+    fn new(hardware_port: i16) -> Self { … }
+    fn make_hotter(&mut self, by: i16) { … }
+    fn make_cooler(&mut self, by: i16) { … }
+    fn get_temperature(&self) -> i16 { … }
+}
+
+pub fn set_temperature_20(cond: &mut AirConditioner) {
+    let t = cond.get_temperature();
+    if t < 20 {
+        cond.make_hotter(20 + t);
+    } else {
+        cond.make_cooler(t - 20);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_temperature_20() {
+        let mut ac = AirConditioner::new(2344);
+        set_temperature_20(&mut ac);
+        assert_eq!(ac.get_temperature(), 20);
+    }
+}
+```
+
+`AirConditioner` implementation may go to real hardware, for example, so it is not suitable for testing. It's better to substitute it with mock. Ideally, of course, you should extract trait and make `AirConditioner` implement this trait.
+
+But if don't want to do it, there is another way:
+
+```rust
+#![feature(plugin, custom_derive)]
+#![plugin(mockers_macros)]
+
+extern crate mockers;
+
+#[cfg(not(test))]
+pub struct AirConditioner { … }
+#[cfg(not(test))]
+impl AirConditioner {
+    fn make_hotter(&mut self, by: i16) { … }
+    fn make_cooler(&mut self, by: i16) { … }
+    fn get_temperature(&self) -> i16 { … }
+}
+
+#[derive(Mock)]
+pub trait AirConditionerTrait {
+    fn make_hotter(&mut self, by: i16);
+    fn make_cooler(&mut self, by: i16);
+    fn get_temperature(&self) -> i16;
+}
+#[cfg(test)]
+pub type AirConditioner = AirConditionerTraitMock;
+
+pub fn set_temperature_20(cond: &mut AirConditioner) {
+    let t = cond.get_temperature();
+    if t < 20 {
+        cond.make_hotter(20 + t);
+    } else {
+        cond.make_cooler(t - 20);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::mockers;
+
+    #[test]
+    fn test_set_temperature_20() {
+        let mut scenario = mockers::Scenario::new();
+        let mut ac = s.create_mock::<AirConditioner>();
+        …
+        set_temperature_20(&mut ac);
+        …
+    }
+}
+```
+
 ## Error messages
 
 The *Mockers* library tries to produce helpful error messages. It highlights key moments so you can easily spot a problem.
