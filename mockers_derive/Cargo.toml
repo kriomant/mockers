@@ -5,14 +5,14 @@ keywords = ["mock", "test"]
 license = "MIT"
 name = "mockers_derive"
 repository = "https://github.com/kriomant/mockers"
-version = "0.5.1"
+version = "0.5.2"
 publish = false
 
 [dependencies]
 syntex = "0.44.0"
 
 [dependencies.mockers_codegen]
-version = "0.5.1"
+version = "0.5.2"
 features = ["with-syntex"]
 path = "../mockers_codegen"
 
@@ -20,4 +20,4 @@ path = "../mockers_codegen"
 
 [lib]
 name = "mockers_derive"
-rustc-macro = true
+proc-macro = true
