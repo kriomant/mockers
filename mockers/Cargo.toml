@@ -12,10 +12,12 @@ license = "MIT"
 [lib]
 name = "mockers"
 
-[dev-dependencies.mockers_macros]
-version = "0.5.2"
-path = "../mockers_macros"
+[dev-dependencies]
+mockers_macros = "0.5.2"
 
 [features]
 default = ["nightly"]
 nightly = []
+
+[replace]
+"mockers_macros:0.5.2" = { path = "../mockers_macros" }

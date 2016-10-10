@@ -14,10 +14,12 @@ syntex = "0.44.0"
 [dependencies.mockers_codegen]
 version = "0.5.2"
 features = ["with-syntex"]
-path = "../mockers_codegen"
 
 [build-dependencies]
 
 [lib]
 name = "mockers_derive"
 proc-macro = true
+
+[replace]
+"mockers_codegen:0.5.2" = { path = "../mockers_codegen" }

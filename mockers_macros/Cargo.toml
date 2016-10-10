@@ -8,7 +8,7 @@ keywords = ["mock", "test"]
 license = "MIT"
 
 [dependencies]
-mockers_codegen = { version = "0.5.2", path = "../mockers_codegen" }
+mockers_codegen = "0.5.2"
 
 [lib]
 name = "mockers_macros"
@@ -16,3 +16,6 @@ plugin = true
 
 [features]
 debug = []
+
+[replace]
+"mockers_codegen:0.5.2" = { path = "../mockers_codegen" }

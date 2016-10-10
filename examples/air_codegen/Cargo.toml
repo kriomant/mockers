@@ -8,10 +8,12 @@ publish = false
 
 [build-dependencies.mockers_codegen]
 version = "0.5.2"
-path = "../../mockers_codegen"
 features = ["with-syntex"]
 
 [dev-dependencies.mockers]
 version = "0.5.2"
-path = "../../mockers"
 default-features = false
+
+[replace]
+"mockers_codegen:0.5.2" = { path = "../../mockers_codegen" }
+"mockers:0.5.2" = { path = "../../mockers" }
