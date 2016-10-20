@@ -27,7 +27,7 @@ use itertools::Itertools;
 /// `*_call` methods and to `Call` structure created by mocked method.
 /// It is same to use call matcher for inspecting call object only when
 /// both mock type ID and method name match.
-static mut next_mock_type_id: usize = 0;
+static mut NEXT_MOCK_TYPE_ID: usize = 0;
 
 #[allow(unused)]
 pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item: &Annotatable,
@@ -84,7 +84,7 @@ pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) ->
     let mut parser = cx.new_parser_from_tts(args);
     match parse_macro_args(&mut parser) {
         Ok(mock_ident) => {
-            let trait_sp = sp.trim_start(parser.last_span).unwrap();
+            let trait_sp = sp.trim_start(prev_span(&parser)).unwrap();
             generate_mock_for_trait_tokens(cx, trait_sp, mock_ident, parser)
         },
 
@@ -295,8 +295,8 @@ fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
     };
 
     let mock_type_id = unsafe {
-        let id = next_mock_type_id;
-        next_mock_type_id += 1;
+        let id = NEXT_MOCK_TYPE_ID;
+        NEXT_MOCK_TYPE_ID += 1;
         id
     };
 
@@ -592,3 +592,14 @@ fn debug_item(item: &Item) {
 }
 #[cfg(not(feature="debug"))]
 fn debug_item(_: &Item) {}
+
+
+#[cfg(feature="with-syntex")]
+fn prev_span<'a>(parser: &Parser<'a>) -> Span {
+    parser.last_span
+}
+#[cfg(not(feature="with-syntex"))]
+fn prev_span<'a>(parser: &Parser<'a>) -> Span {
+	parser.prev_span
+}
+

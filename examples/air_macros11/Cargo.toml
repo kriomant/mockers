@@ -6,11 +6,11 @@ authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
 [dependencies]
-mockers_derive = "0.5.2"
+mockers_derive = "0.5.3"
 
 [dev-dependencies]
-mockers = "0.5.2"
+mockers = "0.5.3"
 
 [replace]
-"mockers_derive:0.5.2" = { path = "../../mockers_derive" }
-"mockers:0.5.2" = { path = "../../mockers" }
+"mockers_derive:0.5.3" = { path = "../../mockers_derive" }
+"mockers:0.5.3" = { path = "../../mockers" }
