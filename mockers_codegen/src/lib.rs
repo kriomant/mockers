@@ -28,12 +28,12 @@ fn syntex_registry() -> syntex::Registry {
 
 #[cfg(not(feature = "with-syntex"))]
 pub fn register(reg: &mut rustc_plugin::Registry) {
-    use syntax::parse::token::intern;
+    use syntax::symbol::Symbol;
     use syntax::ext::base::MultiDecorator;
     use syntax::feature_gate::AttributeType;
 
     reg.register_macro("mock", generate_mock);
-    reg.register_syntax_extension(intern("derive_Mock"),
+    reg.register_syntax_extension(Symbol::intern("derive_Mock"),
                                   MultiDecorator(Box::new(derive_mock)));
     reg.register_attribute("derive_Mock".to_owned(), AttributeType::Whitelisted);
 }

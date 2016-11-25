@@ -4,3 +4,8 @@ members = [
 	"examples/air_macro", "examples/air_codegen",
 ]
 
+[replace]
+"mockers:0.5.4" = { path = "mockers" }
+"mockers_codegen:0.5.4" = { path = "mockers_codegen" }
+"mockers_macros:0.5.4" = { path = "mockers_macros" }
+"mockers_derive:0.5.4" = { path = "mockers_derive" }

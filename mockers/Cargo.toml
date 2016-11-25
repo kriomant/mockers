@@ -2,9 +2,9 @@
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 name = "mockers"
 description = "Mocking library"
-version = "0.5.3"
+version = "0.5.4"
 repository = "https://github.com/kriomant/mockers"
-documentation = "https://github.com/kriomant/mockers/blob/0.5.3/README.md"
+documentation = "https://github.com/kriomant/mockers/blob/0.5.4/README.md"
 keywords = ["mock", "test"]
 readme = "../README.md"
 license = "MIT"
@@ -13,11 +13,8 @@ license = "MIT"
 name = "mockers"
 
 [dev-dependencies]
-mockers_macros = "0.5.3"
+mockers_macros = "0.5.4"
 
 [features]
 default = ["nightly"]
 nightly = []
-
-[replace]
-"mockers_macros:0.5.3" = { path = "../mockers_macros" }

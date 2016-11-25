@@ -5,7 +5,7 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
-                  PathParameters, TyParamBound, TyParamBounds, Defaultness, MetaItem,
+                  PathParameters, TyParamBound, Defaultness, MetaItem,
                   DUMMY_NODE_ID};
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
@@ -13,7 +13,8 @@ use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
 #[cfg(feature="with-syntex")] use quasi::ToTokens;
 use syntax::parse::PResult;
 use syntax::parse::parser::{Parser, PathStyle};
-use syntax::parse::token::{self, keywords, Token, intern_and_get_ident, InternedString};
+use syntax::parse::token::{self, Token};
+use syntax::symbol::{keywords, Symbol};
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 use syntax::print::pprust;
@@ -84,7 +85,7 @@ pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) ->
     let mut parser = cx.new_parser_from_tts(args);
     match parse_macro_args(&mut parser) {
         Ok(mock_ident) => {
-            let trait_sp = sp.trim_start(prev_span(&parser)).unwrap();
+            let trait_sp = sp.trim_start(parser.prev_span).unwrap();
             generate_mock_for_trait_tokens(cx, trait_sp, mock_ident, parser)
         },
 
@@ -342,7 +343,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let mut new_args = Vec::<P<Expr>>::new();
     new_args.push(cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
     new_args.push(quote_expr!(cx, $mock_type_id));
-    new_args.push(cx.expr_str(sp, method_ident.name.as_str()));
+    new_args.push(cx.expr_str(sp, method_ident.name));
     for (i, arg) in args.iter().enumerate() {
         let arg_type = &arg.ty;
         let arg_type_ident = cx.ident_of(&format!("Arg{}Match", i));
@@ -354,13 +355,14 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                 sp, true,
                 vec![cx.ident_of("mockers"), cx.ident_of("MatchArg")],
                 vec![], vec![arg_type.clone()], vec![]);
-        arg_matcher_types.push(typaram(&cx, sp,
-                                       arg_type_ident,
-                                       P::from_vec(vec![
-                                           cx.typarambound(match_arg_path),
-                                           TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
-                                       ]),
-                                       None));
+        arg_matcher_types.push(cx.typaram(sp,
+                                          arg_type_ident,
+                                          vec![],
+                                          P::from_vec(vec![
+                                              cx.typarambound(match_arg_path),
+                                              TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
+                                          ]),
+                                          None));
         // nightly: inputs.push(quote_arg!(cx, $arg_ident: $arg_type_ident));
         inputs.push(cx.arg(sp, arg_ident, cx.ty_ident(sp, arg_type_ident)));
 
@@ -418,7 +420,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         ident: expect_method_name,
         vis: Visibility::Public,
         // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
-        attrs: vec![cx.attribute(sp, cx.meta_list(sp, intern_and_get_ident("allow"), vec![cx.meta_list_item_word(sp, intern_and_get_ident("dead_code"))]))],
+        attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("dead_code"))]))],
         node: ImplItemKind::Method(call_sig, body),
         span: sp,
         defaultness: Defaultness::Final,
@@ -452,7 +454,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                               method_ident: Ident, self_arg: &Arg,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
-    let method_name = cx.expr_str(sp, InternedString::new_from_name(method_ident.name));
+    let method_name = cx.expr_str(sp, method_ident.name);
     // Generate expression returning tuple of all method arguments.
     let tuple_values: Vec<P<Expr>> =
         args.iter().flat_map(|i| {
@@ -487,12 +489,12 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let fn_mock = quote_block!(cx, {
         let args = Box::new($args_tuple);
-        let args_ptr: *const u8 = std::boxed::Box::into_raw(args) as *const u8;
+        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
         fn destroy(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut $args_tuple_type) };
         }
         fn format_args(args_ptr: *const u8) -> String {
-            let _args_ref: &$args_tuple_type = unsafe { std::mem::transmute(args_ptr) };
+            let _args_ref: &$args_tuple_type = unsafe { ::std::mem::transmute(args_ptr) };
             format!($args_format_str, $args_tuple_fields_sep)
         }
         let call = ::mockers::Call { mock_id: $self_ident.mock_id,
@@ -530,32 +532,13 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         ident: method_ident,
         vis: Visibility::Inherited,
         // nightly: attrs: vec![quote_attr!(cx, #[allow(unused_mut)])],
-        attrs: vec![cx.attribute(sp, cx.meta_list(sp, intern_and_get_ident("allow"), vec![cx.meta_list_item_word(sp, intern_and_get_ident("unused_mut"))]))],
+        attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("unused_mut"))]))],
         node: ImplItemKind::Method(impl_sig, nightly_p(fn_mock)),
         span: sp,
         defaultness: Defaultness::Final,
     };
 
     Some(trait_impl_subitem)
-}
-
-/// `typaram` got additional `attrs` parameter in nightly,
-/// `syntex_syntax` doesn't have it yet.
-#[cfg(feature="with-syntex")]
-fn typaram(cx: &ExtCtxt,
-           span: Span,
-           id: Ident,
-           bounds: TyParamBounds,
-           default: Option<P<Ty>>) -> TyParam {
-    cx.typaram(span, id, bounds, default)
-}
-#[cfg(not(feature="with-syntex"))]
-fn typaram(cx: &ExtCtxt,
-           span: Span,
-           id: Ident,
-           bounds: TyParamBounds,
-           default: Option<P<Ty>>) -> TyParam {
-    cx.typaram(span, id, vec![], bounds, default)
 }
 
 /// `quote_block!` macro in nightly and `quasi` return
@@ -592,14 +575,3 @@ fn debug_item(item: &Item) {
 }
 #[cfg(not(feature="debug"))]
 fn debug_item(_: &Item) {}
-
-
-#[cfg(feature="with-syntex")]
-fn prev_span<'a>(parser: &Parser<'a>) -> Span {
-    parser.last_span
-}
-#[cfg(not(feature="with-syntex"))]
-fn prev_span<'a>(parser: &Parser<'a>) -> Span {
-	parser.prev_span
-}
-

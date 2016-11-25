@@ -293,7 +293,7 @@ fn test_range_match() {
 }
 
 #[test]
-#[should_panic(expect="4 is not in range 1..4")]
+#[should_panic(expected="4 is not in range 1..4")]
 fn test_range_edge_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -304,7 +304,7 @@ fn test_range_edge_mismatch() {
 }
 
 #[test]
-#[should_panic(expect="5 is not in range 1..4")]
+#[should_panic(expected="5 is not in range 1..4")]
 fn test_range_mismatch() {
     let mut scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();

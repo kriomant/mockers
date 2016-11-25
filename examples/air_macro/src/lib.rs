@@ -1,15 +1,10 @@
 #![feature(plugin, custom_derive)]
 #![plugin(mockers_macros)]
 
+mod context;
 #[cfg(test)] extern crate mockers;
 #[cfg(test)] mod tests;
-
-#[derive(Mock)]
-pub trait AirConditioner {
-    fn make_hotter(&mut self, by: i16);
-    fn make_cooler(&mut self, by: i16);
-    fn get_temperature(&self) -> i16;
-}
+pub use context::AirConditioner;
 
 pub fn set_temperature_20(cond: &mut AirConditioner) {
     let t = cond.get_temperature();
