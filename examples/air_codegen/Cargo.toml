@@ -7,9 +7,9 @@ build = "build.rs"
 publish = false
 
 [build-dependencies.mockers_codegen]
-version = "0.5.5"
+version = "0.5.6"
 features = ["with-syntex"]
 
 [dev-dependencies.mockers]
-version = "0.5.5"
+version = "0.5.6"
 default-features = false

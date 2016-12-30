@@ -6,7 +6,7 @@ authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
 [dependencies]
-mockers_derive = "0.5.5"
+mockers_derive = "0.5.6"
 
 [dev-dependencies]
-mockers = "0.5.5"
+mockers = "0.5.6"
