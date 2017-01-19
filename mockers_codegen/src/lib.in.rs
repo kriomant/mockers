@@ -356,7 +356,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         arg_matcher_types.push(cx.typaram(sp,
                                           arg_type_ident,
                                           vec![],
-                                          P::from_vec(vec![
+                                          p_vec(vec![
                                               cx.typarambound(match_arg_path),
                                               TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
                                           ]),
@@ -384,7 +384,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let generics = Generics {
         span: sp,
         lifetimes: vec![],
-        ty_params: P::from_vec(arg_matcher_types),
+        ty_params: p_vec(arg_matcher_types),
         where_clause: WhereClause {
             id: DUMMY_NODE_ID,
             predicates: vec![],
@@ -574,6 +574,15 @@ fn create_path_segment(ident: Ident) -> PathSegment {
         identifier: ident,
         parameters: None,
     }
+}
+
+#[cfg(feature="with-syntex")]
+fn p_vec<T>(v: Vec<T>) -> P<[T]> {
+    P::from_vec(v)
+}
+#[cfg(not(feature="with-syntex"))]
+fn p_vec<T>(v: Vec<T>) -> Vec<T> {
+    v
 }
 
 struct CommaSep<'a, T: ToTokens + 'a>(&'a [T]);

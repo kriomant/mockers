@@ -5,6 +5,7 @@ use std::fmt::Debug;
 
 #[cfg(feature="nightly")] use std;
 #[cfg(feature="nightly")] use collections::range::RangeArgument;
+#[cfg(feature="nightly")] use collections::Bound;
 #[cfg(feature="nightly")] use collections::fmt::Write;
 
 pub use self::ext::*;
@@ -104,12 +105,16 @@ pub struct RangeMatchArg<T: Ord + Debug, R: RangeArgument<T>> {
 impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
     fn format_range(&self) -> Result<String, std::fmt::Error> {
         let mut range_str = String::new();
-        if let Some(s) = self.range.start() {
-            try!(write!(range_str, "{:?}", s));
+        match self.range.start() {
+            Bound::Included(s) => try!(write!(range_str, "[{:?}", s)),
+            Bound::Excluded(s) => try!(write!(range_str, "({:?}", s)),
+            Bound::Unbounded => {},
         }
-        try!(write!(range_str, ".."));
-        if let Some(e) = self.range.end() {
-            try!(write!(range_str, "{:?}", e));
+        try!(range_str.write_char(';'));
+        match self.range.end() {
+            Bound::Included(e) => try!(write!(range_str, "{:?}]", e)),
+            Bound::Excluded(e) => try!(write!(range_str, "{:?})", e)),
+            Bound::Unbounded => {},
         }
         Ok(range_str)
     }
@@ -117,8 +122,16 @@ impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
 #[cfg(feature="nightly")]
 impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
     fn matches(&self, arg: &T) -> Result<(), String> {
-        let matches_start = self.range.start().map_or(false, |s| arg >= s);
-        let matches_end = self.range.end().map_or(true, |e| arg < e);
+        let matches_start = match self.range.start() {
+            Bound::Included(s) => arg >= s,
+            Bound::Excluded(s) => arg > s,
+            Bound::Unbounded => true,
+        };
+        let matches_end = match self.range.end() {
+            Bound::Included(s) => arg <= s,
+            Bound::Excluded(s) => arg < s,
+            Bound::Unbounded => true,
+        };
         if matches_start && matches_end {
             Ok(())
         } else {
