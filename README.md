@@ -1,7 +1,7 @@
 
-| master | 0.5.7 |
+| master | 0.5.8 |
 | ------ | ----- |
-| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.5.7)](https://travis-ci.org/kriomant/mockers) |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.5.8)](https://travis-ci.org/kriomant/mockers) |
 
 
 
@@ -21,7 +21,7 @@ four or less arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin on nightly Rust
-(it was tested to work with *1.15.0-nightly (d5814b03e 2016-11-23)*)
+(it was tested to work with *1.17.0-nightly (6eb9960d3 2017-03-19)*)
 and code generation on stable Rust. See User Guide for details.
 
 ## Usage at a glance
@@ -46,10 +46,10 @@ Cargo.toml:
 
 ```toml
 [dependencies]
-mockers_macros = "0.5.7"
+mockers_macros = "0.5.8"
 
 [dev-dependencies]
-mockers = "0.5.7"
+mockers = "0.5.8"
 ```
 
 src/lib.rs:

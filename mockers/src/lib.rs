@@ -1,5 +1,5 @@
 #![cfg_attr(feature="nightly", feature(fnbox))]
-#![cfg_attr(feature="nightly", feature(collections, collections_range, collections_bound))]
+#![cfg_attr(feature="nightly", feature(collections, collections_range))]
 // nightly(box_patterns) #![feature(box_patterns)]
 
 #[cfg(feature="nightly")]

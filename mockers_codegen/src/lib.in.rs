@@ -145,7 +145,7 @@ pub fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
                         Some(path) => path.clone(),
                         None => create_path(sp),
                     };
-                    trait_path.segments.push(create_path_segment(item.ident));
+                    trait_path.segments.push(create_path_segment(item.ident, sp));
                     let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, trait_subitems, false);
                     for item in &generated_items {
                         debug_item(item);
@@ -562,15 +562,16 @@ fn create_path(sp: Span) -> Path {
 }
 
 #[cfg(feature="with-syntex")]
-fn create_path_segment(ident: Ident) -> PathSegment {
+fn create_path_segment(ident: Ident, _span: Span) -> PathSegment {
     PathSegment {
         identifier: ident,
         parameters: PathParameters::none(),
     }
 }
 #[cfg(not(feature="with-syntex"))]
-fn create_path_segment(ident: Ident) -> PathSegment {
+fn create_path_segment(ident: Ident, span: Span) -> PathSegment {
     PathSegment {
+	    span: span,
         identifier: ident,
         parameters: None,
     }
