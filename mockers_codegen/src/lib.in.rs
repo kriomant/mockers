@@ -5,9 +5,8 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
-                  TyParamBound, Defaultness, MetaItem,
+                  TyParamBound, Defaultness, MetaItem, TraitRef,
                   DUMMY_NODE_ID};
-#[cfg(feature="with-syntex")] use syntax::ast::PathParameters;
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
 #[cfg(not(feature="with-syntex"))] use syntax::ext::quote::rt::ToTokens;
@@ -143,7 +142,7 @@ pub fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
 
                     let mut trait_path = match trait_mod_path {
                         Some(path) => path.clone(),
-                        None => create_path(sp),
+                        None => Path { span: sp, segments: vec![] },
                     };
                     trait_path.segments.push(create_path_segment(item.ident, sp));
                     let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, trait_subitems, false);
@@ -219,19 +218,13 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     let impl_item = cx.item(sp,
                             mock_ident,
                             vec![],
-                            ItemKind::Impl(Unsafety::Normal,
-                                           ImplPolarity::Positive,
-                                           Generics::default(),
-                                           None,
+                            item_kind_impl(None,
                                            cx.ty_ident(sp, mock_ident),
                                            impl_methods));
     let trait_impl_item = cx.item(sp,
                                   mock_ident,
                                   vec![],
-                                  ItemKind::Impl(Unsafety::Normal,
-                                                 ImplPolarity::Positive,
-                                                 Generics::default(),
-                                                 Some(cx.trait_ref(trait_path.clone())),
+                                  item_kind_impl(Some(cx.trait_ref(trait_path.clone())),
                                                  cx.ty_ident(sp, mock_ident),
                                                  trait_impl_methods));
 
@@ -356,10 +349,10 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         arg_matcher_types.push(cx.typaram(sp,
                                           arg_type_ident,
                                           vec![],
-                                          p_vec(vec![
+                                          vec![
                                               cx.typarambound(match_arg_path),
                                               TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
-                                          ]),
+                                          ],
                                           None));
         // nightly: inputs.push(quote_arg!(cx, $arg_ident: $arg_type_ident));
         inputs.push(cx.arg(sp, arg_ident, cx.ty_ident(sp, arg_type_ident)));
@@ -384,7 +377,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     let generics = Generics {
         span: sp,
         lifetimes: vec![],
-        ty_params: p_vec(arg_matcher_types),
+        ty_params: arg_matcher_types,
         where_clause: WhereClause {
             id: DUMMY_NODE_ID,
             predicates: vec![],
@@ -552,20 +545,11 @@ fn nightly_p<T: 'static>(t: P<T>) -> P<T> {
     t
 }
 
-#[cfg(not(feature="with-syntex"))]
-fn create_path(sp: Span) -> Path {
-    Path { span: sp, segments: vec![] }
-}
-#[cfg(feature="with-syntex")]
-fn create_path(sp: Span) -> Path {
-    Path { span: sp, global: true, segments: vec![] }
-}
-
 #[cfg(feature="with-syntex")]
 fn create_path_segment(ident: Ident, _span: Span) -> PathSegment {
     PathSegment {
         identifier: ident,
-        parameters: PathParameters::none(),
+        parameters: None,
     }
 }
 #[cfg(not(feature="with-syntex"))]
@@ -578,12 +562,14 @@ fn create_path_segment(ident: Ident, span: Span) -> PathSegment {
 }
 
 #[cfg(feature="with-syntex")]
-fn p_vec<T>(v: Vec<T>) -> P<[T]> {
-    P::from_vec(v)
+fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>) -> ItemKind {
+    ItemKind::Impl(Unsafety::Normal, ImplPolarity::Positive, Generics::default(),
+                   traits, self_ty, items)
 }
 #[cfg(not(feature="with-syntex"))]
-fn p_vec<T>(v: Vec<T>) -> Vec<T> {
-    v
+fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>) -> ItemKind {
+    ItemKind::Impl(Unsafety::Normal, ImplPolarity::Positive, Defaultness::Final, Generics::default(),
+                   traits, self_ty, items)
 }
 
 struct CommaSep<'a, T: ToTokens + 'a>(&'a [T]);

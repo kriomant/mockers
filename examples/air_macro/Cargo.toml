@@ -6,7 +6,7 @@ authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
 [dependencies]
-mockers_macros = "0.5.8"
+mockers_macros = "0.5.9"
 
 [dev-dependencies]
-mockers = "0.5.8"
+mockers = "0.5.9"
