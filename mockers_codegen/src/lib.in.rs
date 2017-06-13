@@ -351,7 +351,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                                           vec![],
                                           vec![
                                               cx.typarambound(match_arg_path),
-                                              TyParamBound::RegionTyParamBound(cx.lifetime(sp, cx.name_of("'static"))),
+                                              TyParamBound::RegionTyParamBound(cx.lifetime(sp, mk_ident(cx, "'static"))),
                                           ],
                                           None));
         // nightly: inputs.push(quote_arg!(cx, $arg_ident: $arg_type_ident));
@@ -570,6 +570,15 @@ fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>
 fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>) -> ItemKind {
     ItemKind::Impl(Unsafety::Normal, ImplPolarity::Positive, Defaultness::Final, Generics::default(),
                    traits, self_ty, items)
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_ident(cx: &ExtCtxt, name: &str) -> Ident {
+  cx.name_of(name).to_ident()
+}
+#[cfg(feature="with-syntex")]
+fn mk_ident(cx: &ExtCtxt, name: &str) -> Symbol {
+  cx.name_of(name)
 }
 
 struct CommaSep<'a, T: ToTokens + 'a>(&'a [T]);

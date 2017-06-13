@@ -5,7 +5,7 @@ members = [
 ]
 
 [replace]
-"mockers:0.5.9" = { path = "mockers" }
-"mockers_codegen:0.5.9" = { path = "mockers_codegen" }
-"mockers_macros:0.5.9" = { path = "mockers_macros" }
-"mockers_derive:0.5.9" = { path = "mockers_derive" }
+"mockers:0.5.10" = { path = "mockers" }
+"mockers_codegen:0.5.10" = { path = "mockers_codegen" }
+"mockers_macros:0.5.10" = { path = "mockers_macros" }
+"mockers_derive:0.5.10" = { path = "mockers_derive" }
