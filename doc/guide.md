@@ -511,6 +511,36 @@ let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned())
 
 There is also a corresponding `create_named_mock` method for external trait mocks.
 
+### Associated types
+
+Traits with associated types are supported, you may use them as usual:
+
+```rust
+#[derive(Mock)]
+pub trait A {
+    type Item;
+    fn create(&self) -> Self::Item;
+}
+
+#[test]
+fn test_assocated_type() {
+    let mut scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A<Item=i32>>();
+    scenario.expect(mock.create_call().and_return(2));
+    assert_eq!(mock.create(), 2);
+}
+```
+
+If you use mock type directly, note that every associated type becomes type parameter of mock structure, in this case use
+
+```rust
+scenario.create_mock::<AMock<i32>>();
+```
+
+### Trait type parameters
+
+Trait type parameters are not supported yet. Not because it is impossible, but because nobody requested it yet. So if you need it, just let me know.
+
 ## Mocking structures
 
 All previous examples assume that you already have some trait and functions which accept this trait.
