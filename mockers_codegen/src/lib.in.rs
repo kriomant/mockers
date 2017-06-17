@@ -23,7 +23,6 @@ use syntax::print::pprust;
 use syntax::tokenstream::TokenTree;
 
 use syntax::ext::build::AstBuilder;
-use itertools::Itertools;
 
 /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
 /// unique type ID. It is added to both call matchers produced by
@@ -245,11 +244,14 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     ).unwrap();
 
     // Generic parameters used for impls. It is part inside angles in
-    // `impl<A, B> ...`.
+    // `impl<A: std::fmt::Debug, B: std::fmt::Debug, ...> ...`.
     let generics = {
         let mut gen = Generics::default();
         gen.ty_params = assoc_types.iter().cloned().map(|param| {
-            cx.typaram(sp, param, vec![], vec![], None)
+            let bounds = vec![
+                cx.typarambound(quote_path!(cx, ::std::fmt::Debug)),
+            ];
+            cx.typaram(sp, param, vec![], bounds, None)
         }).collect();
         gen
     };
@@ -428,7 +430,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     new_args.push(quote_expr!(cx, $mock_type_id));
     new_args.push(cx.expr_str(sp, method_ident.name));
     for (i, arg) in args.iter().enumerate() {
-        let arg_type = &arg.ty;
+        let arg_type = qualify_self(&arg.ty, trait_path);
         let arg_type_ident = cx.ident_of(&format!("Arg{}Match", i));
         let arg_ident = cx.ident_of(&format!("arg{}", i));
 
@@ -454,7 +456,9 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let call_match_ident = cx.ident_of(&format!("CallMatch{}", args.len()));
 
-    let mut call_match_args: Vec<_> = args.iter().map(|arg| arg.ty.clone()).collect();
+    let mut call_match_args: Vec<_> = args.iter().map(|arg| {
+        qualify_self(&arg.ty, trait_path)
+    }).collect();
     call_match_args.push(fixed_return_type);
     let ret_type = cx.path_all(
         sp,
@@ -539,7 +543,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                               args: &[Arg], return_type: &Ty) -> Option<ImplItem> {
     let method_name = cx.expr_str(sp, method_ident.name);
     // Generate expression returning tuple of all method arguments.
-    let tuple_values: Vec<P<Expr>> =
+    let arg_values: Vec<P<Expr>> =
         args.iter().flat_map(|i| {
             if let PatKind::Ident(_, SpannedIdent {node: ident, ..}, _) = i.pat.node {
                 Some(cx.expr_ident(sp, ident))
@@ -548,20 +552,11 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                 return None;
             }
         }).collect();
-    if tuple_values.len() < args.len() { return None }
-    let args_tuple = cx.expr_tuple(sp, tuple_values);
-
-    let args_type: Vec<P<Ty>> = args.iter().map(|a| a.ty.clone()).collect();
-    let args_tuple_type: P<Ty> = cx.ty(sp, TyKind::Tup(args_type));
+    if arg_values.len() < args.len() { return None }
+    let arg_values_sep = comma_sep(&arg_values);
 
     let mut call_match_args: Vec<_> = args.iter().map(|arg| arg.ty.clone()).collect();
     call_match_args.push(P(return_type.clone()));
-
-    let args_format_str = std::iter::repeat("{:?}").take(args.len()).join(", ");
-    let args_tuple_fields: Vec<_> = (0..args.len()).map(|i| {
-        cx.expr_tup_field_access(sp, quote_expr!(cx, _args_ref), i)
-    }).collect();
-    let args_tuple_fields_sep = comma_sep(&args_tuple_fields);
 
     let self_ident = if let PatKind::Ident(_, spanned_ident, _) = self_arg.pat.node {
         spanned_ident.node
@@ -570,25 +565,13 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         return None;
     };
 
+    let verify_fn = mk_ident(cx, &format!("verify{}", args.len()));
+
     let fn_mock = quote_block!(cx, {
-        let args = Box::new($args_tuple);
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut $args_tuple_type) };
-        }
-        fn format_args(args_ptr: *const u8) -> String {
-            let _args_ref: &$args_tuple_type = unsafe { ::std::mem::transmute(args_ptr) };
-            format!($args_format_str, $args_tuple_fields_sep)
-        }
-        let call = ::mockers::Call { mock_id: $self_ident.mock_id,
-                                     mock_type_id: $mock_type_id,
-                                     method_name: $method_name,
-                                     args_ptr: args_ptr,
-                                     destroy: destroy,
-                                     format_args: format_args };
-        let result_ptr: *mut u8 = $self_ident.scenario.borrow_mut().verify(call);
-        let result: Box<$return_type> = unsafe { Box::from_raw(result_ptr as *mut $return_type) };
-        *result
+        let method_data = ::mockers::MethodData { mock_id: $self_ident.mock_id,
+                                                  mock_type_id: $mock_type_id,
+                                                  method_name: $method_name, };
+        $self_ident.scenario.borrow_mut().$verify_fn(method_data, $arg_values_sep)
     }).unwrap();
 
     let mut impl_args: Vec<Arg> = args.iter().map(|a| {

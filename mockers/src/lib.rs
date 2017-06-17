@@ -36,12 +36,12 @@ pub trait CallMatch {
         self.matches_target(call) && self.matches_args(call)
     }
     fn matches_target(&self, call: &Call) -> bool {
-        self.get_mock_id() == call.mock_id &&
-        self.get_method_name() == call.method_name
+        self.get_mock_id() == call.method_data.mock_id &&
+        self.get_method_name() == call.method_data.method_name
     }
     fn matches_method(&self, call: &Call) -> bool {
-        self.get_mock_type_id() == call.mock_type_id &&
-        self.get_method_name() == call.method_name
+        self.get_mock_type_id() == call.method_data.mock_type_id &&
+        self.get_method_name() == call.method_data.method_name
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>>;
     fn get_mock_id(&self) -> usize;
@@ -99,8 +99,8 @@ impl<Res> CallMatch0<Res> {
 }
 impl<Res> CallMatch for CallMatch0<Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        assert!(call.mock_type_id == self.mock_type_id &&
-                call.method_name == self.method_name);
+        assert!(call.method_data.mock_type_id == self.mock_type_id &&
+                call.method_data.method_name == self.method_name);
         true
     }
     fn validate(&self, _call: &Call) -> Vec<Result<(), String>> {
@@ -253,8 +253,8 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        assert!(call.mock_type_id == self.mock_type_id &&
-                call.method_name == self.method_name);
+        assert!(call.method_data.mock_type_id == self.mock_type_id &&
+                call.method_data.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok()
@@ -412,8 +412,8 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        assert!(call.mock_type_id == self.mock_type_id &&
-                call.method_name == self.method_name);
+        assert!(call.method_data.mock_type_id == self.mock_type_id &&
+                call.method_data.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -578,8 +578,8 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        assert!(call.mock_type_id == self.mock_type_id &&
-                call.method_name == self.method_name);
+        assert!(call.method_data.mock_type_id == self.mock_type_id &&
+                call.method_data.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -749,8 +749,8 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        assert!(call.mock_type_id == self.mock_type_id &&
-                call.method_name == self.method_name);
+        assert!(call.method_data.mock_type_id == self.mock_type_id &&
+                call.method_data.method_name == self.method_name);
 
         let args = Self::get_args_ref(call);
         self.arg0.matches(&args.0).is_ok() &&
@@ -1079,9 +1079,7 @@ impl Drop for Scenario {
 }
 
 pub struct Call {
-    pub mock_id: usize,
-    pub mock_type_id: usize,
-    pub method_name: &'static str,
+    pub method_data: MethodData,
     pub args_ptr: *const u8,
     pub destroy: fn(*const u8),
     pub format_args: fn(*const u8) -> String,
@@ -1134,13 +1132,149 @@ macro_rules! colored {
     (white_bold: $s:expr) => ( concat!("\x1b[1;97m", $s, "\x1b[0m") );
 }
 
+pub struct MethodData {
+    pub mock_id: usize,
+    pub mock_type_id: usize,
+    pub method_name: &'static str,
+}
+
 impl ScenarioInternals {
+    pub fn verify0<Res>(&mut self, method_data: MethodData) -> Res {
+        let args = Box::new(());
+        let args_ptr: *const u8 =
+            ::std::boxed::Box::into_raw(args) as *const u8;
+        fn destroy(args_to_destroy: *const u8) {
+            unsafe { Box::from_raw(args_to_destroy as *mut ()) };
+        };
+        fn format_args(args_ptr: *const u8) -> String {
+            let _args_ref: &() =
+                unsafe { ::std::mem::transmute(args_ptr) };
+            format!("")
+        };
+        let call = Call { method_data: method_data,
+                          args_ptr: args_ptr,
+                          destroy: destroy,
+                          format_args: format_args, };
+        let result_ptr: *mut u8 = self.verify(call);
+        let result: Box<Res> =
+            unsafe {
+                Box::from_raw(result_ptr as *mut Res)
+            };
+        *result
+    }
+
+    pub fn verify1<A0: std::fmt::Debug, Res>(&mut self, method_data: MethodData, a0: A0) -> Res {
+        let args = Box::new((a0,));
+        let args_ptr: *const u8 =
+            ::std::boxed::Box::into_raw(args) as *const u8;
+        fn destroy<A0>(args_to_destroy: *const u8) {
+            unsafe { Box::from_raw(args_to_destroy as *mut (A0,)) };
+        };
+        fn format_args<A0: std::fmt::Debug>(args_ptr: *const u8) -> String {
+            let _args_ref: &(A0,) =
+                unsafe { ::std::mem::transmute(args_ptr) };
+            format!("{:?}", _args_ref.0)
+        };
+        let call = Call { method_data: method_data,
+                          args_ptr: args_ptr,
+                          destroy: destroy::<A0>,
+                          format_args: format_args::<A0>, };
+        let result_ptr: *mut u8 = self.verify(call);
+        let result: Box<Res> =
+            unsafe {
+                Box::from_raw(result_ptr as *mut Res)
+            };
+        *result
+    }
+
+    pub fn verify2<A0: std::fmt::Debug, A1: std::fmt::Debug, Res>(
+            &mut self, method_data: MethodData, a0: A0, a1: A1) -> Res {
+        let args = Box::new((a0, a1));
+        let args_ptr: *const u8 =
+            ::std::boxed::Box::into_raw(args) as *const u8;
+        fn destroy<A0, A1>(args_to_destroy: *const u8) {
+            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1)) };
+        };
+        fn format_args<A0: std::fmt::Debug,
+                       A1: std::fmt::Debug>(args_ptr: *const u8) -> String {
+            let _args_ref: &(A0, A1) =
+                unsafe { ::std::mem::transmute(args_ptr) };
+            format!("{:?}, {:?}", _args_ref.0, _args_ref.1)
+        };
+        let call = Call { method_data: method_data,
+                          args_ptr: args_ptr,
+                          destroy: destroy::<A0, A1>,
+                          format_args: format_args::<A0, A1>, };
+        let result_ptr: *mut u8 = self.verify(call);
+        let result: Box<Res> =
+            unsafe {
+                Box::from_raw(result_ptr as *mut Res)
+            };
+        *result
+    }
+
+    pub fn verify3<A0: std::fmt::Debug, A1: std::fmt::Debug,
+                   A2: std::fmt::Debug, Res>
+            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2) -> Res {
+        let args = Box::new((a0, a1, a2));
+        let args_ptr: *const u8 =
+            ::std::boxed::Box::into_raw(args) as *const u8;
+        fn destroy<A0, A1, A2>(args_to_destroy: *const u8) {
+            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2)) };
+        };
+        fn format_args<A0: std::fmt::Debug, A1: std::fmt::Debug,
+                       A2: std::fmt::Debug>
+                (args_ptr: *const u8) -> String {
+            let _args_ref: &(A0, A1, A2) =
+                unsafe { ::std::mem::transmute(args_ptr) };
+            format!("{:?}, {:?}, {:?}", _args_ref.0, _args_ref.1, _args_ref.2)
+        };
+        let call = Call { method_data: method_data,
+                          args_ptr: args_ptr,
+                          destroy: destroy::<A0, A1, A2>,
+                          format_args: format_args::<A0, A1, A2>, };
+        let result_ptr: *mut u8 = self.verify(call);
+        let result: Box<Res> =
+            unsafe {
+                Box::from_raw(result_ptr as *mut Res)
+            };
+        *result
+    }
+
+    pub fn verify4<A0: std::fmt::Debug, A1: std::fmt::Debug,
+                   A2: std::fmt::Debug, A3: std::fmt::Debug, Res>
+            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2, a3: A3) -> Res {
+        let args = Box::new((a0, a1, a2, a3));
+        let args_ptr: *const u8 =
+            ::std::boxed::Box::into_raw(args) as *const u8;
+        fn destroy<A0, A1, A2, A3>(args_to_destroy: *const u8) {
+            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2, A3)) };
+        };
+        fn format_args<A0: std::fmt::Debug, A1: std::fmt::Debug,
+                       A2: std::fmt::Debug, A3: std::fmt::Debug>
+                (args_ptr: *const u8) -> String {
+            let args_ref: &(A0, A1, A2, A3) =
+                unsafe { ::std::mem::transmute(args_ptr) };
+            format!("{:?}, {:?}, {:?}, {:?}", args_ref.0, args_ref.1, args_ref.2, args_ref.3)
+        };
+        let call = Call { method_data: method_data,
+                          args_ptr: args_ptr,
+                          destroy: destroy::<A0, A1, A2, A3>,
+                          format_args: format_args::<A0, A1, A2, A3>, };
+        let result_ptr: *mut u8 = self.verify(call);
+        let result: Box<Res> =
+            unsafe {
+                Box::from_raw(result_ptr as *mut Res)
+            };
+        *result
+    }
+
     /// Verify call performed on mock object
-    pub fn verify(&mut self, call: Call) -> *mut u8 {
+    fn verify(&mut self, call: Call) -> *mut u8 {
 
         for expectation in self.expectations.iter_mut().rev() {
             if expectation.call_match().matches(&call) {
-                let mock_name = self.mock_names.get(&call.mock_id).unwrap();
+                let mock_name = self.mock_names.get(&call.method_data.mock_id).unwrap();
                 return expectation.satisfy(call, mock_name);
             }
         }
@@ -1148,14 +1282,14 @@ impl ScenarioInternals {
         // No expectations exactly matching call are found. However this may be
         // because of unexpected argument values. So check active expectations
         // with matching target (i.e. mock and method) and validate arguments.
-        let mock_name = self.mock_names.get(&call.mock_id).unwrap();
+        let mock_name = self.mock_names.get(&call.method_data.mock_id).unwrap();
 
         let mut msg = String::new();
         msg.write_str("\n\n").unwrap();
         write!(&mut msg,
                concat!(colored!(red: "error:"), " ",
                        colored!(bold: "unexpected call to `{}.{}({})`\n\n")),
-               mock_name, call.method_name, (call.format_args)(call.args_ptr)).unwrap();
+               mock_name, call.method_data.method_name, (call.format_args)(call.args_ptr)).unwrap();
 
         if self.expectations.is_empty() {
             msg.push_str("no call are expected");
@@ -1168,7 +1302,7 @@ impl ScenarioInternals {
                 if target_first_match {
                     write!(&mut msg, concat!(colored!(green: "note: "),
                                             "here are active expectations for {}.{}\n"),
-                                     mock_name, call.method_name).unwrap();
+                                     mock_name, call.method_data.method_name).unwrap();
                     target_first_match = false;
                 }
 
@@ -1186,7 +1320,7 @@ impl ScenarioInternals {
 
         if target_first_match {
             write!(&mut msg, concat!(colored!(green: "note: "), "there are no active expectations for {}.{}\n"),
-                   mock_name, call.method_name).unwrap();
+                   mock_name, call.method_data.method_name).unwrap();
         }
 
         let mut method_first_match = true;

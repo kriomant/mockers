@@ -531,6 +531,8 @@ fn test_assocated_type() {
 }
 ```
 
+However, type bounds on associated types aren't supported yet.
+
 If you use mock type directly, note that every associated type becomes type parameter of mock structure, in this case use
 
 ```rust
