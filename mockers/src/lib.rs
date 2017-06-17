@@ -1,9 +1,9 @@
 #![cfg_attr(feature="nightly", feature(fnbox))]
-#![cfg_attr(feature="nightly", feature(collections, collections_range))]
+#![cfg_attr(feature="nightly", feature(alloc, collections_range))]
 // nightly(box_patterns) #![feature(box_patterns)]
 
 #[cfg(feature="nightly")]
-extern crate collections;
+extern crate alloc;
 
 use std::marker::PhantomData;
 use std::rc::Rc;

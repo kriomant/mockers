@@ -1,6 +1,6 @@
 [package]
 name = "mockers_codegen"
-version = "0.5.10"
+version = "0.5.11"
 description = "Compiler plugin for 'mockers' mocking library"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 repository = "https://github.com/kriomant/mockers"
