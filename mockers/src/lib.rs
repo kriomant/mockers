@@ -1346,4 +1346,8 @@ impl ScenarioInternals {
         msg.push('\n');
         panic!(msg);
     }
+
+    pub fn get_mock_name(&self, mock_id: usize) -> &str {
+        self.mock_names.get(&mock_id).unwrap()
+    }
 }

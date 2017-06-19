@@ -325,6 +325,14 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
         p
     };
 
+    let debug_impl_item = quote_item!(cx,
+        impl<$assoc_types_sep> ::std::fmt::Debug for $mock_ident<$assoc_types_sep> {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+                f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
+            }
+        }
+    ).unwrap();
+
     // Generated impl example:
     //
     //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
@@ -338,10 +346,10 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 
     if local {
         vec![struct_item, mock_impl_item, impl_item,
-             trait_impl_item, mocked_impl_item]
+             trait_impl_item, debug_impl_item, mocked_impl_item]
     } else {
         vec![struct_item, mock_impl_item, impl_item,
-             trait_impl_item]
+             trait_impl_item, debug_impl_item]
     }
 }
 
