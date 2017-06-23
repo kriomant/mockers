@@ -8,7 +8,7 @@ keywords = ["mock", "test"]
 license = "MIT"
 
 [dependencies]
-mockers_codegen = "0.5.11"
+mockers_codegen = { version = "0.5.11", path = "../mockers_codegen" }
 
 [lib]
 name = "mockers_macros"

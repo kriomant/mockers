@@ -13,7 +13,7 @@ license = "MIT"
 name = "mockers"
 
 [dev-dependencies]
-mockers_macros = "0.5.11"
+mockers_macros = { version = "0.5.11", path = "../mockers_macros" }
 
 [features]
 default = ["nightly"]

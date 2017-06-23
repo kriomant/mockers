@@ -8,8 +8,10 @@ publish = false
 
 [build-dependencies.mockers_codegen]
 version = "0.5.11"
+path = "../../mockers_codegen"
 features = ["with-syntex"]
 
 [dev-dependencies.mockers]
 version = "0.5.11"
+path = "../../mockers"
 default-features = false
