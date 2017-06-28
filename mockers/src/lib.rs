@@ -6,29 +6,30 @@
 extern crate alloc;
 
 use std::marker::PhantomData;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use std::fmt::Write;
+use std::ops::DerefMut;
 
 mod box_fn;
 pub mod matchers;
 
 type Action0<T> = box_fn::BoxFn0<T>;
-type ActionClone0<T> = Box<FnMut() -> T>;
+type ActionClone0<T> = Rc<RefCell<FnMut() -> T>>;
 
 type Action1<Arg0, T> = box_fn::BoxFn1<Arg0, T>;
-type ActionClone1<Arg0, T> = Box<FnMut(Arg0) -> T>;
+type ActionClone1<Arg0, T> = Rc<RefCell<FnMut(Arg0) -> T>>;
 
 type Action2<Arg0, Arg1, T> = box_fn::BoxFn2<Arg0, Arg1, T>;
-type ActionClone2<Arg0, Arg1, T> = Box<FnMut(Arg0, Arg1) -> T>;
+type ActionClone2<Arg0, Arg1, T> = Rc<RefCell<FnMut(Arg0, Arg1) -> T>>;
 
 type Action3<Arg0, Arg1, Arg2, T> = box_fn::BoxFn3<Arg0, Arg1, Arg2, T>;
-type ActionClone3<Arg0, Arg1, Arg2, T> = Box<FnMut(Arg0, Arg1, Arg2) -> T>;
+type ActionClone3<Arg0, Arg1, Arg2, T> = Rc<RefCell<FnMut(Arg0, Arg1, Arg2) -> T>>;
 
 type Action4<Arg0, Arg1, Arg2, Arg3, T> = box_fn::BoxFn4<Arg0, Arg1, Arg2, Arg3, T>;
-type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Box<FnMut(Arg0, Arg1, Arg2, Arg3) -> T>;
+type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Rc<RefCell<FnMut(Arg0, Arg1, Arg2, Arg3) -> T>>;
 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
@@ -53,7 +54,7 @@ pub trait CallMatch {
 pub trait Expectation {
     fn call_match(&self) -> &CallMatch;
     fn is_satisfied(&self) -> bool;
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8;
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8>;
     fn describe(&self) -> String;
 }
 
@@ -67,7 +68,7 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     fn is_satisfied(&self) -> bool {
         true
     }
-    fn satisfy(&mut self, _call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, _call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         panic!("{}.{} should never be called", mock_name, self.call_match().get_method_name());
     }
     fn describe(&self) -> String {
@@ -137,22 +138,27 @@ impl<Res> ExpectationTimes0<Res> {
         ExpectationTimes0 { call_match: call_match, action: action, number: number, count: 0 }
     }
 }
-impl<Res: Clone> Expectation for ExpectationTimes0<Res> {
+impl<Res: Clone + 'static> Expectation for ExpectationTimes0<Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.count == self.number
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         if self.count == self.number {
             panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
         }
         self.count += 1;
         let _args = CallMatch0::<Res>::get_args(call);
-        let result = (self.action)();
-        Box::into_raw(Box::new(result)) as *mut u8
+        box_fn::BoxFn0::new({
+            let action = self.action.clone();
+            move || {
+                let result = (action.borrow_mut().deref_mut())();
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        })
     }
     fn describe(&self) -> String {
         format!("{} must be called {} times, called {} times",
@@ -165,20 +171,22 @@ pub struct Expectation0<Res> {
     call_match: CallMatch0<Res>,
     action: Option<Action0<Res>>,
 }
-impl<Res> Expectation for Expectation0<Res> {
+impl<Res: 'static> Expectation for Expectation0<Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.action.is_none()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         match self.action.take() {
             Some(action) => {
                 // nightly: let box () = CallMatch0::<Res>::get_args(call);
                 let () = *CallMatch0::<Res>::get_args(call);
-                let result = action.call();
-                Box::into_raw(Box::new(result)) as *mut u8
+                box_fn::BoxFn0::<*mut u8>::new(move || {
+                    let result = action.call();
+                    Box::into_raw(Box::new(result)) as *mut u8
+                })
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -209,17 +217,17 @@ impl<Res: 'static> CallMatch0<Res> {
 }
 impl<Res: Clone + 'static> CallMatch0<Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction0<Res> {
-        Reaction0 { call_match: self, action: Box::new(move || result.clone()) }
+        Reaction0 { call_match: self, action: Rc::new(RefCell::new(move || result.clone())) }
     }
 
     pub fn and_call_clone<F>(self, func: F) -> Reaction0<Res>
             where F: FnMut() -> Res + 'static {
-        Reaction0 { call_match: self, action: Box::new(func) }
+        Reaction0 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
 impl<Res: Default + 'static> CallMatch0<Res> {
     pub fn and_return_default(self) -> Reaction0<Res> {
-        Reaction0 { call_match: self, action: Box::new(Res::default) }
+        Reaction0 { call_match: self, action: Rc::new(RefCell::new(Res::default)) }
     }
 }
 
@@ -295,14 +303,14 @@ impl<Arg0, Res> ExpectationTimes1<Arg0, Res> {
         ExpectationTimes1 { call_match: call_match, action: action, number: number, count: 0 }
     }
 }
-impl<Arg0, Res: Clone> Expectation for ExpectationTimes1<Arg0, Res> {
+impl<Arg0: 'static, Res: Clone + 'static> Expectation for ExpectationTimes1<Arg0, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.count == self.number
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         if self.count == self.number {
             panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
@@ -310,8 +318,13 @@ impl<Arg0, Res: Clone> Expectation for ExpectationTimes1<Arg0, Res> {
         self.count += 1;
         // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
         let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
-        let result = (self.action)(arg0);
-        Box::into_raw(Box::new(result)) as *mut u8
+        box_fn::BoxFn0::new({
+            let action = self.action.clone();
+            move || {
+                let result = action.borrow_mut().deref_mut()(arg0);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        })
     }
     fn describe(&self) -> String {
         format!("{} must be called {} times, called {} times",
@@ -324,20 +337,22 @@ pub struct Expectation1<Arg0, Res> {
     call_match: CallMatch1<Arg0, Res>,
     action: Option<Action1<Arg0, Res>>,
 }
-impl<Arg0, Res> Expectation for Expectation1<Arg0, Res> {
+impl<Arg0: 'static, Res: 'static> Expectation for Expectation1<Arg0, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.action.is_none()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         match self.action.take() {
             Some(action) => {
                 // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
                 let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
-                let result = action.call(arg0);
-                Box::into_raw(Box::new(result)) as *mut u8
+                box_fn::BoxFn0::new(move || {
+                    let result = action.call(arg0);
+                    Box::into_raw(Box::new(result)) as *mut u8
+                })
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -364,17 +379,17 @@ impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
 }
 impl<Arg0, Res: Clone + 'static> CallMatch1<Arg0, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction1<Arg0, Res> {
-        Reaction1 { call_match: self, action: Box::new(move |_| result.clone()) }
+        Reaction1 { call_match: self, action: Rc::new(RefCell::new(move |_| result.clone())) }
     }
 
     pub fn and_call_clone<F>(self, func: F) -> Reaction1<Arg0, Res>
             where F: FnMut(Arg0) -> Res + 'static {
-        Reaction1 { call_match: self, action: Box::new(func) }
+        Reaction1 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
 impl<Arg0, Res: Default + 'static> CallMatch1<Arg0, Res> {
     pub fn and_return_default(self) -> Reaction1<Arg0, Res> {
-        Reaction1 { call_match: self, action: Box::new(|_| Res::default()) }
+        Reaction1 { call_match: self, action: Rc::new(RefCell::new(|_| Res::default())) }
     }
 }
 
@@ -457,14 +472,14 @@ impl<Arg0, Arg1, Res> ExpectationTimes2<Arg0, Arg1, Res> {
         ExpectationTimes2 { call_match: call_match, action: action, number: number, count: 0 }
     }
 }
-impl<Arg0, Arg1, Res: Clone> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
+impl<Arg0: 'static, Arg1: 'static, Res: Clone + 'static> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.count == self.number
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         if self.count == self.number {
             panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
@@ -472,8 +487,13 @@ impl<Arg0, Arg1, Res: Clone> Expectation for ExpectationTimes2<Arg0, Arg1, Res> 
         self.count += 1;
         // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
         let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-        let result = (self.action)(arg0, arg1);
-        Box::into_raw(Box::new(result)) as *mut u8
+        box_fn::BoxFn0::new({
+            let action = self.action.clone();
+            move || {
+                let result = action.borrow_mut().deref_mut()(arg0, arg1);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        })
     }
     fn describe(&self) -> String {
         format!("{} must be called {} times, called {} times",
@@ -486,20 +506,22 @@ pub struct Expectation2<Arg0, Arg1, Res> {
     call_match: CallMatch2<Arg0, Arg1, Res>,
     action: Option<Action2<Arg0, Arg1, Res>>,
 }
-impl<Arg0, Arg1, Res> Expectation for Expectation2<Arg0, Arg1, Res> {
+impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation for Expectation2<Arg0, Arg1, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.action.is_none()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         match self.action.take() {
             Some(action) => {
                 // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
                 let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                let result = action.call(arg0, arg1);
-                Box::into_raw(Box::new(result)) as *mut u8
+                box_fn::BoxFn0::new(move || {
+                    let result = action.call(arg0, arg1);
+                    Box::into_raw(Box::new(result)) as *mut u8
+                })
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -526,17 +548,17 @@ impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
 }
 impl<Arg0, Arg1, Res: Clone + 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction2<Arg0, Arg1, Res> {
-        Reaction2 { call_match: self, action: Box::new(move |_, _| result.clone()) }
+        Reaction2 { call_match: self, action: Rc::new(RefCell::new(move |_, _| result.clone())) }
     }
 
     pub fn and_call_clone<F>(self, func: F) -> Reaction2<Arg0, Arg1, Res>
             where F: FnMut(Arg0, Arg1) -> Res + 'static {
-        Reaction2 { call_match: self, action: Box::new(func) }
+        Reaction2 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
 impl<Arg0, Arg1, Res: Default + 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return_default(self) -> Reaction2<Arg0, Arg1, Res> {
-        Reaction2 { call_match: self, action: Box::new(|_, _| Res::default()) }
+        Reaction2 { call_match: self, action: Rc::new(RefCell::new(|_, _| Res::default())) }
     }
 }
 
@@ -626,14 +648,14 @@ impl<Arg0, Arg1, Arg2, Res> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
         ExpectationTimes3 { call_match: call_match, action: action, number: number, count: 0 }
     }
 }
-impl<Arg0, Arg1, Arg2, Res> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
+impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.count == self.number
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         if self.count == self.number {
             panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
@@ -641,8 +663,13 @@ impl<Arg0, Arg1, Arg2, Res> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, 
         self.count += 1;
         // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
         let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-        let result = (self.action)(arg0, arg1, arg2);
-        Box::into_raw(Box::new(result)) as *mut u8
+        box_fn::BoxFn0::new({
+            let action = self.action.clone();
+            move || {
+                let result = action.borrow_mut().deref_mut()(arg0, arg1, arg2);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        })
     }
     fn describe(&self) -> String {
         format!("{} must be called {} times, called {} times",
@@ -655,20 +682,22 @@ pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
     call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
     action: Option<Action3<Arg0, Arg1, Arg2, Res>>,
 }
-impl<Arg0, Arg1, Arg2, Res> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
+impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.action.is_none()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         match self.action.take() {
             Some(action) => {
                 // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
                 let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                let result = action.call(arg0, arg1, arg2);
-                Box::into_raw(Box::new(result)) as *mut u8
+                box_fn::BoxFn0::new(move || {
+                    let result = action.call(arg0, arg1, arg2);
+                    Box::into_raw(Box::new(result)) as *mut u8
+                })
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -695,17 +724,17 @@ impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
 }
 impl<Arg0, Arg1, Arg2, Res: Clone + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction3<Arg0, Arg1, Arg2, Res> {
-        Reaction3 { call_match: self, action: Box::new(move |_, _, _| result.clone()) }
+        Reaction3 { call_match: self, action: Rc::new(RefCell::new(move |_, _, _| result.clone())) }
     }
 
     pub fn and_call_clone<F>(self, func: F) -> Reaction3<Arg0, Arg1, Arg2, Res>
             where F: FnMut(Arg0, Arg1, Arg2) -> Res + 'static {
-        Reaction3 { call_match: self, action: Box::new(func) }
+        Reaction3 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Res: Default + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return_default(self) -> Reaction3<Arg0, Arg1, Arg2, Res> {
-        Reaction3 { call_match: self, action: Box::new(move |_, _, _| Res::default()) }
+        Reaction3 { call_match: self, action: Rc::new(RefCell::new(move |_, _, _| Res::default())) }
     }
 }
 
@@ -800,14 +829,14 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res>
         ExpectationTimes4 { call_match: call_match, action: action, number: number, count: 0 }
     }
 }
-impl<Arg0, Arg1, Arg2, Arg3, Res: Clone> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
+impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: Clone + 'static> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.count == self.number
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         if self.count == self.number {
             panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
                    mock_name, self.call_match().get_method_name(), self.count, self.number);
@@ -815,8 +844,13 @@ impl<Arg0, Arg1, Arg2, Arg3, Res: Clone> Expectation for ExpectationTimes4<Arg0,
         self.count += 1;
         // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
         let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-        let result = (self.action)(arg0, arg1, arg2, arg3);
-        Box::into_raw(Box::new(result)) as *mut u8
+        box_fn::BoxFn0::new({
+            let action = self.action.clone();
+            move || {
+                let result = action.borrow_mut().deref_mut()(arg0, arg1, arg2, arg3);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        })
     }
     fn describe(&self) -> String {
         format!("{} must be called {} times, called {} times",
@@ -829,20 +863,22 @@ pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
     action: Option<Action4<Arg0, Arg1, Arg2, Arg3, Res>>,
 }
-impl<Arg0, Arg1, Arg2, Arg3, Res> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
+impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
         self.action.is_none()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         match self.action.take() {
             Some(action) => {
                 // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
                 let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                let result = action.call(arg0, arg1, arg2, arg3);
-                Box::into_raw(Box::new(result)) as *mut u8
+                box_fn::BoxFn0::new(move || {
+                    let result = action.call(arg0, arg1, arg2, arg3);
+                    Box::into_raw(Box::new(result)) as *mut u8
+                })
             },
             None => {
                 panic!("{}.{} was already called earlier", mock_name, self.call_match().get_method_name());
@@ -869,17 +905,17 @@ impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Re
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res: Clone + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Reaction4 { call_match: self, action: Box::new(move |_, _, _, _| result.clone()) }
+        Reaction4 { call_match: self, action: Rc::new(RefCell::new(move |_, _, _, _| result.clone())) }
     }
 
     pub fn and_call_clone<F>(self, func: F) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res>
             where F: FnMut(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
-        Reaction4 { call_match: self, action: Box::new(func) }
+        Reaction4 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res: Default + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_return_default(self) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Reaction4 { call_match: self, action: Box::new(|_, _, _, _| Res::default()) }
+        Reaction4 { call_match: self, action: Rc::new(RefCell::new(|_, _, _, _| Res::default())) }
     }
 }
 
@@ -930,7 +966,7 @@ impl Expectation for Sequence {
     fn is_satisfied(&self) -> bool {
         self.expectations.is_empty()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> *mut u8 {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
         let (res, remove) = {
             let exp = &mut self.expectations[0];
             let res = exp.satisfy(call, mock_name);
@@ -960,15 +996,69 @@ pub trait Mocked {
 pub struct ScenarioInternals {
     expectations: Vec<Box<Expectation>>,
 
+    next_mock_id: usize,
+
     /// Mapping from mock ID to mock name.
     mock_names: HashMap<usize, Rc<String>>,
     /// Set of used mock names used to quicly check for conflicts.
     allocated_names: HashSet<Rc<String>>,
 }
 
+impl ScenarioInternals {
+    fn get_next_mock_id(&mut self) -> usize {
+        let id = self.next_mock_id;
+        self.next_mock_id += 1;
+        id
+    }
+
+    pub fn create_mock<T: Mock>(int: &Rc<RefCell<Self>>) -> T {
+        let mut internals = int.borrow_mut();
+        let mock_id = internals.get_next_mock_id();
+        internals.generate_name_for_class(mock_id, T::mocked_class_name());
+        T::new(mock_id, int.clone())
+    }
+
+    pub fn create_named_mock<T: Mock>(int: &Rc<RefCell<Self>>, name: String) -> T {
+        let mut internals = int.borrow_mut();
+        let mock_id = internals.get_next_mock_id();
+        internals.register_name(mock_id, name);
+        T::new(mock_id, int.clone())
+    }
+
+    pub fn create_mock_for<T: ?Sized>(int: &Rc<RefCell<Self>>) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        Self::create_mock::<<&'static T as Mocked>::MockImpl>(int)
+    }
+
+    pub fn create_named_mock_for<T: ?Sized>(int: &Rc<RefCell<Self>>, name: String) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        Self::create_named_mock::<<&'static T as Mocked>::MockImpl>(int, name)
+    }
+
+    pub fn generate_name_for_class(&mut self, mock_id: usize, class_name: &str) {
+        for i in 0.. {
+            let name = format!("{}#{}", class_name, i);
+            if !self.allocated_names.contains(&name) {
+                let name_rc = Rc::new(name);
+                self.mock_names.insert(mock_id, name_rc.clone());
+                self.allocated_names.insert(name_rc);
+                break;
+            }
+        }
+    }
+
+    fn register_name(&mut self, mock_id: usize, name: String) {
+        if self.allocated_names.contains(&name) {
+            panic!("Mock name {} already used", name);
+        }
+        let name_rc = Rc::new(name);
+        self.mock_names.insert(mock_id, name_rc.clone());
+        self.allocated_names.insert(name_rc);
+    }
+}
+
 pub struct Scenario {
     internals: Rc<RefCell<ScenarioInternals>>,
-    next_mock_id: usize,
 }
 
 impl Scenario {
@@ -976,52 +1066,46 @@ impl Scenario {
         Scenario {
             internals: Rc::new(RefCell::new(ScenarioInternals {
                 expectations: Vec::new(),
+                next_mock_id: 0,
 
                 mock_names: HashMap::new(),
                 allocated_names: HashSet::new(),
             })),
-            next_mock_id: 0,
         }
     }
 
-    pub fn create_mock<T: Mock>(&mut self) -> T {
-        let mock_id = self.get_next_mock_id();
-        self.generate_name_for_class(mock_id, T::mocked_class_name());
-        T::new(mock_id, self.internals.clone())
+    pub fn create_mock<T: Mock>(&self) -> T {
+        ScenarioInternals::create_mock::<T>(&self.internals)
     }
 
-    pub fn create_named_mock<T: Mock>(&mut self, name: String) -> T {
-        let mock_id = self.get_next_mock_id();
-        self.register_name(mock_id, name);
-        T::new(mock_id, self.internals.clone())
+    pub fn create_named_mock<T: Mock>(&self, name: String) -> T {
+        ScenarioInternals::create_named_mock::<T>(&self.internals, name)
     }
 
-    pub fn create_mock_for<T: ?Sized>(&mut self) -> <&'static T as Mocked>::MockImpl
+    pub fn create_mock_for<T: ?Sized>(&self) -> <&'static T as Mocked>::MockImpl
             where &'static T: Mocked {
-        self.create_mock::<<&'static T as Mocked>::MockImpl>()
+        ScenarioInternals::create_mock_for::<T>(&self.internals)
     }
 
-    pub fn create_named_mock_for<T: ?Sized>(&mut self, name: String) -> <&'static T as Mocked>::MockImpl
+    pub fn create_named_mock_for<T: ?Sized>(&self, name: String) -> <&'static T as Mocked>::MockImpl
             where &'static T: Mocked {
-        self.create_named_mock::<<&'static T as Mocked>::MockImpl>(name)
+        ScenarioInternals::create_named_mock_for::<T>(&self.internals, name)
     }
 
-    fn get_next_mock_id(&mut self) -> usize {
-        let id = self.next_mock_id;
-        self.next_mock_id += 1;
-        id
-    }
-
-    pub fn expect<C: Expectation + 'static>(&mut self, call: C) {
+    pub fn expect<C: Expectation + 'static>(&self, call: C) {
         self.internals.borrow_mut().expectations.push(Box::new(call));
     }
 
-    pub fn checkpoint(&mut self) {
+    pub fn checkpoint(&self) {
         self.verify_expectations();
         self.internals.borrow_mut().expectations.clear();
     }
 
-    fn verify_expectations(&mut self) {
+    pub fn handle(&self) -> ScenarioHandle {
+      ScenarioHandle::new(Rc::downgrade(&self.internals))
+    }
+
+    fn verify_expectations(&self) {
         let int = self.internals.borrow();
         let expectations = &int.expectations;
         let mock_names = &int.mock_names;
@@ -1033,29 +1117,6 @@ impl Scenario {
                 s.push_str(&format!("`{}.{}`\n", mock_name, expectation.describe()));
             }
             panic!(s);
-        }
-    }
-
-    fn register_name(&mut self, mock_id: usize, name: String) {
-        let mut int = self.internals.borrow_mut();
-        if int.allocated_names.contains(&name) {
-            panic!("Mock name {} already used", name);
-        }
-        let name_rc = Rc::new(name);
-        int.mock_names.insert(mock_id, name_rc.clone());
-        int.allocated_names.insert(name_rc);
-    }
-
-    fn generate_name_for_class(&mut self, mock_id: usize, class_name: &str) {
-        let mut int = self.internals.borrow_mut();
-        for i in 0.. {
-            let name = format!("{}#{}", class_name, i);
-            if !int.allocated_names.contains(&name) {
-                let name_rc = Rc::new(name);
-                int.mock_names.insert(mock_id, name_rc.clone());
-                int.allocated_names.insert(name_rc);
-                break;
-            }
         }
     }
 }
@@ -1075,6 +1136,43 @@ impl Drop for Scenario {
         }
 
         self.verify_expectations();
+    }
+}
+
+pub struct ScenarioHandle {
+    internals: Weak<RefCell<ScenarioInternals>>,
+}
+
+impl ScenarioHandle {
+    pub fn new(scenario_int: Weak<RefCell<ScenarioInternals>>) -> Self {
+        Self { internals: scenario_int }
+    }
+
+    pub fn create_mock<T: Mock>(&self) -> T {
+        ScenarioInternals::create_mock::<T>(&self.get_internals())
+    }
+
+    pub fn create_named_mock<T: Mock>(&self, name: String) -> T {
+        ScenarioInternals::create_named_mock::<T>(&self.get_internals(), name)
+    }
+
+    pub fn create_mock_for<T: ?Sized>(&self) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        ScenarioInternals::create_mock_for::<T>(&self.get_internals())
+    }
+
+    pub fn create_named_mock_for<T: ?Sized>(&self, name: String) -> <&'static T as Mocked>::MockImpl
+            where &'static T: Mocked {
+        ScenarioInternals::create_named_mock_for::<T>(&self.get_internals(), name)
+    }
+
+    pub fn expect<C: Expectation + 'static>(&self, call: C) {
+        let ints = self.get_internals();
+        ints.borrow_mut().expectations.push(Box::new(call));
+    }
+
+    fn get_internals(&self) -> Rc<RefCell<ScenarioInternals>> {
+      self.internals.upgrade().expect("scenario is dead")
     }
 }
 
@@ -1139,7 +1237,7 @@ pub struct MethodData {
 }
 
 impl ScenarioInternals {
-    pub fn verify0<Res>(&mut self, method_data: MethodData) -> Res {
+    pub fn verify0<Res>(&mut self, method_data: MethodData) -> box_fn::BoxFn0<Res> {
         let args = Box::new(());
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
@@ -1155,15 +1253,18 @@ impl ScenarioInternals {
                           args_ptr: args_ptr,
                           destroy: destroy,
                           format_args: format_args, };
-        let result_ptr: *mut u8 = self.verify(call);
-        let result: Box<Res> =
-            unsafe {
-                Box::from_raw(result_ptr as *mut Res)
-            };
-        *result
+        let action = self.verify(call);
+        box_fn::BoxFn0::new(move || {
+            let result_ptr: *mut u8 = action.call();
+            let result: Box<Res> =
+                unsafe {
+                    Box::from_raw(result_ptr as *mut Res)
+                };
+            *result
+        })
     }
 
-    pub fn verify1<A0: std::fmt::Debug, Res>(&mut self, method_data: MethodData, a0: A0) -> Res {
+    pub fn verify1<A0: std::fmt::Debug, Res>(&mut self, method_data: MethodData, a0: A0) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0,));
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
@@ -1179,16 +1280,19 @@ impl ScenarioInternals {
                           args_ptr: args_ptr,
                           destroy: destroy::<A0>,
                           format_args: format_args::<A0>, };
-        let result_ptr: *mut u8 = self.verify(call);
-        let result: Box<Res> =
-            unsafe {
-                Box::from_raw(result_ptr as *mut Res)
-            };
-        *result
+        let action = self.verify(call);
+        box_fn::BoxFn0::new(move || {
+            let result_ptr: *mut u8 = action.call();
+            let result: Box<Res> =
+                unsafe {
+                    Box::from_raw(result_ptr as *mut Res)
+                };
+            *result
+        })
     }
 
     pub fn verify2<A0: std::fmt::Debug, A1: std::fmt::Debug, Res>(
-            &mut self, method_data: MethodData, a0: A0, a1: A1) -> Res {
+            &mut self, method_data: MethodData, a0: A0, a1: A1) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1));
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
@@ -1205,17 +1309,20 @@ impl ScenarioInternals {
                           args_ptr: args_ptr,
                           destroy: destroy::<A0, A1>,
                           format_args: format_args::<A0, A1>, };
-        let result_ptr: *mut u8 = self.verify(call);
-        let result: Box<Res> =
-            unsafe {
-                Box::from_raw(result_ptr as *mut Res)
-            };
-        *result
+        let action = self.verify(call);
+        box_fn::BoxFn0::new(move || {
+            let result_ptr: *mut u8 = action.call();
+            let result: Box<Res> =
+                unsafe {
+                    Box::from_raw(result_ptr as *mut Res)
+                };
+            *result
+        })
     }
 
     pub fn verify3<A0: std::fmt::Debug, A1: std::fmt::Debug,
                    A2: std::fmt::Debug, Res>
-            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2) -> Res {
+            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1, a2));
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
@@ -1233,17 +1340,20 @@ impl ScenarioInternals {
                           args_ptr: args_ptr,
                           destroy: destroy::<A0, A1, A2>,
                           format_args: format_args::<A0, A1, A2>, };
-        let result_ptr: *mut u8 = self.verify(call);
-        let result: Box<Res> =
-            unsafe {
-                Box::from_raw(result_ptr as *mut Res)
-            };
-        *result
+        let action = self.verify(call);
+        box_fn::BoxFn0::new(move || {
+            let result_ptr: *mut u8 = action.call();
+            let result: Box<Res> =
+                unsafe {
+                    Box::from_raw(result_ptr as *mut Res)
+                };
+            *result
+        })
     }
 
     pub fn verify4<A0: std::fmt::Debug, A1: std::fmt::Debug,
                    A2: std::fmt::Debug, A3: std::fmt::Debug, Res>
-            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2, a3: A3) -> Res {
+            (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2, a3: A3) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1, a2, a3));
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
@@ -1261,21 +1371,29 @@ impl ScenarioInternals {
                           args_ptr: args_ptr,
                           destroy: destroy::<A0, A1, A2, A3>,
                           format_args: format_args::<A0, A1, A2, A3>, };
-        let result_ptr: *mut u8 = self.verify(call);
-        let result: Box<Res> =
-            unsafe {
-                Box::from_raw(result_ptr as *mut Res)
-            };
-        *result
+        let action = self.verify(call);
+        box_fn::BoxFn0::new(move || {
+            let result_ptr: *mut u8 = action.call();
+            let result: Box<Res> =
+                unsafe {
+                    Box::from_raw(result_ptr as *mut Res)
+                };
+            *result
+        })
     }
 
     /// Verify call performed on mock object
-    fn verify(&mut self, call: Call) -> *mut u8 {
+    /// Returns closure which returns result upon call.
+    /// Closure returned instead of actual result, because expectation may
+    /// use user-provided closure as action, and that closure may want to
+    /// use scenario object to create mocks or establish expectations, so
+    /// we need to release scenario borrow before calling expectation action.
+    fn verify(&mut self, call: Call) -> box_fn::BoxFn0<*mut u8> {
 
         for expectation in self.expectations.iter_mut().rev() {
             if expectation.call_match().matches(&call) {
-                let mock_name = self.mock_names.get(&call.method_data.mock_id).unwrap();
-                return expectation.satisfy(call, mock_name);
+                let mock_name = self.mock_names.get(&call.method_data.mock_id).unwrap().clone();
+                return expectation.satisfy(call, &mock_name);
             }
         }
 

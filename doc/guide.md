@@ -169,7 +169,7 @@ mod test {
 
     #[test]
     fn test_set_temperature_20() {
-        let mut scenario = Scenario::new();
+        let scenario = Scenario::new();
         let mut cond = scenario.create_mock_for::<AirConditioner>();
 
         scenario.expect(cond.get_temperature_call().and_return(16));
@@ -219,7 +219,7 @@ was called with value `36`. We found bug in our function.
 Lets examine the test content line by line.
 
 ```rust
-let mut scenario = Scenario::new();
+let scenario = Scenario::new();
 ```
 
 Here we create a `Scenario` instance, which tracks all mock objects
@@ -480,7 +480,7 @@ mock!{
 #[test]
 fn test() {
     // Create scenario as usual.
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
 
     // Use `create_mock` with mock type name instead of
     // `create_mock_for` with mocked trait name.
@@ -511,6 +511,55 @@ let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned())
 
 There is also a corresponding `create_named_mock` method for external trait mocks.
 
+### Creating mocks and expectations from within actions
+
+Sometimes it is needed to create new mocks and establish expectations on them from action assigned to some expectation.
+
+Say you have factory and item traits and want to check that factory is used to create item and then some method is called on that item:
+
+```rust
+#[derive(Mock)]
+pub trait Factory {
+    type Item;
+    fn create(&self) -> Self::Item;
+}
+
+#[derive(Mock)]
+pub trait Item {
+    fn foo(&self);
+}
+
+/// Tests that mock may be created for trait with associated types.
+#[test]
+fn test_factory() {
+    let scenario = Scenario::new();
+    let factory = scenario.create_mock_for::<Factory<Item=ItemMock>>();
+    scenario.expect(a.create_call().and_call(|| {
+        // ???
+    }));
+
+    let item = factory.create();
+    item.foo();
+}
+```
+
+It is not clear what to do, you can't borrow `scenario` inside action because action can potentially outlive scenario object.
+
+Here is what `Scenario::handle()` method is for. It returns `ScenarioHandle` object which doesn't cause expectations to be verified when it is destroyed, but is has methods for creating mocks and establishing expectations:
+
+```rust
+...
+scenario.expect(factory.create_call().and_call({
+    let scenario = scenario.handle();
+    move || {
+        let item = scenario.create_mock_for::<Item>();
+        scenario.expect(item.foo_call().and_return(()));
+        item
+    }
+}));
+...
+```
+
 ### Associated types
 
 Traits with associated types are supported, you may use them as usual:
@@ -524,7 +573,7 @@ pub trait A {
 
 #[test]
 fn test_assocated_type() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A<Item=i32>>();
     scenario.expect(mock.create_call().and_return(2));
     assert_eq!(mock.create(), 2);
@@ -624,7 +673,7 @@ mod tests {
 
     #[test]
     fn test_set_temperature_20() {
-        let mut scenario = mockers::Scenario::new();
+        let scenario = mockers::Scenario::new();
         let mut ac = s.create_mock::<AirConditioner>();
         …
         set_temperature_20(&mut ac);

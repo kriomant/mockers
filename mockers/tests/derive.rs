@@ -14,6 +14,6 @@ pub trait A {
 
 #[test]
 fn test() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let _mock = scenario.create_mock_for::<A>();
 }

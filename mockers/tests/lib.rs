@@ -41,7 +41,7 @@ mock!{
 #[test]
 #[should_panic(expected="unexpected call to `A#0.foo()`")]
 fn test_unit() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(2).and_return(()));
     mock.foo();
@@ -49,7 +49,7 @@ fn test_unit() {
 
 #[test]
 fn test_return() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.baz_call().and_return(2));
     assert_eq!(2, mock.baz());
@@ -59,7 +59,7 @@ fn test_return() {
 #[test]
 #[should_panic(expected="4 is not less than 3")]
 fn test_arg_match_failure() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(4);
@@ -67,7 +67,7 @@ fn test_arg_match_failure() {
 
 #[test]
 fn test_arg_match_success() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(lt(3)).and_return(()));
     mock.bar(2);
@@ -77,7 +77,7 @@ fn test_arg_match_success() {
 #[test]
 #[should_panic(expected="Some expectations are not satisfied:\n`A#0.bar(_)`\n")]
 fn test_expected_call_not_performed() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(ANY).and_return(()));
 }
@@ -86,7 +86,7 @@ fn test_expected_call_not_performed() {
 #[test]
 #[should_panic(expected="boom!")]
 fn test_panic_result() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.foo_call().and_panic("boom!".to_owned()));
     mock.foo();
@@ -94,7 +94,7 @@ fn test_panic_result() {
 
 #[test]
 fn test_mut_self_method() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mut mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.modify_call().and_return(()));
     mock.modify();
@@ -102,7 +102,7 @@ fn test_mut_self_method() {
 
 #[test]
 fn test_value_self_method() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.consume_call().and_return(()));
     mock.consume();
@@ -111,7 +111,7 @@ fn test_value_self_method() {
 #[test]
 #[should_panic(expected="unexpected call to `amock.foo()`")]
 fn test_named_mock() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_named_mock_for::<A>("amock".to_owned());
     scenario.expect(mock.bar_call(2).and_return(()));
     mock.foo();
@@ -123,7 +123,7 @@ fn test_named_mock() {
 #[test]
 #[should_panic(expected="caboom!")]
 fn test_failed_with_remaining_expectations() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
@@ -133,7 +133,7 @@ fn test_failed_with_remaining_expectations() {
 
 #[test]
 fn test_expect_and_call() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
@@ -143,7 +143,7 @@ fn test_expect_and_call() {
 
 #[test]
 fn test_expect_is_unordered() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return(()));
@@ -156,7 +156,7 @@ fn test_expect_is_unordered() {
 #[test]
 #[should_panic(expected="A#0.foo was already called earlier")]
 fn test_expect_consumes_one_call_only() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return(()));
@@ -167,7 +167,7 @@ fn test_expect_consumes_one_call_only() {
 
 #[test]
 fn test_never_satisfied() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().never());
@@ -176,7 +176,7 @@ fn test_never_satisfied() {
 #[test]
 #[should_panic(expected="A#0.foo should never be called")]
 fn test_never_not_satisfied() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().never());
@@ -186,7 +186,7 @@ fn test_never_not_satisfied() {
 
 #[test]
 fn test_consume_result() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
@@ -197,7 +197,7 @@ fn test_consume_result() {
 
 #[test]
 fn test_consume_call_result() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
@@ -208,7 +208,7 @@ fn test_consume_call_result() {
 
 #[test]
 fn test_consume_argument() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.consume_arg_call(ANY).and_call(|arg| { arg }));
@@ -219,7 +219,7 @@ fn test_consume_argument() {
 
 #[test]
 fn test_arguments_are_dropped_on_panic() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let arg = Rc::new(0);
@@ -238,7 +238,7 @@ fn test_arguments_are_dropped_on_panic() {
 
 #[test]
 fn test_times_satisfied() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
@@ -252,7 +252,7 @@ fn test_times_satisfied() {
 `A#0.baz() must be called 2 times, called 1 times`
 ")]
 fn test_times_not_satisfied_less() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
@@ -263,7 +263,7 @@ fn test_times_not_satisfied_less() {
 #[test]
 #[should_panic(expected="A#0.baz was already called 2 times of 2 expected, extra call is unexpected")]
 fn test_times_not_satisfied_more() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_clone(4).times(2));
@@ -276,7 +276,7 @@ fn test_times_not_satisfied_more() {
 #[test]
 #[should_panic(expected="`A#0.foo() must be called 2 times, called 1 times`")]
 fn test_checkpoint() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_clone(()).times(2));
@@ -290,14 +290,14 @@ fn test_checkpoint() {
 
 #[test]
 fn test_create_mock() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let _mock = scenario.create_mock::<AMockByMacro>();
 }
 
 #[test]
 #[should_panic(expected="unexpected call to `A#0.bar(12)`")]
 fn test_format_args() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     mock.bar(12);
@@ -309,7 +309,7 @@ fn test_format_args() {
 // Message without ANSI codes is "expectation `A#0.bar(12)`"
 #[should_panic(expected="expectation `\x1b[1mA#0\x1b[0m.bar(12)`")]
 fn test_check_other_mock_object_expectations() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock0 = scenario.create_mock_for::<A>();
     let mock1 = scenario.create_mock_for::<A>();
 
@@ -320,7 +320,7 @@ fn test_check_other_mock_object_expectations() {
 
 #[test]
 fn test_sequence() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
@@ -335,7 +335,7 @@ fn test_sequence() {
 #[test]
 #[should_panic(expected="unexpected call to `A#0.bar(4)`")]
 fn test_sequence_invalid_order() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
@@ -349,7 +349,7 @@ fn test_sequence_invalid_order() {
 
 #[test]
 fn test_sequence_times() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
@@ -365,7 +365,7 @@ fn test_sequence_times() {
 #[test]
 #[should_panic(expected="unexpected call to `A#0.bar(4)`")]
 fn test_sequence_times_invalid() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
@@ -379,7 +379,7 @@ fn test_sequence_times_invalid() {
 
 #[test]
 fn test_return_default() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.baz_call().and_return_default().times(1));

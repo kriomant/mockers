@@ -231,7 +231,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     // Since type parameters are unused, we have to use PhantomData for each of them.
     // We use tuple of |PhantomData| to create just one struct field.
     let phantom_types: Vec<_> = assoc_types.iter().map(|&ty_param| {
-        P(quote_ty!(cx, std::marker::PhantomData<$ty_param>).unwrap())
+        P(quote_ty!(cx, ::std::marker::PhantomData<$ty_param>).unwrap())
     }).collect();
     let phantom_tuple_type = cx.ty(sp, TyKind::Tup(phantom_types));
 
@@ -244,12 +244,15 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     ).unwrap();
 
     // Generic parameters used for impls. It is part inside angles in
-    // `impl<A: std::fmt::Debug, B: std::fmt::Debug, ...> ...`.
+    // `impl<A: ::std::fmt::Debug, B: ::std::fmt::Debug, ...> ...`.
     let generics = {
         let mut gen = Generics::default();
         gen.ty_params = assoc_types.iter().cloned().map(|param| {
             let bounds = vec![
-                cx.typarambound(quote_path!(cx, ::std::fmt::Debug)),
+                // nighlty: cx.typarambound(quote_path!(cx, ::std::fmt::Debug)),
+                cx.typarambound(cx.path_global(sp, vec![cx.ident_of("std"),
+                                                        cx.ident_of("fmt"),
+                                                        cx.ident_of("Debug")])),
             ];
             cx.typaram(sp, param, vec![], bounds, None)
         }).collect();
@@ -293,7 +296,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     let mocked_class_name = pprust::path_to_string(trait_path);
 
     let phantom_data_initializers: Vec<_> = assoc_types.iter().map(|_| {
-        quote_expr!(cx, std::marker::PhantomData)
+        quote_expr!(cx, ::std::marker::PhantomData)
     }).collect();
     let phantom_data_initializer = cx.expr_tuple(sp, phantom_data_initializers);
     let mock_impl_item = quote_item!(cx,
@@ -327,7 +330,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
 
     let debug_impl_item = quote_item!(cx,
         impl<$assoc_types_sep> ::std::fmt::Debug for $mock_ident<$assoc_types_sep> {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
                 f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
             }
         }
@@ -453,7 +456,8 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                                           vec![],
                                           vec![
                                               cx.typarambound(match_arg_path),
-                                              TyParamBound::RegionTyParamBound(cx.lifetime(sp, mk_ident(cx, "'static"))),
+                                              TyParamBound::RegionTyParamBound(
+                                                  cx.lifetime(sp, mk_ident_or_symbol(cx, "'static"))),
                                           ],
                                           None));
         // nightly: inputs.push(quote_arg!(cx, $arg_ident: $arg_type_ident));
@@ -537,12 +541,13 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 /// following implementation will be generated:
 /// ```
 /// fn method(&self, foo: i32, bar: u16) -> u8 {
-///     let args = (foo, bar);
-///     let args_ptr: *const u8 = unsafe { std::mem::transmute(&args) };
-///     let result_ptr: *mut u8 =
-///         self.scenario.borrow_mut().verify(self.mock_id, 0 /* mock_id */, args_ptr);
-///     let result: Box<u8> = unsafe { Box::from_raw(result_ptr as *mut u8) };
-///     *result;
+///     let actin = result: Box<u8> = unsafe { Box::from_raw(result_ptr as *mut u8) };
+///     let method_data =
+///         ::mockers::MethodData{mock_id: self.mock_id,
+///                               mock_type_id: 15usize,
+///                               method_name: "method",};
+///     let action = self.scenario.borrow_mut().verify2(method_data, foo, bar);
+///     action.call()
 /// }
 /// ```
 /// where constant marked with `mock_id` is unique trait method ID.
@@ -579,7 +584,8 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         let method_data = ::mockers::MethodData { mock_id: $self_ident.mock_id,
                                                   mock_type_id: $mock_type_id,
                                                   method_name: $method_name, };
-        $self_ident.scenario.borrow_mut().$verify_fn(method_data, $arg_values_sep)
+        let action = $self_ident.scenario.borrow_mut().$verify_fn(method_data, $arg_values_sep);
+        action.call()
     }).unwrap();
 
     let mut impl_args: Vec<Arg> = args.iter().map(|a| {
@@ -636,14 +642,14 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
                    path.segments.first().map(|s| s.identifier.name == "Self").unwrap_or(false) {
                     let self_seg = path.segments.first().unwrap();
                     let self_ty = Ty { id: DUMMY_NODE_ID,
-                                       node: TyKind::Path(None, Path { span: self_seg.span,
+                                       node: TyKind::Path(None, Path { span: DUMMY_SP,
                                                                        segments: vec![self_seg.clone()] }),
-                                       span: self_seg.span };
+                                       span: DUMMY_SP };
                     let new_qself = QSelf { ty: P(self_ty),
                                             position: trait_path.segments.len() };
                     let mut new_segments = trait_path.segments.clone();
                     new_segments.extend_from_slice(&path.segments[1..]);
-                    let a = TyKind::Path(Some(new_qself), Path { span: self_seg.span,
+                    let a = TyKind::Path(Some(new_qself), Path { span: DUMMY_SP,
                                                          segments: new_segments });
                     a
                 } else {
@@ -658,6 +664,7 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
             TyKind::Infer => TyKind::Infer,
             TyKind::ImplicitSelf => TyKind::ImplicitSelf,
             TyKind::Mac(ref mac) => TyKind::Mac(mac.clone()),
+            #[cfg(not(feature="with-syntex"))]
             TyKind::Err => TyKind::Err,
         };
         P(Ty { id: ty.id, node: node, span: ty.span })
@@ -680,8 +687,6 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
         Path { span: path.span,
                segments: path.segments.iter().map(|segment| {
                    PathSegment {
-                     identifier: segment.identifier,
-                     span: segment.span,
                      parameters: segment.parameters.as_ref().map(|params| {
                          P(match **params {
                              PathParameters::AngleBracketed(ref data) =>
@@ -704,7 +709,8 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
                                      output: data.output.as_ref().map(|o| qualify_ty(o, trait_path)),
                                  }),
                          })
-                     })
+                     }),
+                     ..*segment
                    }
                }).collect() }
     }
@@ -735,7 +741,7 @@ fn create_path_segment(ident: Ident, _span: Span) -> PathSegment {
 #[cfg(not(feature="with-syntex"))]
 fn create_path_segment(ident: Ident, span: Span) -> PathSegment {
     PathSegment {
-	    span: span,
+        span: span,
         identifier: ident,
         parameters: None,
     }
@@ -757,7 +763,16 @@ fn mk_ident(cx: &ExtCtxt, name: &str) -> Ident {
   cx.name_of(name).to_ident()
 }
 #[cfg(feature="with-syntex")]
-fn mk_ident(cx: &ExtCtxt, name: &str) -> Symbol {
+fn mk_ident(cx: &ExtCtxt, name: &str) -> Ident {
+  Ident::with_empty_ctxt(cx.name_of(name))
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_ident_or_symbol(cx: &ExtCtxt, name: &str) -> Ident {
+  cx.name_of(name).to_ident()
+}
+#[cfg(feature="with-syntex")]
+fn mk_ident_or_symbol(cx: &ExtCtxt, name: &str) -> Symbol {
   cx.name_of(name)
 }
 

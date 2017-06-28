@@ -18,3 +18,4 @@ mockers_macros = { version = "0.5.11", path = "../mockers_macros" }
 [features]
 default = ["nightly"]
 nightly = []
+debug = ["mockers_macros/debug"]

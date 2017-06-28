@@ -5,7 +5,7 @@ use mockers::Scenario;
 
 #[test]
 fn test_set_temperature_20() {
-    let mut scenario = Scenario::new();
+    let scenario = Scenario::new();
     let mut cond = scenario.create_mock_for::<AirConditioner>();
 
     scenario.expect(cond.get_temperature_call().and_return(16));
