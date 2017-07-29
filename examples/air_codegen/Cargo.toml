@@ -7,11 +7,11 @@ build = "build.rs"
 publish = false
 
 [build-dependencies.mockers_codegen]
-version = "0.6.1"
+version = "0.6.2"
 path = "../../mockers_codegen"
 features = ["with-syntex"]
 
 [dev-dependencies.mockers]
-version = "0.6.1"
+version = "0.6.2"
 path = "../../mockers"
 default-features = false

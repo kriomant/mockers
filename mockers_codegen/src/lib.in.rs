@@ -276,13 +276,10 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
     let mut trait_impl_items = trait_impl_methods;
     trait_impl_items.extend(assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
         ImplItem {
-            id: DUMMY_NODE_ID,
             ident: assoc,
-            vis: Visibility::Inherited,
-            attrs: vec![],
-            node: ImplItemKind::Type(cx.ty_ident(sp, param)),
             span: sp,
             defaultness: Defaultness::Final,
+            .. mk_implitem(assoc, ImplItemKind::Type(cx.ty_ident(sp, param)))
         }
     }));
     let trait_impl_item = cx.item(sp,
@@ -323,7 +320,8 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
         let mut p = trait_path.clone();
         p.segments.last_mut().unwrap().parameters =
             Some(P(PathParameters::AngleBracketed(AngleBracketedParameterData {
-                lifetimes: vec![], types: vec![], bindings: type_bindings,
+                bindings: type_bindings,
+                .. mk_default_angle_bracketed_data()
             })));
         p
     };
@@ -516,13 +514,12 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
-        ident: expect_method_name,
         vis: Visibility::Public,
         // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("dead_code"))]))],
-        node: ImplItemKind::Method(call_sig, body),
         span: sp,
         defaultness: Defaultness::Final,
+        .. mk_implitem(expect_method_name, ImplItemKind::Method(call_sig, body))
     };
 
     Some(impl_subitem)
@@ -609,13 +606,12 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
-        ident: method_ident,
         vis: Visibility::Inherited,
         // nightly: attrs: vec![quote_attr!(cx, #[allow(unused_mut)])],
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("unused_mut"))]))],
-        node: ImplItemKind::Method(impl_sig, nightly_p(fn_mock)),
         span: sp,
         defaultness: Defaultness::Final,
+        .. mk_implitem(method_ident, ImplItemKind::Method(impl_sig, nightly_p(fn_mock)))
     };
 
     Some(trait_impl_subitem)
@@ -701,6 +697,7 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
                                              span: binding.span,
                                          }
                                      }).collect(),
+                                     .. mk_default_angle_bracketed_data()
                                  }),
                              PathParameters::Parenthesized(ref data) =>
                                  PathParameters::Parenthesized(ParenthesizedParameterData {
@@ -790,6 +787,47 @@ impl<'a, T: ToTokens + 'a> ToTokens for CommaSep<'a, T> {
     }
 }
 fn comma_sep<'a, T: ToTokens + 'a>(items: &'a [T]) -> CommaSep<'a, T> { CommaSep(items) }
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
+    ImplItem {
+        id: DUMMY_NODE_ID,
+        ident: ident,
+        vis: Visibility::Inherited,
+        // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
+        attrs: vec![],
+        node: node,
+        span: DUMMY_SP,
+        defaultness: Defaultness::Final,
+        tokens: None,
+    }
+}
+#[cfg(feature="with-syntex")]
+fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
+    ImplItem {
+        id: DUMMY_NODE_ID,
+        ident: ident,
+        vis: Visibility::Inherited,
+        // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
+        attrs: vec![],
+        node: node,
+        span: DUMMY_SP,
+        defaultness: Defaultness::Final,
+    }
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
+    AngleBracketedParameterData {
+        lifetimes: vec![], types: vec![], bindings: vec![], span: DUMMY_SP,
+    }
+}
+#[cfg(feature="with-syntex")]
+fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
+    AngleBracketedParameterData {
+        lifetimes: vec![], types: vec![], bindings: vec![],
+    }
+}
 
 #[cfg(feature="debug")]
 fn debug_item(item: &Item) {
