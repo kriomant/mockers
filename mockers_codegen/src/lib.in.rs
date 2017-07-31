@@ -484,10 +484,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         span: sp,
         lifetimes: vec![],
         ty_params: arg_matcher_types,
-        where_clause: WhereClause {
-            id: DUMMY_NODE_ID,
-            predicates: vec![],
-        }
+        where_clause: mk_where_clause(),
     };
 
     // nightly: let new_method_path = quote_path!(cx, ::mockers::$call_match_ident::new);
@@ -826,6 +823,22 @@ fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
 fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
     AngleBracketedParameterData {
         lifetimes: vec![], types: vec![], bindings: vec![],
+    }
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_where_clause() -> WhereClause {
+    WhereClause {
+        id: DUMMY_NODE_ID,
+        predicates: vec![],
+        span: DUMMY_SP,
+    }
+}
+#[cfg(feature="with-syntex")]
+fn mk_where_clause() -> WhereClause {
+    WhereClause {
+        id: DUMMY_NODE_ID,
+        predicates: vec![],
     }
 }
 
