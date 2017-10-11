@@ -141,7 +141,7 @@ impl<Res> ExpectationTimes0<Res> {
         ExpectationTimes0 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
-impl<Res: Clone + 'static> Expectation for ExpectationTimes0<Res> {
+impl<Res: 'static> Expectation for ExpectationTimes0<Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
@@ -223,12 +223,14 @@ impl<Res: Clone + 'static> CallMatch0<Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction0<Res> {
         Reaction0 { call_match: self, action: Rc::new(RefCell::new(move || result.clone())) }
     }
-
+}
+impl<Res> CallMatch0<Res> {
     pub fn and_call_clone<F>(self, func: F) -> Reaction0<Res>
             where F: FnMut() -> Res + 'static {
         Reaction0 { call_match: self, action: Rc::new(RefCell::new(func)) }
     }
 }
+
 impl<Res: Default + 'static> CallMatch0<Res> {
     pub fn and_return_default(self) -> Reaction0<Res> {
         Reaction0 { call_match: self, action: Rc::new(RefCell::new(Res::default)) }
@@ -307,7 +309,7 @@ impl<Arg0, Res> ExpectationTimes1<Arg0, Res> {
         ExpectationTimes1 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
-impl<Arg0: 'static, Res: Clone + 'static> Expectation for ExpectationTimes1<Arg0, Res> {
+impl<Arg0: 'static, Res: 'static> Expectation for ExpectationTimes1<Arg0, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
@@ -386,7 +388,8 @@ impl<Arg0, Res: Clone + 'static> CallMatch1<Arg0, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction1<Arg0, Res> {
         Reaction1 { call_match: self, action: Rc::new(RefCell::new(move |_| result.clone())) }
     }
-
+}
+impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
     pub fn and_call_clone<F>(self, func: F) -> Reaction1<Arg0, Res>
             where F: FnMut(Arg0) -> Res + 'static {
         Reaction1 { call_match: self, action: Rc::new(RefCell::new(func)) }
@@ -477,7 +480,7 @@ impl<Arg0, Arg1, Res> ExpectationTimes2<Arg0, Arg1, Res> {
         ExpectationTimes2 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
-impl<Arg0: 'static, Arg1: 'static, Res: Clone + 'static> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
+impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
@@ -556,7 +559,8 @@ impl<Arg0, Arg1, Res: Clone + 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction2<Arg0, Arg1, Res> {
         Reaction2 { call_match: self, action: Rc::new(RefCell::new(move |_, _| result.clone())) }
     }
-
+}
+impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_call_clone<F>(self, func: F) -> Reaction2<Arg0, Arg1, Res>
             where F: FnMut(Arg0, Arg1) -> Res + 'static {
         Reaction2 { call_match: self, action: Rc::new(RefCell::new(func)) }
@@ -734,7 +738,8 @@ impl<Arg0, Arg1, Arg2, Res: Clone + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction3<Arg0, Arg1, Arg2, Res> {
         Reaction3 { call_match: self, action: Rc::new(RefCell::new(move |_, _, _| result.clone())) }
     }
-
+}
+impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_call_clone<F>(self, func: F) -> Reaction3<Arg0, Arg1, Arg2, Res>
             where F: FnMut(Arg0, Arg1, Arg2) -> Res + 'static {
         Reaction3 { call_match: self, action: Rc::new(RefCell::new(func)) }
@@ -838,7 +843,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res>
         ExpectationTimes4 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
-impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: Clone + 'static> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
+impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
     fn call_match(&self) -> &CallMatch {
         &self.call_match
     }
@@ -917,7 +922,8 @@ impl<Arg0, Arg1, Arg2, Arg3, Res: Clone + 'static> CallMatch4<Arg0, Arg1, Arg2, 
     pub fn and_return_clone(self, result: Res) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
         Reaction4 { call_match: self, action: Rc::new(RefCell::new(move |_, _, _, _| result.clone())) }
     }
-
+}
+impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn and_call_clone<F>(self, func: F) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res>
             where F: FnMut(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
         Reaction4 { call_match: self, action: Rc::new(RefCell::new(func)) }
