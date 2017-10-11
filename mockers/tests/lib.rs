@@ -237,44 +237,7 @@ fn test_arguments_are_dropped_on_panic() {
 }
 
 #[test]
-fn test_times_satisfied() {
-    let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
-
-    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
-
-    mock.baz();
-    mock.baz();
-}
-
-#[test]
-#[should_panic(expected="Some expectations are not satisfied:
-`A#0.baz() must be called 2 times, called 1 times`
-")]
-fn test_times_not_satisfied_less() {
-    let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
-
-    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
-
-    mock.baz();
-}
-
-#[test]
-#[should_panic(expected="A#0.baz was already called 2 times of 2 expected, extra call is unexpected")]
-fn test_times_not_satisfied_more() {
-    let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
-
-    scenario.expect(mock.baz_call().and_return_clone(4).times(2));
-
-    mock.baz();
-    mock.baz();
-    mock.baz();
-}
-
-#[test]
-#[should_panic(expected="`A#0.foo() must be called 2 times, called 1 times`")]
+#[should_panic(expected="`A#0.foo() must be called exactly 2 times, called 1 times`")]
 fn test_checkpoint() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();

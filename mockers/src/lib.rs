@@ -1,5 +1,5 @@
 #![cfg_attr(feature="nightly", feature(fnbox))]
-#![cfg_attr(feature="nightly", feature(alloc, collections_range))]
+#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range))]
 // nightly(box_patterns) #![feature(box_patterns)]
 
 #[cfg(feature="nightly")]
@@ -15,6 +15,9 @@ use std::ops::DerefMut;
 
 mod box_fn;
 pub mod matchers;
+pub mod cardinality;
+
+use cardinality::{Cardinality, CardinalityCheckResult};
 
 type Action0<T> = box_fn::BoxFn0<T>;
 type ActionClone0<T> = Rc<RefCell<FnMut() -> T>>;
@@ -121,8 +124,8 @@ pub struct Reaction0<Res> {
     action: ActionClone0<Res>,
 }
 impl<Res> Reaction0<Res> {
-    pub fn times(self, number: usize) -> ExpectationTimes0<Res> {
-        ExpectationTimes0::new(self.call_match, self.action, number)
+    pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> ExpectationTimes0<Res> {
+        ExpectationTimes0::new(self.call_match, self.action, Box::new(cardinality))
     }
 }
 
@@ -130,12 +133,12 @@ impl<Res> Reaction0<Res> {
 pub struct ExpectationTimes0<Res> {
     action: ActionClone0<Res>,
     call_match: CallMatch0<Res>,
-    number: usize,
-    count: usize,
+    cardinality: Box<Cardinality>,
+    count: u32,
 }
 impl<Res> ExpectationTimes0<Res> {
-    fn new(call_match: CallMatch0<Res>, action: ActionClone0<Res>, number: usize) -> Self {
-        ExpectationTimes0 { call_match: call_match, action: action, number: number, count: 0 }
+    fn new(call_match: CallMatch0<Res>, action: ActionClone0<Res>, cardinality: Box<Cardinality>) -> Self {
+        ExpectationTimes0 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Res: Clone + 'static> Expectation for ExpectationTimes0<Res> {
@@ -143,14 +146,15 @@ impl<Res: Clone + 'static> Expectation for ExpectationTimes0<Res> {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.count == self.number
+        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        if self.count == self.number {
-            panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
-                   mock_name, self.call_match().get_method_name(), self.count, self.number);
-        }
         self.count += 1;
+        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+            panic!("{}.{} is called for the {} time, but expected to be {}",
+                   mock_name, self.call_match().get_method_name(), format_ordinal(self.count),
+                   self.cardinality.describe_upper_bound());
+        }
         let _args = CallMatch0::<Res>::get_args(call);
         box_fn::BoxFn0::new({
             let action = self.action.clone();
@@ -161,8 +165,8 @@ impl<Res: Clone + 'static> Expectation for ExpectationTimes0<Res> {
         })
     }
     fn describe(&self) -> String {
-        format!("{} must be called {} times, called {} times",
-                self.call_match.describe(), self.number, self.count)
+        format!("{} must be {}, called {} times",
+                self.call_match.describe(), self.cardinality.describe(), self.count)
     }
 }
 
@@ -286,8 +290,8 @@ pub struct Reaction1<Arg0, Res> {
     action: ActionClone1<Arg0, Res>,
 }
 impl<Arg0, Res> Reaction1<Arg0, Res> {
-    pub fn times(self, number: usize) -> ExpectationTimes1<Arg0, Res> {
-        ExpectationTimes1::new(self.call_match, self.action, number)
+    pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> ExpectationTimes1<Arg0, Res> {
+        ExpectationTimes1::new(self.call_match, self.action, Box::new(cardinality))
     }
 }
 
@@ -295,12 +299,12 @@ impl<Arg0, Res> Reaction1<Arg0, Res> {
 pub struct ExpectationTimes1<Arg0, Res> {
     action: ActionClone1<Arg0, Res>,
     call_match: CallMatch1<Arg0, Res>,
-    number: usize,
-    count: usize,
+    cardinality: Box<Cardinality>,
+    count: u32,
 }
 impl<Arg0, Res> ExpectationTimes1<Arg0, Res> {
-    fn new(call_match: CallMatch1<Arg0, Res>, action: ActionClone1<Arg0, Res>, number: usize) -> Self {
-        ExpectationTimes1 { call_match: call_match, action: action, number: number, count: 0 }
+    fn new(call_match: CallMatch1<Arg0, Res>, action: ActionClone1<Arg0, Res>, cardinality: Box<Cardinality>) -> Self {
+        ExpectationTimes1 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Res: Clone + 'static> Expectation for ExpectationTimes1<Arg0, Res> {
@@ -308,14 +312,15 @@ impl<Arg0: 'static, Res: Clone + 'static> Expectation for ExpectationTimes1<Arg0
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.count == self.number
+        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        if self.count == self.number {
-            panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
-                   mock_name, self.call_match().get_method_name(), self.count, self.number);
-        }
         self.count += 1;
+        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+            panic!("{}.{} is called for the {} time, but expected to be {}",
+                   mock_name, self.call_match().get_method_name(), format_ordinal(self.count),
+                   self.cardinality.describe_upper_bound());
+        }
         // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
         let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
         box_fn::BoxFn0::new({
@@ -327,8 +332,8 @@ impl<Arg0: 'static, Res: Clone + 'static> Expectation for ExpectationTimes1<Arg0
         })
     }
     fn describe(&self) -> String {
-        format!("{} must be called {} times, called {} times",
-                self.call_match.describe(), self.number, self.count)
+        format!("{} must be {}, called {} times",
+                self.call_match.describe(), self.cardinality.describe(), self.count)
     }
 }
 
@@ -455,8 +460,8 @@ pub struct Reaction2<Arg0, Arg1, Res> {
     action: ActionClone2<Arg0, Arg1, Res>,
 }
 impl<Arg0, Arg1, Res> Reaction2<Arg0, Arg1, Res> {
-    pub fn times(self, number: usize) -> ExpectationTimes2<Arg0, Arg1, Res> {
-        ExpectationTimes2::new(self.call_match, self.action, number)
+    pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> ExpectationTimes2<Arg0, Arg1, Res> {
+        ExpectationTimes2::new(self.call_match, self.action, Box::new(cardinality))
     }
 }
 
@@ -464,12 +469,12 @@ impl<Arg0, Arg1, Res> Reaction2<Arg0, Arg1, Res> {
 pub struct ExpectationTimes2<Arg0, Arg1, Res> {
     action: ActionClone2<Arg0, Arg1, Res>,
     call_match: CallMatch2<Arg0, Arg1, Res>,
-    number: usize,
-    count: usize,
+    cardinality: Box<Cardinality>,
+    count: u32,
 }
 impl<Arg0, Arg1, Res> ExpectationTimes2<Arg0, Arg1, Res> {
-    fn new(call_match: CallMatch2<Arg0, Arg1, Res>, action: ActionClone2<Arg0, Arg1, Res>, number: usize) -> Self {
-        ExpectationTimes2 { call_match: call_match, action: action, number: number, count: 0 }
+    fn new(call_match: CallMatch2<Arg0, Arg1, Res>, action: ActionClone2<Arg0, Arg1, Res>, cardinality: Box<Cardinality>) -> Self {
+        ExpectationTimes2 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Res: Clone + 'static> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
@@ -477,14 +482,15 @@ impl<Arg0: 'static, Arg1: 'static, Res: Clone + 'static> Expectation for Expecta
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.count == self.number
+        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        if self.count == self.number {
-            panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
-                   mock_name, self.call_match().get_method_name(), self.count, self.number);
-        }
         self.count += 1;
+        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+            panic!("{}.{} is called for the {} time, but expected to be {}",
+                   mock_name, self.call_match().get_method_name(), format_ordinal(self.count),
+                   self.cardinality.describe_upper_bound());
+        }
         // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
         let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
         box_fn::BoxFn0::new({
@@ -496,8 +502,8 @@ impl<Arg0: 'static, Arg1: 'static, Res: Clone + 'static> Expectation for Expecta
         })
     }
     fn describe(&self) -> String {
-        format!("{} must be called {} times, called {} times",
-                self.call_match.describe(), self.number, self.count)
+        format!("{} must be {}, called {} times",
+                self.call_match.describe(), self.cardinality.describe(), self.count)
     }
 }
 
@@ -631,8 +637,9 @@ pub struct Reaction3<Arg0, Arg1, Arg2, Res> {
     action: ActionClone3<Arg0, Arg1, Arg2, Res>,
 }
 impl<Arg0, Arg1, Arg2, Res> Reaction3<Arg0, Arg1, Arg2, Res> {
-    pub fn times(self, number: usize) -> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-        ExpectationTimes3::new(self.call_match, self.action, number)
+    pub fn times<C: Cardinality + 'static>(self, cardinality: C)
+        -> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
+        ExpectationTimes3::new(self.call_match, self.action, Box::new(cardinality))
     }
 }
 
@@ -640,12 +647,12 @@ impl<Arg0, Arg1, Arg2, Res> Reaction3<Arg0, Arg1, Arg2, Res> {
 pub struct ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
     action: ActionClone3<Arg0, Arg1, Arg2, Res>,
     call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    number: usize,
-    count: usize,
+    cardinality: Box<Cardinality>,
+    count: u32,
 }
 impl<Arg0, Arg1, Arg2, Res> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-    fn new(call_match: CallMatch3<Arg0, Arg1, Arg2, Res>, action: ActionClone3<Arg0, Arg1, Arg2, Res>, number: usize) -> Self {
-        ExpectationTimes3 { call_match: call_match, action: action, number: number, count: 0 }
+    fn new(call_match: CallMatch3<Arg0, Arg1, Arg2, Res>, action: ActionClone3<Arg0, Arg1, Arg2, Res>, cardinality: Box<Cardinality>) -> Self {
+        ExpectationTimes3 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
@@ -653,14 +660,15 @@ impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for 
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.count == self.number
+        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        if self.count == self.number {
-            panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
-                   mock_name, self.call_match().get_method_name(), self.count, self.number);
-        }
         self.count += 1;
+        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+            panic!("{}.{} is called for the {} time, but expected to be {}",
+                   mock_name, self.call_match().get_method_name(), format_ordinal(self.count),
+                   self.cardinality.describe_upper_bound());
+        }
         // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
         let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
         box_fn::BoxFn0::new({
@@ -672,8 +680,8 @@ impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for 
         })
     }
     fn describe(&self) -> String {
-        format!("{} must be called {} times, called {} times",
-                self.call_match.describe(), self.number, self.count)
+        format!("{} must be {}, called {} times",
+                self.call_match.describe(), self.cardinality.describe(), self.count)
     }
 }
 
@@ -812,8 +820,9 @@ pub struct Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
     action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn times(self, number: usize) -> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-        ExpectationTimes4::new(self.call_match, self.action, number)
+    pub fn times<C: Cardinality + 'static>(self, cardinality: C)
+        -> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
+        ExpectationTimes4::new(self.call_match, self.action, Box::new(cardinality))
     }
 }
 
@@ -821,12 +830,12 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
 pub struct ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
     action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
     call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    number: usize,
-    count: usize,
+    cardinality: Box<Cardinality>,
+    count: u32,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn new(call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>, action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>, number: usize) -> Self {
-        ExpectationTimes4 { call_match: call_match, action: action, number: number, count: 0 }
+    fn new(call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>, action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>, cardinality: Box<Cardinality>) -> Self {
+        ExpectationTimes4 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: Clone + 'static> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
@@ -834,14 +843,15 @@ impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: Clone + 's
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
-        self.count == self.number
+        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
     }
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        if self.count == self.number {
-            panic!("{}.{} was already called {} times of {} expected, extra call is unexpected",
-                   mock_name, self.call_match().get_method_name(), self.count, self.number);
-        }
         self.count += 1;
+        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+            panic!("{}.{} is called for the {} time, but expected to be {}",
+                   mock_name, self.call_match().get_method_name(), format_ordinal(self.count),
+                   self.cardinality.describe_upper_bound());
+        }
         // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
         let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
         box_fn::BoxFn0::new({
@@ -853,8 +863,8 @@ impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: Clone + 's
         })
     }
     fn describe(&self) -> String {
-        format!("{} must be called {} times, called {} times",
-                self.call_match.describe(), self.number, self.count)
+        format!("{} must be {}, called {} times",
+                self.call_match.describe(), self.cardinality.describe(), self.count)
     }
 }
 
@@ -1467,5 +1477,14 @@ impl ScenarioInternals {
 
     pub fn get_mock_name(&self, mock_id: usize) -> &str {
         self.mock_names.get(&mock_id).unwrap()
+    }
+}
+
+fn format_ordinal(n: u32) -> String {
+    match n % 10 {
+        1 => format!("{}st", n),
+        2 => format!("{}nd", n),
+        3 => format!("{}rd", n),
+        _ => format!("{}th", n),
     }
 }
