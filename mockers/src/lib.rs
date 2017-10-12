@@ -16,6 +16,8 @@ use std::ops::DerefMut;
 mod box_fn;
 pub mod matchers;
 pub mod cardinality;
+#[macro_use]
+pub mod clone;
 
 use cardinality::{Cardinality, CardinalityCheckResult};
 
@@ -1031,6 +1033,10 @@ impl ScenarioInternals {
         let mut internals = int.borrow_mut();
         let mock_id = internals.get_next_mock_id();
         internals.generate_name_for_class(mock_id, T::mocked_class_name());
+        T::new(mock_id, int.clone())
+    }
+
+    pub fn create_mock_with_id<T: Mock>(int: &Rc<RefCell<Self>>, mock_id: usize) -> T {
         T::new(mock_id, int.clone())
     }
 
