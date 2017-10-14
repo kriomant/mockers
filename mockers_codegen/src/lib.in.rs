@@ -464,7 +464,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             // Parameter is reference
             &TyKind::Rptr(ref _old_lifetime, ref mut_ty) => {
                 // Create separate lifetime.
-                let lifetime =  cx.lifetime(DUMMY_SP, mk_ident(cx, &format!("'a{}", i)));
+                let lifetime =  cx.lifetime(DUMMY_SP, mk_ident_or_symbol(cx, &format!("'a{}", i)));
                 arg_lifetimes.push(lifetime);
                 cx.ty(arg_type.span, TyKind::Rptr(Some(lifetime), mut_ty.clone()))
             },
