@@ -7,7 +7,7 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   TyParamBound, Defaultness, MetaItem, TraitRef, TypeBinding, PathParameters,
                   AngleBracketedParameterData, ParenthesizedParameterData,
-                  QSelf, MutTy, BareFnTy,
+                  QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef,
                   DUMMY_NODE_ID};
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
@@ -19,6 +19,7 @@ use syntax::parse::token::{self, Token};
 use syntax::symbol::{keywords, Symbol};
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
+use syntax::util::ThinVec;
 use syntax::print::pprust;
 use syntax::tokenstream::TokenTree;
 
@@ -434,21 +435,51 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     // For each argument generate...
     let mut arg_matcher_types = Vec::<TyParam>::new();
     let mut inputs = Vec::<Arg>::new();
+
+    // Arguments passed to `CallMatchN::new` method inside mock method body.
     let mut new_args = Vec::<P<Expr>>::new();
     new_args.push(cx.expr_field_access(sp, cx.expr_self(sp), cx.ident_of("mock_id")));
     new_args.push(quote_expr!(cx, $mock_type_id));
     new_args.push(cx.expr_str(sp, method_ident.name));
+
+    // Lifetimes used for reference-type parameters.
+    let mut arg_lifetimes = Vec::<Lifetime>::new();
+    let mut new_arg_types = Vec::new();
+
     for (i, arg) in args.iter().enumerate() {
         let arg_type = qualify_self(&arg.ty, trait_path);
         let arg_type_ident = cx.ident_of(&format!("Arg{}Match", i));
         let arg_ident = cx.ident_of(&format!("arg{}", i));
+
+        // To support reference parameters we must create lifetime parameter for each of them
+        // and modify parameter type to adopt new lifetime.
+        // Generated method signature for reference parameter looks like this:
+        //
+        // ```rust
+        // pub fn foo_call<'a0, Arg0Match: ::mockers::MatchArg<&'a0 u32> + 'static>
+        //                (&self, arg0: Arg0Match)
+        //  -> ::mockers::CallMatch1<&'a0 u32, ()>;
+        // ```
+        let new_arg_type = match &arg_type.node {
+            // Parameter is reference
+            &TyKind::Rptr(ref _old_lifetime, ref mut_ty) => {
+                // Create separate lifetime.
+                let lifetime =  cx.lifetime(DUMMY_SP, mk_ident(cx, &format!("'a{}", i)));
+                arg_lifetimes.push(lifetime);
+                cx.ty(arg_type.span, TyKind::Rptr(Some(lifetime), mut_ty.clone()))
+            },
+
+            // Parameter is not reference
+            _ => arg_type.clone(),
+        };
+        new_arg_types.push(new_arg_type.clone());
 
         // 1. Type parameter
         // nightly: let match_arg_path = quote_path!(cx, ::mockers::MatchArg<$arg_type>);
         let match_arg_path = cx.path_all(
                 sp, true,
                 vec![cx.ident_of("mockers"), cx.ident_of("MatchArg")],
-                vec![], vec![arg_type.clone()], vec![]);
+                vec![], vec![new_arg_type], vec![]);
         arg_matcher_types.push(cx.typaram(sp,
                                           arg_type_ident,
                                           vec![],
@@ -466,9 +497,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let call_match_ident = cx.ident_of(&format!("CallMatch{}", args.len()));
 
-    let mut call_match_args: Vec<_> = args.iter().map(|arg| {
-        qualify_self(&arg.ty, trait_path)
-    }).collect();
+    let mut call_match_args: Vec<_> = new_arg_types;
     call_match_args.push(fixed_return_type);
     let ret_type = cx.path_all(
         sp,
@@ -480,9 +509,19 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let output = quote_ty!(cx, $ret_type); //cx.ty_path(ret_type.clone());
     let expect_method_name = cx.ident_of(&format!("{}_call", method_ident.name.as_str()));
+
+    // Turn plain lifetimes into lifetime definitions.
+    let arg_lifetime_defs = arg_lifetimes.into_iter().map(| lifetime | {
+        LifetimeDef {
+            attrs: ThinVec::new(),
+            lifetime: lifetime,
+            bounds: Vec::new(),
+        }
+    }).collect();
+
     let generics = Generics {
         span: sp,
-        lifetimes: vec![],
+        lifetimes: arg_lifetime_defs,
         ty_params: arg_matcher_types,
         where_clause: mk_where_clause(),
     };
