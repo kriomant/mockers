@@ -689,7 +689,7 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
                                  qualify_path(&path, trait_path))
                 }
             },
-            TyKind::TraitObject(ref bounds) => TyKind::TraitObject(bounds.clone()),
+            ref t @ TyKind::TraitObject(..) => t.clone(),
             TyKind::ImplTrait(ref bounds) => TyKind::ImplTrait(bounds.clone()),
             TyKind::Paren(ref t) => TyKind::Paren(qualify_ty(&t, trait_path)),
             TyKind::Typeof(ref expr) => TyKind::Typeof(expr.clone()),

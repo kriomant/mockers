@@ -5,20 +5,20 @@ keywords = ["mock", "test"]
 license = "MIT"
 name = "mockers_derive"
 repository = "https://github.com/kriomant/mockers"
-version = "0.8.0"
+version = "0.8.1"
 
 [dependencies]
 syntex = "0.44.0"
 
 [dependencies.mockers_codegen]
-version = "0.8.0"
+version = "0.8.1"
 path = "../mockers_codegen"
 features = ["with-syntex"]
 
 [build-dependencies]
 
 [dev-dependencies]
-mockers = { version = "0.8.0", path = "../mockers" }
+mockers = { version = "0.8.1", path = "../mockers" }
 
 [lib]
 name = "mockers_derive"
