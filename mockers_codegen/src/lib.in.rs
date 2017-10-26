@@ -77,21 +77,61 @@ pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item:
     }
 }
 
-fn parse_macro_args<'a>(parser: &mut Parser<'a>) -> PResult<'a, Ident> {
-    let mock_ident = try!(parser.parse_ident());
-    try!(parser.expect(&Token::Comma));
-    Ok(mock_ident)
+/// Parse module path or `self` identifier which means current module.
+fn parse_module_path<'a>(parser: &mut Parser<'a>) -> PResult<'a, Path> {
+    let sp = parser.span;
+    match parser.token {
+        token::Ident(id) if id.name == keywords::SelfValue.name() => {
+            parser.bump();
+            Ok(Path { span: DUMMY_SP, segments: vec![] })
+        },
+        _ => match parser.parse_path(PathStyle::Mod) {
+            Ok(path) => Ok(path),
+            Err(_) => Err(parser.diagnostic().struct_span_err(
+                    sp, "Either module path or `self` expected here"))
+        }
+    }
+}
+
+/// Parse module path or `self` identifier which means current module.
+/// Return `Some` in case of explicit module name or `None` when `self` is used.
+fn parse_macro_args<'a>(parser: &mut Parser<'a>) -> PResult<'a, (Ident, Path, P<Item>)> {
+    let mock_ident = parser.parse_ident()?;
+    parser.expect(&Token::Comma)?;
+
+    let module_path = parse_module_path(parser)?;
+    parser.expect(&Token::Comma)?;
+
+    let sp = parser.span;
+    let item = parser.parse_item()?;
+    let item = item.ok_or_else(||
+            parser.diagnostic().struct_span_err(sp, "Trait definition expected"))?;
+
+    match item.node {
+        ItemKind::Trait(unsafety, ref generics, ref param_bounds, ..) => {
+            if unsafety != Unsafety::Normal {
+                return Err(parser.diagnostic().struct_span_err(sp, "Unsafe traits are not supported yet"));
+            }
+
+            if generics.is_parameterized() {
+                return Err(parser.diagnostic().struct_span_err(sp, "Parametrized traits are not supported yet"));
+            }
+
+            assert!(param_bounds.is_empty());
+        }
+
+        _ => return Err(parser.diagnostic().struct_span_err(sp, "Trait definition expected"))
+    };
+
+    Ok((mock_ident, module_path, item))
 }
 
 pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'cx> {
     let mut parser = cx.new_parser_from_tts(args);
-    match parse_macro_args(&mut parser) {
-        Ok(mock_ident) => {
-            let trait_sp = sp.trim_start(parser.prev_span).unwrap();
-            generate_mock_for_trait_tokens(cx, trait_sp, mock_ident, parser)
-        },
-
-        _ => {
+    let (mock_ident, module_path, trait_item) = match parse_macro_args(&mut parser) {
+        Ok(args) => args,
+        Err(mut err) => {
+            err.emit();
             cx.span_err(sp, "Mock identifier, trait module (may be `self`) and trait definition
                              separated by comma are expected, example usage:
                              mock!{
@@ -99,77 +139,22 @@ pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) ->
                                 ::path::to::foo::module,
                                 trait Foo { … }
                              }");
-            DummyResult::any(sp)
+            return DummyResult::any(sp)
         },
-    }
-}
-
-pub fn generate_mock_for_trait_tokens(cx: &mut ExtCtxt,
-                                      sp: Span, mock_ident: Ident,
-                                      mut parser: Parser) -> Box<MacResult + 'static> {
-    let trait_mod_path = match parser.token {
-        token::Ident(id) if id.name == keywords::SelfValue.name() => {
-            parser.bump();
-            None
-        },
-        _ => match parser.parse_path(PathStyle::Mod) {
-            Ok(path) => Some(path),
-            Err(mut err) => {
-                err.emit();
-                return DummyResult::any(sp)
-            }
-        }
     };
 
-    if !parser.eat(&Token::Comma) {
-        cx.span_err(parser.span, "Comma expected after module path");
-        return DummyResult::any(sp)
+    let trait_subitems = match trait_item.node {
+        ItemKind::Trait(_unsafety, ref _generics, ref _param_bounds, ref trait_subitems) => trait_subitems,
+        _ => unreachable!()
+    };
+
+    let mut trait_path = module_path;
+    trait_path.segments.push(create_path_segment(trait_item.ident, DUMMY_SP));
+    let generated_items = generate_mock_for_trait(cx, trait_item.span, mock_ident, &trait_path, trait_subitems, false);
+    for item in &generated_items {
+        debug_item(item);
     }
-
-    match parser.parse_item() {
-        Ok(Some(item)) => {
-            match item.node {
-                ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref trait_subitems) => {
-                    if unsafety != Unsafety::Normal {
-                        cx.span_err(sp, "Unsafe traits are not supported yet");
-                        return DummyResult::any(sp);
-                    }
-
-                    if generics.is_parameterized() {
-                        cx.span_err(sp, "Parametrized traits are not supported yet");
-                        return DummyResult::any(sp);
-                    }
-
-                    assert!(param_bounds.is_empty());
-
-                    let mut trait_path = match trait_mod_path {
-                        Some(path) => path.clone(),
-                        None => Path { span: sp, segments: vec![] },
-                    };
-                    trait_path.segments.push(create_path_segment(item.ident, sp));
-                    let generated_items = generate_mock_for_trait(cx, sp, mock_ident, &trait_path, trait_subitems, false);
-                    for item in &generated_items {
-                        debug_item(item);
-                    }
-                    MacEager::items(SmallVector::many(generated_items))
-                },
-                _ => {
-                    cx.span_err(sp, "Trait definition expected");
-                    DummyResult::any(sp)
-                }
-            }
-        }
-
-        Ok(None) => {
-            cx.span_err(sp, "Trait definition expected");
-            DummyResult::any(sp)
-        },
-
-        Err(mut err) => {
-            err.emit();
-            DummyResult::any(sp)
-        }
-    }
+    MacEager::items(SmallVector::many(generated_items))
 }
 
 struct GeneratedMethods {
