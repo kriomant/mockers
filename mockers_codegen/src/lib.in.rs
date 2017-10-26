@@ -1,12 +1,14 @@
 extern crate itertools;
 
+use std::collections::HashSet;
+
 use syntax::abi::Abi;
 use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   TyParamBound, Defaultness, MetaItem, TraitRef, TypeBinding, PathParameters,
-                  AngleBracketedParameterData, ParenthesizedParameterData,
+                  AngleBracketedParameterData, ParenthesizedParameterData, TraitBoundModifier,
                   QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef,
                   DUMMY_NODE_ID};
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
@@ -140,6 +142,7 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
                             mock_ident: Ident, trait_items: &[TraitDesc],
                             local: bool) -> Vec<P<Item>> {
     // Validate items, reject unsupported ones.
+    let mut trait_paths = HashSet::<String>::new();
     let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items.iter().flat_map(|desc| {
         match desc.trait_item.node {
             ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
@@ -153,14 +156,34 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
                     return None
                 }
 
-                if !param_bounds.is_empty() {
-                    cx.span_err(desc.trait_item.span, "Parameter bounds are not supported yet");
+                for bound in param_bounds {
+                    match *bound {
+                        TyParamBound::TraitTyParamBound(ref poly_trait_ref, ref bound_modifier) => {
+                            match *bound_modifier {
+                                TraitBoundModifier::None => {
+                                    assert!(poly_trait_ref.bound_lifetimes.is_empty());
+                                    let path = &poly_trait_ref.trait_ref.path;
+
+                                    // Ok, this is plain base trait reference with no lifetimes
+                                    // and type bounds. Check whether base trait definition was
+                                    // provided by user.
+                                    if !trait_paths.contains(&pprust::path_to_string(&path)) {
+                                        cx.span_err(poly_trait_ref.span, "All base trait definitions must be provided")
+                                    }
+                                },
+                                _ => cx.span_err(poly_trait_ref.span, "Type bound modifiers are not supported yet")
+                            }
+                        },
+                        TyParamBound::RegionTyParamBound(lifetime) =>
+                            cx.span_err(lifetime.span, "Lifetime parameter bounds are not supported yet")
+                    }
                     return None
                 }
 
                 let mut trait_path = desc.mod_path.clone();
                 trait_path.segments.push(create_path_segment(desc.trait_item.ident, DUMMY_SP));
 
+                trait_paths.insert(pprust::path_to_string(&trait_path));
                 Some((trait_path, subitems))
             }
             _ => {

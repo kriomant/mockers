@@ -90,3 +90,32 @@ mod multi_trait {
         accept_cd(mock);
     }
 }
+
+/// Test that it is possible to specify parent trait when using `mock!`.
+/// It is currently not used, but may be used in the future, so syntax
+/// should be allowed.
+mod inherited_trait_with_specified_parent {
+    use super::*;
+
+    pub trait A {
+        fn foo(&self, a: u32);
+    }
+
+    pub trait B: A {
+        fn bar(&self, b: u32);
+    }
+
+    mock!{
+        BMock,
+
+        self,
+        trait A {
+            fn foo(&self, a: u32);
+        },
+
+        self,
+        trait B: A {
+            fn bar(&self, b: u32);
+        }
+    }
+}
