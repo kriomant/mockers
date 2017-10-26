@@ -13,6 +13,7 @@ use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
 #[cfg(not(feature="with-syntex"))] use syntax::ext::quote::rt::ToTokens;
 #[cfg(feature="with-syntex")] use quasi::ToTokens;
+use syntax::parse::common::SeqSep;
 use syntax::parse::PResult;
 use syntax::parse::parser::{Parser, PathStyle};
 use syntax::parse::token::{self, Token};
@@ -24,6 +25,7 @@ use syntax::print::pprust;
 use syntax::tokenstream::TokenTree;
 
 use syntax::ext::build::AstBuilder;
+use itertools::Itertools;
 
 /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
 /// unique type ID. It is added to both call matchers produced by
@@ -35,38 +37,19 @@ static mut NEXT_MOCK_TYPE_ID: usize = 0;
 #[allow(unused)]
 pub fn derive_mock(cx: &mut ExtCtxt, span: Span, meta_item: &MetaItem, ann_item: &Annotatable,
                    push: &mut FnMut(Annotatable)) {
-    let (ident, subitems) = match *ann_item {
-        Annotatable::Item(ref item) =>
-            match item.node {
-                ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
-                    if unsafety != Unsafety::Normal {
-                        cx.span_err(span, "Unsafe traits are not supported yet");
-                        return;
-                    }
-
-                    if generics.is_parameterized() {
-                        cx.span_err(span, "Parametrized traits are not supported yet");
-                        return;
-                    }
-
-                    assert!(param_bounds.is_empty());
-
-                    (item.ident, subitems)
-                },
-                _ => {
-                    cx.span_err(span, "Deriving Mock is possible for traits only");
-                    return;
-                }
-            },
+    let item = match *ann_item {
+        Annotatable::Item(ref item) => item,
         Annotatable::TraitItem(_) | Annotatable::ImplItem(_) => {
             cx.span_err(span, "Deriving Mock is possible for traits only");
             return;
         }
     };
-    let mock_ident = cx.ident_of(&format!("{}Mock", ident.name.as_str()));
-    let trait_path = cx.path_ident(span, ident);
+    let mock_ident = cx.ident_of(&format!("{}Mock", item.ident.name.as_str()));
+    let trait_path = cx.path_ident(span, item.ident);
 
-    let generated_items = generate_mock_for_trait(cx, span, mock_ident, &trait_path, subitems, true);
+    let trait_desc = TraitDesc { mod_path: Path { span: DUMMY_SP, segments: vec![] },
+                                 trait_item: item.clone() };
+    let generated_items = generate_mock_for_traits(cx, span, mock_ident, &[trait_desc], true);
     for item in generated_items {
         let item = item.map(|mut it| {
             it.attrs.push(quote_attr!(cx, #[cfg(test)]));
@@ -93,42 +76,36 @@ fn parse_module_path<'a>(parser: &mut Parser<'a>) -> PResult<'a, Path> {
     }
 }
 
+struct TraitDesc {
+    mod_path: Path,
+    trait_item: P<Item>,
+}
+
 /// Parse module path or `self` identifier which means current module.
 /// Return `Some` in case of explicit module name or `None` when `self` is used.
-fn parse_macro_args<'a>(parser: &mut Parser<'a>) -> PResult<'a, (Ident, Path, P<Item>)> {
+fn parse_macro_args<'a>(parser: &mut Parser<'a>) -> PResult<'a, (Ident, Vec<TraitDesc>)> {
     let mock_ident = parser.parse_ident()?;
     parser.expect(&Token::Comma)?;
 
-    let module_path = parse_module_path(parser)?;
-    parser.expect(&Token::Comma)?;
+    let items = parser.parse_seq_to_before_end(&token::Eof, SeqSep::trailing_allowed(token::Comma),
+                                               |parser| {
+        let module_path = parse_module_path(parser)?;
+        parser.expect(&Token::Comma)?;
 
-    let sp = parser.span;
-    let item = parser.parse_item()?;
-    let item = item.ok_or_else(||
-            parser.diagnostic().struct_span_err(sp, "Trait definition expected"))?;
+        let sp = parser.span;
+        let item = parser.parse_item()?;
+        let item = item.ok_or_else(||
+                parser.diagnostic().struct_span_err(sp, "Trait definition expected"))?;
 
-    match item.node {
-        ItemKind::Trait(unsafety, ref generics, ref param_bounds, ..) => {
-            if unsafety != Unsafety::Normal {
-                return Err(parser.diagnostic().struct_span_err(sp, "Unsafe traits are not supported yet"));
-            }
+        Ok(TraitDesc { mod_path: module_path, trait_item: item })
+    });
 
-            if generics.is_parameterized() {
-                return Err(parser.diagnostic().struct_span_err(sp, "Parametrized traits are not supported yet"));
-            }
-
-            assert!(param_bounds.is_empty());
-        }
-
-        _ => return Err(parser.diagnostic().struct_span_err(sp, "Trait definition expected"))
-    };
-
-    Ok((mock_ident, module_path, item))
+    Ok((mock_ident, items))
 }
 
 pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'cx> {
     let mut parser = cx.new_parser_from_tts(args);
-    let (mock_ident, module_path, trait_item) = match parse_macro_args(&mut parser) {
+    let (mock_ident, trait_items) = match parse_macro_args(&mut parser) {
         Ok(args) => args,
         Err(mut err) => {
             err.emit();
@@ -143,14 +120,7 @@ pub fn generate_mock<'cx>(cx: &'cx mut ExtCtxt, sp: Span, args: &[TokenTree]) ->
         },
     };
 
-    let trait_subitems = match trait_item.node {
-        ItemKind::Trait(_unsafety, ref _generics, ref _param_bounds, ref trait_subitems) => trait_subitems,
-        _ => unreachable!()
-    };
-
-    let mut trait_path = module_path;
-    trait_path.segments.push(create_path_segment(trait_item.ident, DUMMY_SP));
-    let generated_items = generate_mock_for_trait(cx, trait_item.span, mock_ident, &trait_path, trait_subitems, false);
+    let generated_items = generate_mock_for_traits(cx, sp, mock_ident, &trait_items, false);
     for item in &generated_items {
         debug_item(item);
     }
@@ -162,50 +132,55 @@ struct GeneratedMethods {
     impl_method: ImplItem,
 }
 
-fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
-                           mock_ident: Ident, trait_path: &Path,
-                           members: &[TraitItem], local: bool) -> Vec<P<Item>> {
-    let mut impl_methods = Vec::with_capacity(members.len());
-    let mut trait_impl_methods = Vec::with_capacity(members.len());
+/// Generate mock struct and all implementations for given `trait_items`.
+/// `mock_ident` is identifier for mock struct.
+/// If `local` is `true`, `Mocked` instance generated for mock, which
+/// allows to use `scenario.create_mock_for::<Trait>`.
+fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
+                            mock_ident: Ident, trait_items: &[TraitDesc],
+                            local: bool) -> Vec<P<Item>> {
+    // Validate items, reject unsupported ones.
+    let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items.iter().flat_map(|desc| {
+        match desc.trait_item.node {
+            ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
+                if unsafety != Unsafety::Normal {
+                    cx.span_err(desc.trait_item.span, "Unsafe traits are not supported yet");
+                    return None
+                }
+
+                if generics.is_parameterized() {
+                    cx.span_err(desc.trait_item.span, "Parametrized traits are not supported yet");
+                    return None
+                }
+
+                if !param_bounds.is_empty() {
+                    cx.span_err(desc.trait_item.span, "Parameter bounds are not supported yet");
+                    return None
+                }
+
+                let mut trait_path = desc.mod_path.clone();
+                trait_path.segments.push(create_path_segment(desc.trait_item.ident, DUMMY_SP));
+
+                Some((trait_path, subitems))
+            }
+            _ => {
+                cx.span_err(desc.trait_item.span, "Only traits are accepted here");
+                None
+            }
+        }
+    }).collect();
+
+    // Gather associated types from all traits, because they are used in mock
+    // struct definition.
     let mut assoc_types = Vec::new();
-
-    for member in members.iter() {
-        match member.node {
-            TraitItemKind::Method(ref sig, ref _opt_body) => {
-                if sig.unsafety != Unsafety::Normal {
-                    cx.span_err(member.span, "unsafe trait methods are not supported");
-                    continue;
-                }
-                if sig.constness.node != Constness::NotConst {
-                    cx.span_err(member.span, "const trait methods are not supported");
-                    continue;
-                }
-                if sig.abi != Abi::Rust {
-                    cx.span_err(member.span, "non-Rust ABIs for trait methods are not supported");
-                    continue;
-                }
-                if sig.generics.is_parameterized() {
-                    cx.span_err(member.span, "parametrized trait methods are not supported");
-                    continue;
-                }
-
-                if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl, &trait_path) {
-                    impl_methods.push(methods.impl_method);
-                    trait_impl_methods.push(methods.trait_impl_method);
-                }
-            },
-            TraitItemKind::Type(ref bounds, ref _dflt) => {
+    for &(_, ref members) in &traits {
+        for member in members.iter() {
+            if let TraitItemKind::Type(ref bounds, ref _dflt) = member.node {
                 if !bounds.is_empty() {
                     cx.span_err(member.span, "associated type bounds are not supported yet");
                 }
                 assoc_types.push(member.ident);
-            },
-            TraitItemKind::Const(..) => {
-                cx.span_err(member.span, "trait constants are not supported yet");
-            },
-            TraitItemKind::Macro(..) => {
-                cx.span_err(member.span, "trait macros are not supported yet");
-            },
+            }
         }
     }
 
@@ -249,34 +224,83 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
         sp, false, vec![mock_ident], vec![],
         assoc_types.iter().cloned().map(|ident| cx.ty_ident(sp, ident)).collect(), vec![]));
 
-    // `impl<...> AMock<...> { pub fn foo_call(...) { ... } }`
-    let impl_item = cx.item(sp,
-                            mock_ident,
-                            vec![],
-                            item_kind_impl(None,
-                                           struct_type.clone(),
-                                           impl_methods,
-                                           generics.clone()));
+    let mut generated_items = vec![struct_item];
 
-    // `impl<...> A for AMock<...> { ... }`
-    let mut trait_impl_items = trait_impl_methods;
-    trait_impl_items.extend(assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
-        ImplItem {
-            ident: assoc,
-            span: sp,
-            defaultness: Defaultness::Final,
-            .. mk_implitem(assoc, ImplItemKind::Type(cx.ty_ident(sp, param)))
+    for &(ref trait_path, ref members) in &traits {
+        let mut impl_methods = Vec::new();
+        let mut trait_impl_methods = Vec::new();
+
+        for member in members.iter() {
+            match member.node {
+                TraitItemKind::Method(ref sig, ref _opt_body) => {
+                    if sig.unsafety != Unsafety::Normal {
+                        cx.span_err(member.span, "unsafe trait methods are not supported");
+                        continue;
+                    }
+                    if sig.constness.node != Constness::NotConst {
+                        cx.span_err(member.span, "const trait methods are not supported");
+                        continue;
+                    }
+                    if sig.abi != Abi::Rust {
+                        cx.span_err(member.span, "non-Rust ABIs for trait methods are not supported");
+                        continue;
+                    }
+                    if sig.generics.is_parameterized() {
+                        cx.span_err(member.span, "parametrized trait methods are not supported");
+                        continue;
+                    }
+
+                    if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl, &trait_path) {
+                        impl_methods.push(methods.impl_method);
+                        trait_impl_methods.push(methods.trait_impl_method);
+                    }
+                },
+                TraitItemKind::Type(ref bounds, ref _dflt) => {
+                    if !bounds.is_empty() {
+                        cx.span_err(member.span, "associated type bounds are not supported yet");
+                    }
+                },
+                TraitItemKind::Const(..) => {
+                    cx.span_err(member.span, "trait constants are not supported yet");
+                },
+                TraitItemKind::Macro(..) => {
+                    cx.span_err(member.span, "trait macros are not supported yet");
+                },
+            }
         }
-    }));
-    let trait_impl_item = cx.item(sp,
-                                  mock_ident,
-                                  vec![],
-                                  item_kind_impl(Some(cx.trait_ref(trait_path.clone())),
-                                                 struct_type,
-                                                 trait_impl_items,
-                                                 generics));
 
-    let mocked_class_name = pprust::path_to_string(trait_path);
+        // `impl<...> AMock<...> { pub fn foo_call(...) { ... } }`
+        let impl_item = cx.item(sp,
+                                mock_ident,
+                                vec![],
+                                item_kind_impl(None,
+                                               struct_type.clone(),
+                                               impl_methods,
+                                               generics.clone()));
+
+        // `impl<...> A for AMock<...> { ... }`
+        let mut trait_impl_items = trait_impl_methods;
+        trait_impl_items.extend(assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
+            ImplItem {
+                ident: assoc,
+                span: sp,
+                defaultness: Defaultness::Final,
+                .. mk_implitem(assoc, ImplItemKind::Type(cx.ty_ident(sp, param)))
+            }
+        }));
+        let trait_impl_item = cx.item(sp,
+                                      mock_ident,
+                                      vec![],
+                                      item_kind_impl(Some(cx.trait_ref(trait_path.clone())),
+                                                     struct_type.clone(),
+                                                     trait_impl_items,
+                                                     generics.clone()));
+
+        generated_items.push(impl_item);
+        generated_items.push(trait_impl_item);
+    }
+
+    let mocked_class_name = traits.iter().map(|&(ref path, _)| pprust::path_to_string(&path)).join("+");
 
     let phantom_data_initializers: Vec<_> = assoc_types.iter().map(|_| {
         quote_expr!(cx, ::std::marker::PhantomData)
@@ -297,20 +321,7 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
             }
         }
     ).unwrap();
-
-    // Create path for trait being mocked. Path includes bindings for all associated types.
-    let type_bindings: Vec<_> = assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
-        TypeBinding { id: DUMMY_NODE_ID, ident: assoc, ty: cx.ty_ident(sp, param), span: sp }
-    }).collect();
-    let trait_path_with_bindings = {
-        let mut p = trait_path.clone();
-        p.segments.last_mut().unwrap().parameters =
-            Some(P(PathParameters::AngleBracketed(AngleBracketedParameterData {
-                bindings: type_bindings,
-                .. mk_default_angle_bracketed_data()
-            })));
-        p
-    };
+    generated_items.push(mock_impl_item);
 
     let debug_impl_item = quote_item!(cx,
         impl<$assoc_types_sep> ::std::fmt::Debug for $mock_ident<$assoc_types_sep> {
@@ -319,25 +330,41 @@ fn generate_mock_for_trait(cx: &mut ExtCtxt, sp: Span,
             }
         }
     ).unwrap();
-
-    // Generated impl example:
-    //
-    //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
-    //         type MockImpl = AMock<Item>;
-    //     }
-    let mocked_impl_item = quote_item!(cx,
-        impl<$assoc_types_sep> ::mockers::Mocked for &'static $trait_path_with_bindings {
-            type MockImpl = $mock_ident<$assoc_types_sep>;
-        }
-    ).unwrap();
+    generated_items.push(debug_impl_item);
 
     if local {
-        vec![struct_item, mock_impl_item, impl_item,
-             trait_impl_item, debug_impl_item, mocked_impl_item]
-    } else {
-        vec![struct_item, mock_impl_item, impl_item,
-             trait_impl_item, debug_impl_item]
+        assert!(traits.len() == 1);
+        let (ref trait_path, _) = traits[0];
+
+        // Create path for trait being mocked. Path includes bindings for all associated types.
+        let type_bindings: Vec<_> = assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
+            TypeBinding { id: DUMMY_NODE_ID, ident: assoc, ty: cx.ty_ident(sp, param), span: sp }
+        }).collect();
+        let trait_path_with_bindings = {
+            let mut p = trait_path.clone();
+            p.segments.last_mut().unwrap().parameters =
+                Some(P(PathParameters::AngleBracketed(AngleBracketedParameterData {
+                    bindings: type_bindings,
+                    .. mk_default_angle_bracketed_data()
+                })));
+            p
+        };
+
+        // Generated impl example:
+        //
+        //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
+        //         type MockImpl = AMock<Item>;
+        //     }
+        let mocked_impl_item = quote_item!(cx,
+            impl<$assoc_types_sep> ::mockers::Mocked for &'static $trait_path_with_bindings {
+                type MockImpl = $mock_ident<$assoc_types_sep>;
+            }
+        ).unwrap();
+
+        generated_items.push(mocked_impl_item)
     }
+
+    generated_items
 }
 
 fn generate_trait_methods(cx: &mut ExtCtxt, sp: Span,
