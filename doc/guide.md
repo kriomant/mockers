@@ -682,6 +682,52 @@ scenario.create_mock::<AMock<i32>>();
 
 Trait type parameters are not supported yet. Not because it is impossible, but because nobody requested it yet. So if you need it, just let me know.
 
+### Inherited traits & mocking several traits
+
+There are cases when you need mock object to implement several traits. You
+can do it with `mock!` macro, just specify several module paths and trait
+definitions instead of one:
+
+```rust
+trait A { … }
+trait B { … }
+
+mock!{
+  ABMock,
+
+  self,
+  trait A { … },
+
+  self,
+  trait B { … }
+}
+```
+
+The same way you can mock inherited trait:
+
+```rust
+trait A { … }
+trait B: A { … }
+
+mock!{
+  ABMock,
+
+  self,
+  trait A { … },
+
+  self,
+  trait B: A { … }
+}
+```
+
+Note that while right now it is not strictly necessary to
+specify inheritance inside `mock!` call (you may just use
+`trait B` instead of `trait B: A`), it is highly recommended to
+do it, because this information may be used in the
+future.
+
+Traits must be specified ordered from base to derived ones.
+
 ## Mocking structures
 
 All previous examples assume that you already have some trait and functions which accept this trait.
