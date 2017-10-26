@@ -4,6 +4,37 @@ __Mockers__ is a mocking library (and compiler plugin) for Rust.
 
 It is inspired by [Google Mock].
 
+## Table of Contents
+
+<!-- TOC depthFrom:2 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [Table of Contents](#table-of-contents)
+- [Getting Started](#getting-started)
+	- [Nightly Rust](#nightly-rust)
+	- [Stable Rust](#stable-rust)
+	- ["Macros 1.1"](#macros-11)
+- [Usage](#usage)
+	- [Basics](#basics)
+	- [Argument Matchers](#argument-matchers)
+	- [Reactions](#reactions)
+	- [Expecting no calls](#expecting-no-calls)
+	- [Expecting several calls](#expecting-several-calls)
+	- [Order of calls](#order-of-calls)
+	- [Matching calls](#matching-calls)
+	- [Checkpoints](#checkpoints)
+	- [Usage from Test Crate](#usage-from-test-crate)
+	- [Named mockers](#named-mockers)
+	- [Creating mocks and expectations from within actions](#creating-mocks-and-expectations-from-within-actions)
+	- [Mocks cloning](#mocks-cloning)
+	- [Associated types](#associated-types)
+	- [Trait type parameters](#trait-type-parameters)
+	- [Inherited traits & mocking several traits](#inherited-traits-mocking-several-traits)
+- [Mocking structures](#mocking-structures)
+- [Error messages](#error-messages)
+- [Debugging](#debugging)
+
+<!-- /TOC -->
+
 ## Getting Started
 
 ### Nightly Rust
@@ -58,7 +89,7 @@ default-features = false
 Add build script and register it in your `Cargo.toml`:
 
 ```rust
-# build.rs
+// build.rs
 extern crate mockers_codegen;
 
 use std::env;
