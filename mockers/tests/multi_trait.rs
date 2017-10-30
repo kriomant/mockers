@@ -95,8 +95,6 @@ mod multi_trait {
 /// It is currently not used, but may be used in the future, so syntax
 /// should be allowed.
 mod inherited_trait_with_specified_parent {
-    use super::*;
-
     pub trait A {
         fn foo(&self, a: u32);
     }

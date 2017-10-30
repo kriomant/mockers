@@ -268,11 +268,6 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
                         cx.span_err(member.span, "non-Rust ABIs for trait methods are not supported");
                         continue;
                     }
-                    if sig.generics.is_parameterized() {
-                        cx.span_err(member.span, "parametrized trait methods are not supported");
-                        continue;
-                    }
-
                     if let Some(methods) = generate_trait_methods(cx, member.span, member.ident, &sig.decl, &trait_path) {
                         impl_methods.push(methods.impl_method);
                         trait_impl_methods.push(methods.trait_impl_method);
@@ -308,7 +303,7 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
                 ident: assoc,
                 span: sp,
                 defaultness: Defaultness::Final,
-                .. mk_implitem(assoc, ImplItemKind::Type(cx.ty_ident(sp, param)))
+                .. mk_implitem(assoc, ImplItemKind::Type(cx.ty_ident(sp, param)), Generics::default())
             }
         }));
         let trait_impl_item = cx.item(sp,
@@ -575,12 +570,14 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         unsafety: Unsafety::Normal,
         constness: respan(sp, Constness::NotConst),
         abi: Abi::Rust,
-        decl: P(FnDecl {
-            inputs: ainputs,
-            output: FunctionRetTy::Ty(output),
-            variadic: false,
-        }),
-        generics: generics,
+        .. mk_method_sig(
+            P(FnDecl {
+                inputs: ainputs,
+                output: FunctionRetTy::Ty(output),
+                variadic: false,
+            }),
+            generics.clone(),
+        )
     };
 
     let impl_subitem = ImplItem {
@@ -590,7 +587,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("dead_code"))]))],
         span: sp,
         defaultness: Defaultness::Final,
-        .. mk_implitem(expect_method_name, ImplItemKind::Method(call_sig, body))
+        .. mk_implitem(expect_method_name, ImplItemKind::Method(call_sig, body), generics)
     };
 
     Some(impl_subitem)
@@ -668,12 +665,14 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         unsafety: Unsafety::Normal,
         constness: respan(sp, Constness::NotConst),
         abi: Abi::Rust,
-        decl: P(FnDecl {
-            inputs: impl_args,
-            output: FunctionRetTy::Ty(P(return_type.clone())),
-            variadic: false,
-        }),
-        generics: Generics::default(),
+        .. mk_method_sig(
+            P(FnDecl {
+                inputs: impl_args,
+                output: FunctionRetTy::Ty(P(return_type.clone())),
+                variadic: false,
+            }),
+            Generics::default(),
+        )
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
@@ -682,7 +681,8 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("unused_mut"))]))],
         span: sp,
         defaultness: Defaultness::Final,
-        .. mk_implitem(method_ident, ImplItemKind::Method(impl_sig, nightly_p(fn_mock)))
+        .. mk_implitem(method_ident, ImplItemKind::Method(impl_sig, nightly_p(fn_mock)),
+                       Generics::default())
     };
 
     Some(trait_impl_subitem)
@@ -860,7 +860,7 @@ impl<'a, T: ToTokens + 'a> ToTokens for CommaSep<'a, T> {
 fn comma_sep<'a, T: ToTokens + 'a>(items: &'a [T]) -> CommaSep<'a, T> { CommaSep(items) }
 
 #[cfg(not(feature="with-syntex"))]
-fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
+fn mk_implitem(ident: Ident, node: ImplItemKind, generics: Generics) -> ImplItem {
     ImplItem {
         id: DUMMY_NODE_ID,
         ident: ident,
@@ -870,20 +870,40 @@ fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
         node: node,
         span: DUMMY_SP,
         defaultness: Defaultness::Final,
+        generics: generics,
         tokens: None,
     }
 }
 #[cfg(feature="with-syntex")]
-fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
+fn mk_implitem(ident: Ident, node: ImplItemKind, _generics: Generics) -> ImplItem {
     ImplItem {
         id: DUMMY_NODE_ID,
         ident: ident,
         vis: Visibility::Inherited,
-        // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         attrs: vec![],
         node: node,
         span: DUMMY_SP,
         defaultness: Defaultness::Final,
+    }
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn mk_method_sig(decl: P<FnDecl>, generics: Generics) -> MethodSig {
+    MethodSig {
+        unsafety: Unsafety::Normal,
+        constness: respan(DUMMY_SP, Constness::NotConst),
+        abi: Abi::Rust,
+        decl: decl,
+    }
+}
+#[cfg(feature="with-syntex")]
+fn mk_method_sig(decl: P<FnDecl>, generics: Generics) -> MethodSig {
+    MethodSig {
+        unsafety: Unsafety::Normal,
+        constness: respan(DUMMY_SP, Constness::NotConst),
+        abi: Abi::Rust,
+        decl: decl,
+        generics: generics,
     }
 }
 
