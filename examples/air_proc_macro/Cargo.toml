@@ -6,7 +6,7 @@ authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
 [dependencies]
-mockers_derive = { version = "0.9.1", path = "../../mockers_derive" }
+mockers_derive = { version = "0.9.2", path = "../../mockers_derive" }
 
 [dev-dependencies]
-mockers = { version = "0.9.1", path = "../../mockers" }
+mockers = { version = "0.9.2", path = "../../mockers" }

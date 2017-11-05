@@ -9,7 +9,7 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   TyParamBound, Defaultness, MetaItem, TraitRef, TypeBinding, PathParameters,
                   AngleBracketedParameterData, ParenthesizedParameterData, TraitBoundModifier,
-                  QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef,
+                  QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef, TyParamBounds,
                   DUMMY_NODE_ID};
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
@@ -145,7 +145,8 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
     let mut trait_paths = HashSet::<String>::new();
     let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items.iter().flat_map(|desc| {
         match desc.trait_item.node {
-            ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
+            ref item_kind @ ItemKind::Trait(..) => {
+                let (unsafety, generics, param_bounds, subitems) = destruct_item_kind_trait(&item_kind);
                 if unsafety != Unsafety::Normal {
                     cx.span_err(desc.trait_item.span, "Unsafe traits are not supported yet");
                     return None
@@ -934,6 +935,23 @@ fn mk_where_clause() -> WhereClause {
         id: DUMMY_NODE_ID,
         predicates: vec![],
     }
+}
+
+#[cfg(not(feature="with-syntex"))]
+fn destruct_item_kind_trait(item_kind: &ItemKind)
+    -> (Unsafety, &Generics, &TyParamBounds, &Vec<TraitItem>) {
+  match *item_kind {
+    ItemKind::Trait(_is_auto, unsafety, ref generics, ref param_bounds, ref subitems) => (unsafety, generics, param_bounds, subitems),
+    _ => unreachable!(),
+  }
+}
+#[cfg(feature="with-syntex")]
+fn destruct_item_kind_trait(item_kind: &ItemKind)
+    -> (Unsafety, &Generics, &TyParamBounds, &Vec<TraitItem>) {
+  match *item_kind {
+    ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => (unsafety, generics, param_bounds, subitems),
+    _ => unreachable!(),
+  }
 }
 
 #[cfg(feature="debug")]
