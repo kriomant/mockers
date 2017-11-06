@@ -5,8 +5,7 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 extern crate itertools;
-
-extern crate mockers_codegen;
+#[macro_use] extern crate synom;
 
 use std::result::Result;
 use std::collections::HashSet;
@@ -750,7 +749,57 @@ fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
 
 #[proc_macro]
 pub fn mock(input: TokenStream) -> TokenStream {
-    let item = format!("mock!{{\n{}\n}}", input);
-    let expanded = mockers_codegen::expand_str(&item).unwrap();
-    expanded.parse().unwrap()
+    match mock_impl(input) {
+        Ok(tokens) => tokens,
+        Err(err) => panic!("{}", err),
+    }
+}
+
+// Stealed from syn crate.
+fn unwrap<T>(name: &'static str,
+             f: fn(&str) -> synom::IResult<&str, T>,
+             input: &str)
+             -> Result<T, String> {
+    match f(input) {
+        synom::IResult::Done(mut rest, t) => {
+            rest = synom::space::skip_whitespace(rest);
+            if rest.is_empty() {
+                Ok(t)
+            } else if rest.len() == input.len() {
+                // parsed nothing
+                Err(format!("failed to parse {}: {:?}", name, rest))
+            } else {
+                Err(format!("unparsed tokens after {}: {:?}", name, rest))
+            }
+        }
+        synom::IResult::Error => Err(format!("failed to parse {}: {:?}", name, input)),
+    }
+}
+
+fn mock_impl(input: TokenStream) -> Result<TokenStream, String> {
+    use syn::parse::{ident, path, item};
+    named!(mock_args -> (Ident, Vec<TraitDesc>), do_parse!(
+        ident: ident >>
+        punct!(",") >>
+        traits: separated_list!(punct!(","), do_parse!(
+            path: alt!(
+                map!(keyword!("self"), |_| Path { global: false, segments: vec![] })
+                | path
+            ) >>
+            punct!(",") >>
+            trait_item: item >>
+            (TraitDesc { mod_path: path, trait_item: trait_item })
+        )) >>
+        (ident, traits)
+    ));
+
+    let source = input.to_string();
+    let args = unwrap("mock! arguments", mock_args, &source)?;
+    let tokens = generate_mock_for_traits(args.0, &args.1, false)?;
+
+    if cfg!(feature="debug") {
+        println!("{}", tokens.to_string());
+    }
+
+    Ok(tokens.parse().unwrap())
 }
