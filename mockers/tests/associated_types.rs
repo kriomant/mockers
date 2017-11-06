@@ -1,19 +1,20 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 ///! Test that traits with associated types can be mocked.
 
 extern crate mockers;
+extern crate mockers_derive;
 
+use mockers_derive::derive_mock;
 use mockers::Scenario;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     type Item;
     fn create(&self) -> Self::Item;
 }
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait B {
     type Item;
     fn create(&self, item: Self::Item) -> Vec<(bool, Self::Item)>;

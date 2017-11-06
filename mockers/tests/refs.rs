@@ -1,14 +1,16 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 ///! Test that mockers can mock methods with reference parameters.
 
 extern crate mockers;
+extern crate mockers_derive;
+
+use mockers_derive::derive_mock;
 
 use mockers::Scenario;
 use mockers::matchers::ANY;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     fn foo(&self, a: &u32);
 }

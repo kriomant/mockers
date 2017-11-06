@@ -1,9 +1,10 @@
-#![feature(plugin)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 #[macro_use]
 extern crate mockers;
+extern crate mockers_derive;
 
+use mockers_derive::mock;
 use mockers::Scenario;
 
 pub trait A {

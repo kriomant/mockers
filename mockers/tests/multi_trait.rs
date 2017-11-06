@@ -1,10 +1,10 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 ///! Test that mockers can mock several traits using one mock.
 ///! In particular, it should work for mocking inherited traits.
 
 extern crate mockers;
+extern crate mockers_derive;
 
 use mockers::Scenario;
 use mockers::matchers::ANY;
@@ -12,6 +12,7 @@ use mockers::matchers::ANY;
 /// Test mocking of inherited trait.
 mod inherited_trait {
     use super::*;
+    use mockers_derive::mock;
 
     pub trait A {
         fn foo(&self, a: u32);
@@ -51,6 +52,7 @@ mod inherited_trait {
 /// Test creating mock for several independent traits at once.
 mod multi_trait {
     use super::*;
+    use mockers_derive::mock;
 
     pub trait A {
         fn foo(&self, a: u32);
@@ -95,6 +97,8 @@ mod multi_trait {
 /// It is currently not used, but may be used in the future, so syntax
 /// should be allowed.
 mod inherited_trait_with_specified_parent {
+    use mockers_derive::mock;
+
     pub trait A {
         fn foo(&self, a: u32);
     }

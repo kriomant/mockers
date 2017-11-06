@@ -1,15 +1,16 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 extern crate mockers;
+extern crate mockers_derive;
 
 use std::rc::Rc;
 use std::panic::AssertUnwindSafe;
 
+use mockers_derive::{derive_mock, mock};
 use mockers::{Scenario, Sequence};
 use mockers::matchers::{ANY, lt};
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     fn foo(&self);
     fn bar(&self, arg: u32);

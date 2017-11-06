@@ -1,19 +1,20 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 ///! Tests that expectations may be set from inside expectation action.
 
 extern crate mockers;
+extern crate mockers_derive;
 
+use mockers_derive::derive_mock;
 use mockers::Scenario;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     type Item;
     fn create(&self) -> Self::Item;
 }
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait B {
     fn foo(&self);
 }

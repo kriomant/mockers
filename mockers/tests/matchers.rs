@@ -1,13 +1,14 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 #[macro_use(arg, check)]
 extern crate mockers;
+extern crate mockers_derive;
 
+use mockers_derive::derive_mock;
 use mockers::Scenario;
 use mockers::matchers::*;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     fn bar(&self, arg: u32);
     fn noarg(&self);
@@ -367,7 +368,7 @@ fn test_some_inner_mismatch() {
     mock.cmplx(Some(2));
 }
 
-#[derive(Mock)]
+#[derive_mock]
 trait ResultTest {
     fn func(&self, arg: Result<usize, &'static str>);
 }
