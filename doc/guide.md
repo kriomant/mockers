@@ -10,9 +10,6 @@ It is inspired by [Google Mock].
 
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
-	- [Nightly Rust](#nightly-rust)
-	- [Stable Rust](#stable-rust)
-	- ["Macros 1.1"](#macros-11)
 - [Usage](#usage)
 	- [Basics](#basics)
 	- [Argument Matchers](#argument-matchers)
@@ -37,29 +34,13 @@ It is inspired by [Google Mock].
 
 ## Getting Started
 
-### Nightly Rust
+Mockers uses `proc_macro` feature, so it works with both nighly and stable compiler.
 
-This is the simplest way to use `mockers` library.
-
-Run
-
-```sh
-$ multirust override nightly
-```
-
-or
-
-```sh
-$ rustup override set nightly
-```
-
-if you use [rustup](http://rustup.rs/).
-
-Next, add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
+Add `mockers` and `mockers_derive` as dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mockers_macros = "0.9.2"
+mockers_derive = "0.9.2"
 
 [dev-dependencies]
 mockers = "0.9.2"
@@ -67,70 +48,7 @@ mockers = "0.9.2"
 
 Now you are ready to start testing.
 
-This approach is used by [air_macro](../examples/air_macro/) example.
-
-### Stable Rust
-
-You will have to use code generation on stable Rust. It means that types
-you want to mock must live in a separate file which will be processed during build.
-
-Add `mockers` and `mockers_macros` as dependencies to your `Cargo.toml`:
-
-```toml
-[build-dependencies.mockers_codegen]
-version = "0.9.2"
-features = ["with-syntex"]
-
-[dev-dependencies.mockers]
-version = "0.9.2"
-default-features = false
-```
-
-Add build script and register it in your `Cargo.toml`:
-
-```rust
-// build.rs
-extern crate mockers_codegen;
-
-use std::env;
-use std::path::Path;
-
-fn main() {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-
-    let src = Path::new("src/types.in.rs");
-    let dst = Path::new(&out_dir).join("types.rs");
-
-    mockers_codegen::expand(&src, &dst).unwrap();
-}
-```
-
-```toml
-# Cargo.toml
-
-[package]
-…
-build = "build.rs"
-```
-
-Now you are ready to start testing.
-
-This approach is used by [air_codegen](../examples/air_codegen/) example.
-
-### "Macros 1.1"
-
-Rust now has ["macros 1.1"] feature which is intended to support
-deriving custom user traits on stable Rust without code generation.
-
-Unfortunately, this feature doesn't support `derive` clause on traits.
-However, upcoming [procedural macros feature] supports arbitrary macro
-attributes.
-
-`mockers` is ready to use procedural macros feature right now, `air_proc_macro`
-example shows how to do it.
-
-Procedural macros will be used as a primary usage scenario after feature
-stabilization.
+This approach is used by [air_proc_macro](../examples/air_proc_macro/) example.
 
 ## Usage
 
@@ -158,36 +76,25 @@ pub fn set_temperature_20(cond: &mut AirConditioner) {
 }
 ```
 
-On nightly, import the `mockers` crate and the `mockers_macros` compiler plugin:
+Enable `proc_macro` feature and import the `mockers` and `mockers_derive` crates:
 
 ```rust
 // src/lib.rs
 
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 #[cfg(test)] extern crate mockers;
+#[cfg(test)] extern crate mockers_derive;
 
 …
 ```
 
-On stable, move trait definition the separate file (`src/types.in.rs`) and
-import `mockers` crate:
+Add `#[derive_mock]` attribute to trait:
 
 ```rust
-// src/lib.rs
-
-include!(concat!(env!("OUT_DIR"), "/types.rs"));
-```
-
-```rust
-// src/types.in.rs
-
-#[cfg(test)] extern crate mockers;
-
-#[derive(Mock)]
+#[derive_mock]
 pub trait AirConditioner {
-    …
+  …
 }
 ```
 
@@ -271,7 +178,7 @@ scenario.expect(cond.make_hotter_call(4).and_return(()));
 
 Here we create a mock object which implements the `AirConditioner` trait and
 add expectations. Note that the concrete mock type is not specified. In fact the
-`#[derive(Mock)]` clause will generate an `AirConditionerMock` struct, i.e.
+`#[derive_mock]` attribute will generate an `AirConditionerMock` struct, i.e.
 it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
 Don't rely on it.
 
@@ -511,11 +418,9 @@ There is an implicit checkpoint call when a scenario object is destroyed.
 
 ### Usage from Test Crate
 
-Using `#[derive(Mock)]` is the easiest way to create a mock.
+Using `#[derive_mock]` is the easiest way to create a mock.
 
 However sometimes you don't want to have tests-related code in your `src` directory. Or a trait you want to mock is from another crate.
-
-(Note that all items produced by `#[derive(Mock)]` are wrapped with #[cfg(test)], so it won't go into your production binary.)
 
 Anyway, this is how you can "mockify" an external trait.
 
@@ -577,13 +482,13 @@ Sometimes it is needed to create new mocks and establish expectations on them fr
 Say you have factory and item traits and want to check that factory is used to create item and then some method is called on that item:
 
 ```rust
-#[derive(Mock)]
+#[derive_mock]
 pub trait Factory {
     type Item;
     fn create(&self) -> Self::Item;
 }
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait Item {
     fn foo(&self);
 }
@@ -686,7 +591,7 @@ fn test_target() {
 Traits with associated types are supported, you may use them as usual:
 
 ```rust
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     type Item;
     fn create(&self) -> Self::Item;
@@ -815,7 +720,7 @@ impl AirConditioner {
     fn get_temperature(&self) -> i16 { … }
 }
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait AirConditionerTrait {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);
