@@ -5,10 +5,12 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 extern crate itertools;
+#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate synom;
 
 use std::result::Result;
-use std::collections::HashSet;
+use std::sync::Mutex;
+use std::collections::{HashSet, HashMap};
 use proc_macro::TokenStream;
 use syn::{Item, ItemKind, Ident, Path, TraitItem, Unsafety, TyParamBound, TraitBoundModifier,
           PathParameters, PathSegment, TraitItemKind, Ty, Generics, TyParam, Constness,
@@ -27,18 +29,95 @@ use itertools::Itertools;
 /// both mock type ID and method name match.
 static mut NEXT_MOCK_TYPE_ID: usize = 0;
 
+lazy_static! {
+    static ref KNOWN_TRAITS: Mutex<HashMap<Path, Item>> = Mutex::new(HashMap::new());
+}
+
+struct MockAttrOptions {
+    module_path: Option<Path>,
+    refs: HashMap<Path, Path>,
+}
+
+fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
+    use syn::{MetaItem, NestedMetaItem};
+
+    let attr = syn::parse_outer_attr(&format!("#[mocked{}]", attr_tokens)).expect("parsed");
+    assert!(attr.style == syn::AttrStyle::Outer);
+
+    let mut module_path: Option<Path> = None;
+    let mut refs: HashMap<Path, Path> = HashMap::new();
+
+    match attr.value {
+        // Just plain `#[mocked]` without parameters.
+        MetaItem::Word(..) => (),
+
+        // `#[mocked(module="...", inherits(...))]`
+        MetaItem::List(_, ref items) => {
+            for item in items {
+                match *item {
+                    NestedMetaItem::MetaItem(MetaItem::NameValue(ref name, syn::Lit::Str(ref refs_str, _))) if name == "refs" => {
+                        use syn::parse::path;
+                        named!(refs_parser -> Vec<(Path, Path)>,
+                            terminated_list!(punct!(","), do_parse!(
+                                source: path >>
+                                punct!("=>") >>
+                                target: path >>
+                                ((source, target))
+                            ))
+                        );
+                        let refs_list = unwrap("`refs` attr parameter", refs_parser, refs_str)?;
+
+                        for (source, target) in refs_list {
+                            if source.global {
+                                return Err("global source path".to_string());
+                            }
+                            if !target.global {
+                                return Err("local target path".to_string());
+                            }
+                            refs.insert(source, target);
+                        }
+                    }
+
+                    NestedMetaItem::MetaItem(MetaItem::NameValue(ref name, syn::Lit::Str(ref path_str, _))) if name == "module" => {
+                        if module_path.is_some() {
+                            return Err("module attribute parameters is used more than once".to_string());
+                        }
+                        let path = syn::parse_path(&path_str)?;
+                        if !path.global {
+                            return Err("module path must be global".to_string());
+                        }
+                        module_path = Some(path);
+                    },
+
+                    _ => return Err("unexpected attribute parameter".to_string()),
+                }
+            }
+        },
+
+        // #[mocked="..."], such form isn't used right now, but may be used for specifying
+        // mock struct name.
+        MetaItem::NameValue(_, _) => return Err(format!("unexpected name-value attribute param")),
+    }
+
+    Ok(MockAttrOptions { module_path, refs })
+}
+
 #[proc_macro_attribute]
-pub fn derive_mock(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    match derive_mock_impl(input) {
+pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let opts = match parse_options(attr) {
+        Ok(opts) => opts,
+        Err(err) => panic!("{}", err),
+    };
+    match derive_mock_impl(input, &opts) {
         Ok(tokens) => tokens,
         Err(err) => panic!("{}", err),
     }
 }
 
-fn derive_mock_impl(input: TokenStream) -> Result<TokenStream, String> {
+fn derive_mock_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
     let mut source = input.to_string();
     let source_item = syn::parse_item(&source)?;
-    let tokens = generate_mock(&source_item)?;
+    let tokens = generate_mock(&source_item, opts)?;
 
     if cfg!(feature="debug") {
         println!("{}", tokens.to_string());
@@ -53,12 +132,50 @@ struct TraitDesc {
     trait_item: Item,
 }
 
-fn generate_mock(item: &Item) -> Result<quote::Tokens, String> {
-    match item.node {
-        ItemKind::Trait(..) => (),
+fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<quote::Tokens, String> {
+    let bounds = match item.node {
+        ItemKind::Trait(ref _unsafety, ref _generics, ref bounds, ref _subitems) => bounds,
         _ => return Err("Attribute may be used on traits only".to_string()),
     };
     let mock_ident = Ident::new(format!("{}Mock", item.ident));
+
+    // Find definitions for referenced traits.
+    let referenced_items = bounds.iter().map(|b| {
+        let path = match *b {
+            TyParamBound::Region(..) =>
+                return Err("lifetime parameters not supported yet".to_string()),
+            TyParamBound::Trait(PolyTraitRef { ref trait_ref, .. }, _modifier) =>
+                trait_ref,
+        };
+        let full_path = if path.global {
+            path
+        } else {
+            match opts.refs.get(path) {
+                Some(p) => p,
+                None => return Err("parent trait path must be given using 'refs' param".to_string()),
+            }
+        };
+        if let Some(referenced_trait) = KNOWN_TRAITS.lock().unwrap().get(full_path) {
+            let mod_path = Path {
+                global: path.global,
+                segments: path.segments[..path.segments.len()-1].into(),
+            };
+            Ok(TraitDesc {
+                mod_path: mod_path,
+                trait_item: referenced_trait.clone(),
+            })
+        } else {
+            Err(format!("Can't resolve trait reference: {:?}", path))
+        }
+    }).collect::<Result<Vec<TraitDesc>, String>>()?;
+
+    // Remember full trait definition, so we can recall it when it is references by
+    // another trait.
+    if let Some(ref module_path) = opts.module_path {
+        let mut full_path = module_path.clone();
+        full_path.segments.push(PathSegment::from(item.ident.clone()));
+        KNOWN_TRAITS.lock().unwrap().insert(full_path, item.clone());
+    }
 
     let trait_desc = TraitDesc {
         mod_path: Path {
@@ -67,7 +184,9 @@ fn generate_mock(item: &Item) -> Result<quote::Tokens, String> {
         },
         trait_item: item.clone(),
     };
-    generate_mock_for_traits(mock_ident, &[trait_desc], true)
+    let mut all_traits = referenced_items;
+    all_traits.push(trait_desc);
+    generate_mock_for_traits(mock_ident, &all_traits, true)
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
@@ -82,7 +201,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
     // Validate items, reject unsupported ones.
     let mut trait_paths = HashSet::<String>::new();
     let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items.iter()
-        .flat_map(|desc| {
+        .map(|desc| {
             match desc.trait_item.node {
                 ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => {
                     if unsafety != Unsafety::Normal {
@@ -138,7 +257,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
                 }
             }
         })
-        .collect();
+        .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, String>>()?;
 
     // Gather associated types from all traits, because they are used in mock
     // struct definition.
@@ -343,8 +462,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
     generated_items.push(debug_impl_item);
 
     if local {
-        assert!(traits.len() == 1);
-        let (ref trait_path, _) = traits[0];
+        let (ref trait_path, _) = traits[traits.len()-1];
 
         // Create path for trait being mocked. Path includes bindings for all associated types.
         // Generated impl example:

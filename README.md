@@ -13,6 +13,13 @@ Inspired by Google Mock library for C++.
 
 [User Guide]
 
+## Note: breaking change
+
+Previous version were implemented as compiler plugin and used
+`syntex` crate for parsing. Since then
+Version 0.10.0 migrated from compiler plugin implementation
+to usage of `proc_macro_attribute` feature. Support
+
 ## Limitations
 
 For now it is not a full-featured mocking library, but just
@@ -20,9 +27,10 @@ a prototype to gather feedback. For example, only methods with
 four or fewer arguments are supported, non-'static lifetimes are not
 supported and so on.
 
-Mocking magic is implemented using compiler plugin on nightly Rust
-(it was tested to work with *1.21.0-nightly (aac223f4f 2017-07-30)*)
-and code generation on stable Rust. See User Guide for details.
+Mocking magic is implemented using `proc_macro_attribute` attribute
+which is only available on nightly Rust (it was tested to work with
+*1.21.0-nightly (aac223f4f 2017-07-30)*). Working on stable Rust
+will be supported later.
 
 ## Usage at a glance
 
