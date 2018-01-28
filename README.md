@@ -17,7 +17,7 @@ Inspired by Google Mock library for C++.
 
 For now it is not a full-featured mocking library, but just
 a prototype to gather feedback. For example, only methods with
-four or less arguments are supported, non-'static lifetimes are not
+four or fewer arguments are supported, non-'static lifetimes are not
 supported and so on.
 
 Mocking magic is implemented using compiler plugin on nightly Rust
