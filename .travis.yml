@@ -1,8 +1,6 @@
 language: rust
 rust:
   - nightly
-  - beta
-  - stable
 
 # necessary for `travis-cargo coveralls --no-sudo`
 addons:
@@ -32,10 +30,8 @@ script:
   - (cd mockers && travis-cargo --only nightly test)
   # `mockers_macros` and `mockers_derive` use nightly Rust features.
   - (cd mockers_macros && travis-cargo --only nightly build)
-  # `mockers_codegen` can be build with nightly and with stable Rust
-  # (using `syntex`).
+  # `mockers_codegen` can be build with nightly only.
   - (cd mockers_codegen && travis-cargo --only nightly build)
-  - (cd mockers_codegen && travis-cargo build -- --features=with-syntex)
   # Examples
   - (cd examples/air_macro && travis-cargo --only nightly test)
 
