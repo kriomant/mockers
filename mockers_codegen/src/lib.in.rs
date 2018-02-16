@@ -9,7 +9,7 @@ use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   TyParamBound, Defaultness, MetaItem, TraitRef, TypeBinding, PathParameters,
                   AngleBracketedParameterData, ParenthesizedParameterData, TraitBoundModifier,
-                  QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef, TyParamBounds,
+                  QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef, TyParamBounds, GenericParam,
                   DUMMY_NODE_ID};
 use syntax::codemap::{Span, Spanned, respan, DUMMY_SP};
 use syntax::ext::base::{DummyResult, ExtCtxt, MacResult, MacEager, Annotatable};
@@ -100,7 +100,7 @@ fn parse_macro_args<'a>(parser: &mut Parser<'a>) -> PResult<'a, (Ident, Vec<Trai
                 parser.diagnostic().struct_span_err(sp, "Trait definition expected"))?;
 
         Ok(TraitDesc { mod_path: module_path, trait_item: item })
-    });
+    })?;
 
     Ok((mock_ident, items))
 }
@@ -162,7 +162,7 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
                         TyParamBound::TraitTyParamBound(ref poly_trait_ref, ref bound_modifier) => {
                             match *bound_modifier {
                                 TraitBoundModifier::None => {
-                                    assert!(poly_trait_ref.bound_lifetimes.is_empty());
+                                    assert!(poly_trait_ref.bound_generic_params.iter().all(|p| !p.is_lifetime_param()));
                                     let path = &poly_trait_ref.trait_ref.path;
 
                                     // Ok, this is plain base trait reference with no lifetimes
@@ -216,7 +216,7 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
     // Since type parameters are unused, we have to use PhantomData for each of them.
     // We use tuple of |PhantomData| to create just one struct field.
     let phantom_types: Vec<_> = assoc_types.iter().map(|&ty_param| {
-        P(quote_ty!(cx, ::std::marker::PhantomData<$ty_param>).unwrap())
+        quote_ty!(cx, ::std::marker::PhantomData<$ty_param>)
     }).collect();
     let phantom_tuple_type = cx.ty(sp, TyKind::Tup(phantom_types));
 
@@ -232,14 +232,14 @@ fn generate_mock_for_traits(cx: &mut ExtCtxt, sp: Span,
     // `impl<A: ::std::fmt::Debug, B: ::std::fmt::Debug, ...> ...`.
     let generics = {
         let mut gen = Generics::default();
-        gen.ty_params = assoc_types.iter().cloned().map(|param| {
+        gen.params = assoc_types.iter().cloned().map(|param| {
             let bounds = vec![
                 // nighlty: cx.typarambound(quote_path!(cx, ::std::fmt::Debug)),
                 cx.typarambound(cx.path_global(sp, vec![cx.ident_of("std"),
                                                         cx.ident_of("fmt"),
                                                         cx.ident_of("Debug")])),
             ];
-            cx.typaram(sp, param, vec![], bounds, None)
+            GenericParam::Type(cx.typaram(sp, param, vec![], bounds, None))
         }).collect();
         gen
     };
@@ -548,12 +548,15 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
             lifetime: lifetime,
             bounds: Vec::new(),
         }
-    }).collect();
+    });
+
+    let mut params = Vec::<GenericParam>::new();
+    params.extend(arg_lifetime_defs.map(GenericParam::Lifetime));
+    params.extend(arg_matcher_types.into_iter().map(GenericParam::Type));
 
     let generics = Generics {
         span: sp,
-        lifetimes: arg_lifetime_defs,
-        ty_params: arg_matcher_types,
+        params: params,
         where_clause: mk_where_clause(),
     };
 
@@ -652,7 +655,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
                                                   method_name: $method_name, };
         let action = $self_ident.scenario.borrow_mut().$verify_fn(method_data, $arg_values_sep);
         action.call()
-    }).unwrap();
+    });
 
     let mut impl_args: Vec<Arg> = args.iter().map(|a| {
         let ident = match a.pat.node {
@@ -682,7 +685,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("unused_mut"))]))],
         span: sp,
         defaultness: Defaultness::Final,
-        .. mk_implitem(method_ident, ImplItemKind::Method(impl_sig, nightly_p(fn_mock)),
+        .. mk_implitem(method_ident, ImplItemKind::Method(impl_sig, fn_mock),
                        Generics::default())
     };
 
@@ -701,7 +704,7 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
                                                                             mutbl: t.mutbl }),
             TyKind::BareFn(ref fnty) => TyKind::BareFn(P(BareFnTy { unsafety: fnty.unsafety,
                                                                     abi: fnty.abi,
-                                                                    lifetimes: fnty.lifetimes.clone(),
+                                                                    generic_params: fnty.generic_params.clone(),
                                                                     decl: qualify_fn_decl(&fnty.decl, trait_path) })),
             TyKind::Never => TyKind::Never,
             TyKind::Tup(ref ts) => TyKind::Tup(ts.iter().map(|t| qualify_ty(t, trait_path)).collect()),
@@ -787,27 +790,6 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> P<Ty> {
     qualify_ty(&ty, trait_path)
 }
 
-/// `quote_block!` macro in nightly and `quasi` return
-/// different types: `Block` in nightly and `P<Block>`
-/// in `quasi`, so in nightly it must be wrapped with
-/// `P`.
-#[cfg(not(feature="with-syntex"))]
-fn nightly_p<T: 'static>(t: T) -> P<T> {
-    P(t)
-}
-#[cfg(feature="with-syntex")]
-fn nightly_p<T: 'static>(t: P<T>) -> P<T> {
-    t
-}
-
-#[cfg(feature="with-syntex")]
-fn create_path_segment(ident: Ident, _span: Span) -> PathSegment {
-    PathSegment {
-        identifier: ident,
-        parameters: None,
-    }
-}
-#[cfg(not(feature="with-syntex"))]
 fn create_path_segment(ident: Ident, span: Span) -> PathSegment {
     PathSegment {
         span: span,
@@ -816,33 +798,17 @@ fn create_path_segment(ident: Ident, span: Span) -> PathSegment {
     }
 }
 
-#[cfg(feature="with-syntex")]
-fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>, generics: Generics) -> ItemKind {
-    ItemKind::Impl(Unsafety::Normal, ImplPolarity::Positive, generics,
-                   traits, self_ty, items)
-}
-#[cfg(not(feature="with-syntex"))]
 fn item_kind_impl(traits: Option<TraitRef>, self_ty: P<Ty>, items: Vec<ImplItem>, generics: Generics) -> ItemKind {
     ItemKind::Impl(Unsafety::Normal, ImplPolarity::Positive, Defaultness::Final, generics,
                    traits, self_ty, items)
 }
 
-#[cfg(not(feature="with-syntex"))]
 fn mk_ident(cx: &ExtCtxt, name: &str) -> Ident {
   cx.name_of(name).to_ident()
-}
-#[cfg(feature="with-syntex")]
-fn mk_ident(cx: &ExtCtxt, name: &str) -> Ident {
-  Ident::with_empty_ctxt(cx.name_of(name))
 }
 
-#[cfg(not(feature="with-syntex"))]
 fn mk_ident_or_symbol(cx: &ExtCtxt, name: &str) -> Ident {
   cx.name_of(name).to_ident()
-}
-#[cfg(feature="with-syntex")]
-fn mk_ident_or_symbol(cx: &ExtCtxt, name: &str) -> Symbol {
-  cx.name_of(name)
 }
 
 struct CommaSep<'a, T: ToTokens + 'a>(&'a [T]);
@@ -860,7 +826,6 @@ impl<'a, T: ToTokens + 'a> ToTokens for CommaSep<'a, T> {
 }
 fn comma_sep<'a, T: ToTokens + 'a>(items: &'a [T]) -> CommaSep<'a, T> { CommaSep(items) }
 
-#[cfg(not(feature="with-syntex"))]
 fn mk_implitem(ident: Ident, node: ImplItemKind, generics: Generics) -> ImplItem {
     ImplItem {
         id: DUMMY_NODE_ID,
@@ -875,21 +840,8 @@ fn mk_implitem(ident: Ident, node: ImplItemKind, generics: Generics) -> ImplItem
         tokens: None,
     }
 }
-#[cfg(feature="with-syntex")]
-fn mk_implitem(ident: Ident, node: ImplItemKind, _generics: Generics) -> ImplItem {
-    ImplItem {
-        id: DUMMY_NODE_ID,
-        ident: ident,
-        vis: Visibility::Inherited,
-        attrs: vec![],
-        node: node,
-        span: DUMMY_SP,
-        defaultness: Defaultness::Final,
-    }
-}
 
-#[cfg(not(feature="with-syntex"))]
-fn mk_method_sig(decl: P<FnDecl>, generics: Generics) -> MethodSig {
+fn mk_method_sig(decl: P<FnDecl>, _generics: Generics) -> MethodSig {
     MethodSig {
         unsafety: Unsafety::Normal,
         constness: respan(DUMMY_SP, Constness::NotConst),
@@ -897,31 +849,13 @@ fn mk_method_sig(decl: P<FnDecl>, generics: Generics) -> MethodSig {
         decl: decl,
     }
 }
-#[cfg(feature="with-syntex")]
-fn mk_method_sig(decl: P<FnDecl>, generics: Generics) -> MethodSig {
-    MethodSig {
-        unsafety: Unsafety::Normal,
-        constness: respan(DUMMY_SP, Constness::NotConst),
-        abi: Abi::Rust,
-        decl: decl,
-        generics: generics,
-    }
-}
 
-#[cfg(not(feature="with-syntex"))]
 fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
     AngleBracketedParameterData {
         lifetimes: vec![], types: vec![], bindings: vec![], span: DUMMY_SP,
     }
 }
-#[cfg(feature="with-syntex")]
-fn mk_default_angle_bracketed_data() -> AngleBracketedParameterData {
-    AngleBracketedParameterData {
-        lifetimes: vec![], types: vec![], bindings: vec![],
-    }
-}
 
-#[cfg(not(feature="with-syntex"))]
 fn mk_where_clause() -> WhereClause {
     WhereClause {
         id: DUMMY_NODE_ID,
@@ -929,27 +863,11 @@ fn mk_where_clause() -> WhereClause {
         span: DUMMY_SP,
     }
 }
-#[cfg(feature="with-syntex")]
-fn mk_where_clause() -> WhereClause {
-    WhereClause {
-        id: DUMMY_NODE_ID,
-        predicates: vec![],
-    }
-}
 
-#[cfg(not(feature="with-syntex"))]
 fn destruct_item_kind_trait(item_kind: &ItemKind)
     -> (Unsafety, &Generics, &TyParamBounds, &Vec<TraitItem>) {
   match *item_kind {
     ItemKind::Trait(_is_auto, unsafety, ref generics, ref param_bounds, ref subitems) => (unsafety, generics, param_bounds, subitems),
-    _ => unreachable!(),
-  }
-}
-#[cfg(feature="with-syntex")]
-fn destruct_item_kind_trait(item_kind: &ItemKind)
-    -> (Unsafety, &Generics, &TyParamBounds, &Vec<TraitItem>) {
-  match *item_kind {
-    ItemKind::Trait(unsafety, ref generics, ref param_bounds, ref subitems) => (unsafety, generics, param_bounds, subitems),
     _ => unreachable!(),
   }
 }

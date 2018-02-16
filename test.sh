@@ -14,14 +14,7 @@ set -e
 (echo mockers/nightly/test ; cd mockers && cargo +nightly test)
 # `mockers_macros` and `mockers_derive` use nightly Rust features.
 (echo mockers_macros/nightly ; cd mockers_macros && cargo +nightly build)
-(echo mockers_derive/nightly ; cd mockers_derive && cargo +nightly test)
-# `mockers_codegen` can be build with nightly and with stable Rust
-# (using `syntex`).
+# `mockers_codegen`
 (echo mockers_codegen/nightly ; cd mockers_codegen && cargo +nightly build)
-(echo mockers_codegen/nightly/with-syntex ; cd mockers_codegen && cargo +nightly build --features=with-syntex)
-(echo mockers_codegen/stable/with-syntex; cd mockers_codegen && cargo +stable  build --features=with-syntex)
 # Examples
 (echo air_macro/nightly/test ; cd examples/air_macro   && cargo +nightly test)
-(echo air_codegen/nightly/test ; cd examples/air_codegen && cargo +nightly test)
-(echo air_codegen/stable/test ; cd examples/air_codegen && cargo +stable test)
-(echo air_proc_macro/nightly/test ; cd examples/air_proc_macro && cargo +nightly test)
