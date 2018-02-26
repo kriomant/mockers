@@ -6,7 +6,7 @@ use syntax::abi::Abi;
 use syntax::ast::{Item, ItemKind, TraitItemKind, Unsafety, Constness, SelfKind,
                   PatKind, SpannedIdent, Expr, FunctionRetTy, TyKind, Generics, WhereClause,
                   ImplPolarity, MethodSig, FnDecl, Mutability, ImplItem, Ident, TraitItem,
-                  Visibility, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
+                  VisibilityKind, ImplItemKind, Arg, Ty, TyParam, Path, PathSegment,
                   TyParamBound, Defaultness, MetaItem, TraitRef, TypeBinding, PathParameters,
                   AngleBracketedParameterData, ParenthesizedParameterData, TraitBoundModifier,
                   QSelf, MutTy, BareFnTy, Lifetime, LifetimeDef, TyParamBounds, GenericParam,
@@ -586,7 +586,7 @@ fn generate_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
 
     let impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
-        vis: Visibility::Public,
+        vis: respan(DUMMY_SP, VisibilityKind::Public),
         // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("dead_code"))]))],
         span: sp,
@@ -680,7 +680,7 @@ fn generate_trait_impl_method(cx: &mut ExtCtxt, sp: Span, mock_type_id: usize,
     };
     let trait_impl_subitem = ImplItem {
         id: DUMMY_NODE_ID,
-        vis: Visibility::Inherited,
+        vis: respan(DUMMY_SP, VisibilityKind::Inherited),
         // nightly: attrs: vec![quote_attr!(cx, #[allow(unused_mut)])],
         attrs: vec![cx.attribute(sp, cx.meta_list(sp, Symbol::intern("allow"), vec![cx.meta_list_item_word(sp, Symbol::intern("unused_mut"))]))],
         span: sp,
@@ -830,7 +830,7 @@ fn mk_implitem(ident: Ident, node: ImplItemKind, generics: Generics) -> ImplItem
     ImplItem {
         id: DUMMY_NODE_ID,
         ident: ident,
-        vis: Visibility::Inherited,
+        vis: respan(DUMMY_SP, VisibilityKind::Inherited),
         // nightly: attrs: vec![quote_attr!(cx, #[allow(dead_code)])],
         attrs: vec![],
         node: node,

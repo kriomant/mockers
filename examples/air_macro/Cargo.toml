@@ -6,7 +6,7 @@ authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
 [dependencies]
-mockers_macros = { version = "0.9.3", path = "../../mockers_macros" }
+mockers_macros = { version = "0.9.4", path = "../../mockers_macros" }
 
 [dev-dependencies]
-mockers = { version = "0.9.3", path = "../../mockers" }
+mockers = { version = "0.9.4", path = "../../mockers" }
