@@ -1,7 +1,7 @@
 
-| master | 0.9.4 |
+| master | 0.10.0 |
 | ------ | ----- |
-| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.9.4)](https://travis-ci.org/kriomant/mockers) |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.10.0)](https://travis-ci.org/kriomant/mockers) |
 
 
 
@@ -13,10 +13,20 @@ Inspired by Google Mock library for C++.
 
 [User Guide]
 
-## Compatibility note
+## Note: breaking change
 
-Support for stable Rust is dropped in version 0.93.
-I will try to revive it after migration to `proc_macro_attribute` feature.
+Previous version were implemented as compiler plugin and used
+`syntex` crate for parsing. Compiler plugins are now deprecated, and
+`syntex` crate is not maintained anymore.
+
+Version 0.10.0 migrated from compiler plugin implementation
+to usage of `proc_macro_attribute` feature. Since this feature isn't supported
+in stable Rust yet, `mockers` is only available on unstable at the moment.
+It is possible that support for stable Rust will be implemented even before
+`proc_macro_attribute` feature stabilization.
+
+In trivial cases migration of your tests to new `mockers` version is as
+simple as replacing `#[derive(Mock)]` with `#[derive_mock]`.
 
 ## Limitations
 
@@ -25,9 +35,10 @@ a prototype to gather feedback. For example, only methods with
 four or fewer arguments are supported, non-'static lifetimes are not
 supported and so on.
 
-Mocking magic is implemented using compiler plugin on nightly Rust
-(it was tested to work with *1.26.0-nightly (322d7f7b9 2018-02-25)*)
-and code generation on stable Rust. See User Guide for details.
+Mocking magic is implemented using `proc_macro_attribute` attribute
+which is only available on nightly Rust (it was tested to work with
+*1.25.0-nightly (3bcda48a3 2018-02-09)*). Working on stable Rust
+will be supported later.
 
 ## Usage at a glance
 
@@ -51,10 +62,10 @@ Cargo.toml:
 
 ```toml
 [dependencies]
-mockers_macros = "0.9.4"
+mockers_macros = "0.10.0"
 
 [dev-dependencies]
-mockers = "0.9.4"
+mockers = "0.10.0"
 ```
 
 src/lib.rs:
@@ -65,7 +76,7 @@ src/lib.rs:
 
 #[cfg(test)] extern crate mockers;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait AirConditioner {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);

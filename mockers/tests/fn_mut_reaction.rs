@@ -1,13 +1,14 @@
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
 extern crate mockers;
+extern crate mockers_derive;
 
+use mockers_derive::derive_mock;
 use mockers::Scenario;
 
 pub struct NonClonable;
 
-#[derive(Mock)]
+#[derive_mock]
 pub trait A {
     fn create0(&self) -> NonClonable;
     fn create1(&self, a0: ()) -> NonClonable;

@@ -1,5 +1,5 @@
 #![cfg_attr(feature="nightly", feature(fnbox))]
-#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range))]
+#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range, inclusive_range_fields))]
 // nightly(box_patterns) #![feature(box_patterns)]
 
 #[cfg(feature="nightly")]

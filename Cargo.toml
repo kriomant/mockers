@@ -1,4 +1,4 @@
 [workspace]
 members = [
-	"mockers", "mockers_codegen", "mockers_macros", "examples/air_macro"
+	"mockers", "mockers_derive", "examples/air_proc_macro",
 ]
