@@ -28,16 +28,10 @@ script:
   - (cd mockers && travis-cargo --only nightly build)
   # Tests use `mockers_macros` and thus are only runnable with nightly Rust.
   - (cd mockers && travis-cargo --only nightly test)
-  # `mockers_macros` and `mockers_derive` use nightly Rust features.
-  - (cd mockers_macros && travis-cargo --only nightly build)
+  # mockers_derive` use nightly Rust features.
   - (cd mockers_derive && travis-cargo --only nightly build)
-  # `mockers_codegen` can be build with nightly and with stable Rust
-  # (using `syntex`).
-  - (cd mockers_codegen && travis-cargo --only nightly build)
-  - (cd mockers_codegen && travis-cargo build -- --features=with-syntex)
   # Examples
-  - (cd examples/air_macro && travis-cargo --only nightly test)
-  - (cd examples/air_codegen && travis-cargo test)
+  - (cd examples/air_proc_macro && travis-cargo --only nightly test)
 
 after_success:
   # measure code coverage and upload to coveralls.io (the verify
