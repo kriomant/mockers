@@ -5,8 +5,6 @@ version = "0.1.0"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
 
-[dependencies]
-mockers_derive = { version = "0.10.0", path = "../../mockers_derive" }
-
 [dev-dependencies]
 mockers = { version = "0.10.0", path = "../../mockers" }
+mockers_derive = { version = "0.10.0", path = "../../mockers_derive" }

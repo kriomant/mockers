@@ -61,22 +61,21 @@ $ rustup override set nightly
 Cargo.toml:
 
 ```toml
-[dependencies]
-mockers_macros = "0.10.0"
-
 [dev-dependencies]
 mockers = "0.10.0"
+mockers_derive = "0.10.0"
 ```
 
 src/lib.rs:
 
 ```rust
-#![feature(plugin, custom_derive)]
-#![plugin(mockers_macros)]
+#![feature(proc_macro)]
 
-#[cfg(test)] extern crate mockers;
+#[cfg(test)] extern crate mockers_derive;
 
-#[derive_mock]
+#[cfg(test)] use mockers_derive::derive_mock;
+
+#[cfg_attr(test, derive_mock)]
 pub trait AirConditioner {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);
