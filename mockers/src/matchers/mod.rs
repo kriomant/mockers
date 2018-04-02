@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use std::fmt::Debug;
 
 #[cfg(feature="nightly")] use std;
-#[cfg(feature="nightly")] use alloc::range::RangeArgument;
-#[cfg(feature="nightly")] use alloc::Bound;
+#[cfg(feature="nightly")] use std::collections::range::RangeArgument;
+#[cfg(feature="nightly")] use std::collections::Bound;
 #[cfg(feature="nightly")] use alloc::fmt::Write;
 
 pub use self::ext::*;

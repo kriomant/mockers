@@ -1,5 +1,3 @@
-#![cfg_attr(feature="nightly", feature(inclusive_range_syntax))]
-
 #![feature(proc_macro)]
 
 extern crate mockers;
