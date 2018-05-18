@@ -41,7 +41,7 @@ struct MockAttrOptions {
 fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
     use syn::{MetaItem, NestedMetaItem};
 
-    let attr = syn::parse_outer_attr(&format!("#[mocked{}]", attr_tokens)).expect("parsed");
+    let attr = syn::parse_outer_attr(&format!("#[mocked({})]", attr_tokens)).expect("parsed");
     assert!(attr.style == syn::AttrStyle::Outer);
 
     let mut module_path: Option<Path> = None;

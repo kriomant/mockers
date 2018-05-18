@@ -84,9 +84,9 @@ impl Cardinality for Range<u32> {
 #[cfg(feature="nightly")]
 impl Cardinality for RangeInclusive<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
-        if count < self.start {
+        if count < *self.start() {
             CardinalityCheckResult::Possible
-        } else if count <= self.end {
+        } else if count <= *self.end() {
             CardinalityCheckResult::Satisfied
         } else {
             CardinalityCheckResult::Wrong
@@ -94,7 +94,7 @@ impl Cardinality for RangeInclusive<u32> {
     }
 
     fn describe(&self) -> String {
-        match (self.start, self.end) {
+        match (*self.start(), *self.end()) {
             (_, 0) => "never called".to_string(),
             (_, 1) => "called at most one time".to_string(),
             (b, e) => format!("called from {} to {} times", b, e),
@@ -102,12 +102,12 @@ impl Cardinality for RangeInclusive<u32> {
     }
 
     fn describe_upper_bound(&self) -> String {
-        if self.end == 0 {
+        if *self.end() == 0 {
             "never called".to_string()
-        } else if self.end == 1 {
+        } else if *self.end() == 1 {
             "called at most one time".to_string()
         } else {
-            format!("called at most {} times", self.end)
+            format!("called at most {} times", self.end())
         }
     }
 }
