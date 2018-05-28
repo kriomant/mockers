@@ -3,10 +3,10 @@ use super::MatchArg;
 use std::marker::PhantomData;
 use std::fmt::Debug;
 
-#[cfg(feature="nightly")] use std;
-#[cfg(feature="nightly")] use std::collections::range::RangeArgument;
-#[cfg(feature="nightly")] use std::collections::Bound;
-#[cfg(feature="nightly")] use alloc::fmt::Write;
+use std;
+use std::collections::range::RangeArgument;
+use std::collections::Bound;
+use alloc::fmt::Write;
 
 pub use self::ext::*;
 pub use self::option::*;
@@ -108,12 +108,10 @@ simple_matcher!(ne, NeMatchArg, !=, "equal to", PartialEq);
 simple_matcher!(ge, GeMatchArg, >=, "not greater than or equal to", PartialOrd);
 simple_matcher!(gt, GtMatchArg,  >, "not greater than", PartialOrd);
 
-#[cfg(feature="nightly")]
 pub struct RangeMatchArg<T: Ord + Debug, R: RangeArgument<T>> {
     range: R,
     _phantom: PhantomData<T>,
 }
-#[cfg(feature="nightly")]
 impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
     fn format_range(&self) -> Result<String, std::fmt::Error> {
         let mut range_str = String::new();
@@ -131,7 +129,6 @@ impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
         Ok(range_str)
     }
 }
-#[cfg(feature="nightly")]
 impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
     fn matches(&self, arg: &T) -> Result<(), String> {
         let matches_start = match self.range.start() {
@@ -155,7 +152,7 @@ impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
         format!("in_range({})", self.format_range().unwrap())
     }
 }
-#[cfg(feature="nightly")]
+
 pub fn in_range<T: Ord + Debug, R: RangeArgument<T>>(range: R) -> RangeMatchArg<T, R> {
     RangeMatchArg { range: range, _phantom: PhantomData }
 }

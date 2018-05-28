@@ -98,7 +98,6 @@ fn test_times_range_more() {
     mock.foo();
 }
 
-#[cfg(feature="nightly")]
 #[test]
 fn test_times_range_inclusive_lower_bound() {
     let scenario = Scenario::new();
@@ -110,7 +109,6 @@ fn test_times_range_inclusive_lower_bound() {
     mock.foo();
 }
 
-#[cfg(feature="nightly")]
 #[test]
 fn test_times_range_inclusive_upper_bound() {
     let scenario = Scenario::new();
@@ -123,7 +121,6 @@ fn test_times_range_inclusive_upper_bound() {
     mock.foo();
 }
 
-#[cfg(feature="nightly")]
 #[test]
 #[should_panic(expected="A#0.foo() must be called from 2 to 4 times, called 1 times")]
 fn test_times_range_inclusive_less() {
@@ -135,7 +132,6 @@ fn test_times_range_inclusive_less() {
     mock.foo();
 }
 
-#[cfg(feature="nightly")]
 #[test]
 #[should_panic(expected="A#0.foo is called for the 5th time, but expected to be called at most 4 times")]
 fn test_times_range_inclusive_more() {

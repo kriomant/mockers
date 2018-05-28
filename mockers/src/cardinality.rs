@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::ops::{Range, RangeFrom, RangeTo, RangeFull};
-#[cfg(feature="nightly")]
 use std::ops::{RangeInclusive, RangeToInclusive};
 
 /// Result of checking call count against cardinality constraints
@@ -81,7 +80,6 @@ impl Cardinality for Range<u32> {
     }
 }
 
-#[cfg(feature="nightly")]
 impl Cardinality for RangeInclusive<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         if count < *self.start() {
@@ -159,7 +157,6 @@ impl Cardinality for RangeTo<u32> {
     }
 }
 
-#[cfg(feature="nightly")]
 impl Cardinality for RangeToInclusive<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         match count.cmp(&self.end) {

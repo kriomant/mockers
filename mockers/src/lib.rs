@@ -1,9 +1,6 @@
-#![cfg_attr(feature="nightly", feature(fnbox, inclusive_range_methods))]
-#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range, inclusive_range_fields,
-                                       specialization))]
-// nightly(box_patterns) #![feature(box_patterns)]
+#![feature(fnbox, inclusive_range_methods, alloc, collections_range,
+           inclusive_range, inclusive_range_fields, specialization)]
 
-#[cfg(feature="nightly")]
 extern crate alloc;
 
 use std::marker::PhantomData;

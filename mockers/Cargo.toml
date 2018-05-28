@@ -16,6 +16,4 @@ name = "mockers"
 mockers_derive = { version = "0.10.2", path = "../mockers_derive" }
 
 [features]
-default = ["nightly"]
-nightly = []
 debug = ["mockers_derive/debug"]
