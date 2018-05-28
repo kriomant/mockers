@@ -231,6 +231,18 @@ The `matchers` module contains other matchers which may be useful:
     cond.make_hotter_call(ANY).and_return(());
     ```
 
+	* `any` will match any value, just like `ANY`, but may be used for generic
+	  params when compiler is unable to infer type:
+		```rust
+		#[derive_mock]
+		trait A {
+			fn foo<T>(t: T);
+		}
+
+		mock.foo_call(any::<u32>()).and_return(());
+		mock.foo(1u32);
+		```
+
   * `lt`, `le`, `eq`, `ne`, `ge`, `gt` will compare the argument with a specified value
     using `<`, `<=`, `==`, `!=`, `>=` and `>` respectively:
     ```rust

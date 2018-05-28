@@ -1,5 +1,6 @@
 #![cfg_attr(feature="nightly", feature(fnbox, inclusive_range_methods))]
-#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range, inclusive_range_fields))]
+#![cfg_attr(feature="nightly", feature(alloc, collections_range, inclusive_range, inclusive_range_fields,
+                                       specialization))]
 // nightly(box_patterns) #![feature(box_patterns)]
 
 #[cfg(feature="nightly")]
@@ -14,12 +15,14 @@ use std::fmt::Write;
 use std::ops::DerefMut;
 
 mod box_fn;
+mod dbg;
 pub mod matchers;
 pub mod cardinality;
 #[macro_use]
 pub mod clone;
 
 use cardinality::{Cardinality, CardinalityCheckResult};
+use dbg::dbg;
 
 type Action0<T> = box_fn::BoxFn0<T>;
 type ActionClone0<T> = Rc<RefCell<FnMut() -> T>>;
@@ -1286,17 +1289,17 @@ impl ScenarioInternals {
         })
     }
 
-    pub fn verify1<A0: std::fmt::Debug, Res>(&mut self, method_data: MethodData, a0: A0) -> box_fn::BoxFn0<Res> {
+    pub fn verify1<A0, Res>(&mut self, method_data: MethodData, a0: A0) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0,));
         let args_ptr: *const u8 =
             ::std::boxed::Box::into_raw(args) as *const u8;
         fn destroy<A0>(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut (A0,)) };
         };
-        fn format_args<A0: std::fmt::Debug>(args_ptr: *const u8) -> String {
+        fn format_args<A0>(args_ptr: *const u8) -> String {
             let _args_ref: &(A0,) =
                 unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}", _args_ref.0)
+            format!("{:?}", dbg(&_args_ref.0))
         };
         let call = Call { method_data: method_data,
                           args_ptr: args_ptr,
@@ -1313,7 +1316,7 @@ impl ScenarioInternals {
         })
     }
 
-    pub fn verify2<A0: std::fmt::Debug, A1: std::fmt::Debug, Res>(
+    pub fn verify2<A0, A1, Res>(
             &mut self, method_data: MethodData, a0: A0, a1: A1) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1));
         let args_ptr: *const u8 =
@@ -1321,11 +1324,10 @@ impl ScenarioInternals {
         fn destroy<A0, A1>(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1)) };
         };
-        fn format_args<A0: std::fmt::Debug,
-                       A1: std::fmt::Debug>(args_ptr: *const u8) -> String {
+        fn format_args<A0, A1>(args_ptr: *const u8) -> String {
             let _args_ref: &(A0, A1) =
                 unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}, {:?}", _args_ref.0, _args_ref.1)
+            format!("{:?}, {:?}", dbg(&_args_ref.0), dbg(&_args_ref.1))
         };
         let call = Call { method_data: method_data,
                           args_ptr: args_ptr,
@@ -1342,8 +1344,7 @@ impl ScenarioInternals {
         })
     }
 
-    pub fn verify3<A0: std::fmt::Debug, A1: std::fmt::Debug,
-                   A2: std::fmt::Debug, Res>
+    pub fn verify3<A0, A1, A2, Res>
             (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1, a2));
         let args_ptr: *const u8 =
@@ -1351,12 +1352,11 @@ impl ScenarioInternals {
         fn destroy<A0, A1, A2>(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2)) };
         };
-        fn format_args<A0: std::fmt::Debug, A1: std::fmt::Debug,
-                       A2: std::fmt::Debug>
+        fn format_args<A0, A1, A2>
                 (args_ptr: *const u8) -> String {
             let _args_ref: &(A0, A1, A2) =
                 unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}, {:?}, {:?}", _args_ref.0, _args_ref.1, _args_ref.2)
+            format!("{:?}, {:?}, {:?}", dbg(&_args_ref.0), dbg(&_args_ref.1), dbg(&_args_ref.2))
         };
         let call = Call { method_data: method_data,
                           args_ptr: args_ptr,
@@ -1373,8 +1373,7 @@ impl ScenarioInternals {
         })
     }
 
-    pub fn verify4<A0: std::fmt::Debug, A1: std::fmt::Debug,
-                   A2: std::fmt::Debug, A3: std::fmt::Debug, Res>
+    pub fn verify4<A0, A1, A2, A3, Res>
             (&mut self, method_data: MethodData, a0: A0, a1: A1, a2: A2, a3: A3) -> box_fn::BoxFn0<Res> {
         let args = Box::new((a0, a1, a2, a3));
         let args_ptr: *const u8 =
@@ -1382,12 +1381,11 @@ impl ScenarioInternals {
         fn destroy<A0, A1, A2, A3>(args_to_destroy: *const u8) {
             unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2, A3)) };
         };
-        fn format_args<A0: std::fmt::Debug, A1: std::fmt::Debug,
-                       A2: std::fmt::Debug, A3: std::fmt::Debug>
+        fn format_args<A0, A1, A2, A3>
                 (args_ptr: *const u8) -> String {
             let args_ref: &(A0, A1, A2, A3) =
                 unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}, {:?}, {:?}, {:?}", args_ref.0, args_ref.1, args_ref.2, args_ref.3)
+            format!("{:?}, {:?}, {:?}, {:?}", dbg(&args_ref.0), dbg(&args_ref.1), dbg(&args_ref.2), dbg(&args_ref.3))
         };
         let call = Call { method_data: method_data,
                           args_ptr: args_ptr,

@@ -361,17 +361,13 @@ fn generate_mock_for_traits(mock_ident: Ident,
                     {
                         return Err("non-Rust ABIs for trait methods are not supported".to_string());
                     }
-                    if !sig.generics.lifetimes.is_empty() || !sig.generics.ty_params.is_empty() ||
-                       !sig.generics.where_clause.predicates.is_empty() {
-                        return Err("parametrized trait methods are not supported".to_string());
-                    }
 
-                    if let Ok(methods) = generate_trait_methods(member.ident.clone(),
-                                                                &sig.decl,
-                                                                &trait_path) {
-                        impl_methods.push(methods.impl_method);
-                        trait_impl_methods.push(methods.trait_impl_method);
-                    }
+                    let methods = generate_trait_methods(member.ident.clone(),
+                                                         &sig.decl,
+                                                         &sig.generics,
+                                                         &trait_path)?;
+                    impl_methods.push(methods.impl_method);
+                    trait_impl_methods.push(methods.trait_impl_method);
                 }
                 TraitItemKind::Type(ref bounds, ref _dflt) => {
                     if !bounds.is_empty() {
@@ -461,7 +457,13 @@ fn generate_mock_for_traits(mock_ident: Ident,
     };
     generated_items.push(debug_impl_item);
 
-    if local {
+    let has_generic_method =
+        Itertools::flatten(traits.iter().map(|&(_, members)| members.iter()))
+        .any(|member| match member.node {
+            TraitItemKind::Method(ref sig, _) => !sig.generics.ty_params.is_empty(),
+            _ => false
+        });
+    if local && !has_generic_method {
         let (ref trait_path, _) = traits[traits.len()-1];
 
         // Create path for trait being mocked. Path includes bindings for all associated types.
@@ -491,6 +493,7 @@ struct GeneratedMethods {
 
 fn generate_trait_methods(method_ident: Ident,
                           decl: &FnDecl,
+                          generics: &Generics,
                           trait_path: &Path)
                           -> Result<GeneratedMethods, String> {
     // There must be at least `self` arg.
@@ -525,11 +528,12 @@ fn generate_trait_methods(method_ident: Ident,
 
     let trait_impl_method = generate_trait_impl_method(mock_type_id,
                                                        method_ident.clone(),
+                                                       generics,
                                                        self_arg,
                                                        args,
                                                        &return_type);
     let impl_method =
-        generate_impl_method(mock_type_id, method_ident, args, &return_type, trait_path);
+        generate_impl_method(mock_type_id, method_ident, generics, args, &return_type, trait_path);
 
     if let (Ok(tim), Ok(im)) = (trait_impl_method, impl_method) {
         Ok(GeneratedMethods {
@@ -566,6 +570,7 @@ fn generate_trait_methods(method_ident: Ident,
 /// where constant marked with `mock_id` is unique trait method ID.
 fn generate_trait_impl_method(mock_type_id: usize,
                               method_ident: Ident,
+                              generics: &Generics,
                               self_arg: &FnArg,
                               args: &[FnArg],
                               return_type: &Ty)
@@ -610,7 +615,7 @@ fn generate_trait_impl_method(mock_type_id: usize,
 
     let trait_impl_subitem = quote!{
         #[allow(unused_mut)]
-        fn #method_ident(#(#impl_args),*) -> #return_type {
+        fn #method_ident #generics (#(#impl_args),*) -> #return_type {
             let method_data = ::mockers::MethodData { mock_id: self.mock_id,
                                                       mock_type_id: #mock_type_id,
                                                       method_name: #method_name, };
@@ -642,6 +647,7 @@ fn generate_trait_impl_method(mock_type_id: usize,
 /// ```
 fn generate_impl_method(mock_type_id: usize,
                         method_ident: Ident,
+                        generics: &Generics,
                         args: &[FnArg],
                         return_type: &Ty,
                         trait_path: &Path)
@@ -718,7 +724,16 @@ fn generate_impl_method(mock_type_id: usize,
     let output = ret_type.clone();
     let expect_method_name = Ident::from(format!("{}_call", method_ident));
 
-    let generic_params = [&arg_lifetimes[..], &arg_matcher_types[..]].concat();
+    let debug_param_bound = syn::parse_ty_param_bound("::std::fmt::Debug").unwrap();
+    let generic_params = [&arg_lifetimes[..],
+                          &generics.ty_params.iter()
+                                             .map(|p| {
+                                                 let mut p = p.clone();
+                                                 p.bounds.push(debug_param_bound.clone());
+                                                 quote!{ #p }
+                                             })
+                                             .collect::<Vec<_>>()[..],
+                          &arg_matcher_types[..]].concat();
 
     let impl_subitem: quote::Tokens = quote!{
         #[allow(dead_code)]

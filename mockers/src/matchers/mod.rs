@@ -32,6 +32,18 @@ impl<T> MatchArg<T> for MatchAny {
 /// Matches any value.
 pub const ANY: MatchAny = MatchAny;
 
+pub struct MatchAnyT<T>(PhantomData<T>);
+impl<T> MatchArg<T> for MatchAnyT<T> {
+    fn matches(&self, _: &T) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn describe(&self) -> String { "_".to_owned() }
+}
+
+pub fn any<T>() -> MatchAnyT<T> {
+    MatchAnyT(PhantomData)
+}
 
 /// Hack for interpreting macro result as token stream and
 /// converting it to items.
