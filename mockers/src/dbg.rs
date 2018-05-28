@@ -22,10 +22,6 @@ impl<'t, T: ?Sized> Debug for MaybeDebugWrapper<'t, T> {
     }
 }
 
-fn print_any<T: ?Sized>(t: &T) {
-    println!("{:?}", MaybeDebugWrapper(t));
-}
-
 pub fn dbg<T: ?Sized>(t: &T) -> MaybeDebugWrapper<T> {
     MaybeDebugWrapper(t)
 }
