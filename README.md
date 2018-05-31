@@ -1,7 +1,7 @@
 
-| master | 0.11.0 |
+| master | 0.11.1 |
 | ------ | ----- |
-| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.11.0)](https://travis-ci.org/kriomant/mockers) |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.11.1)](https://travis-ci.org/kriomant/mockers) |
 
 
 
@@ -37,7 +37,7 @@ supported and so on.
 
 Mocking magic is implemented using `proc_macro_attribute` attribute
 which is only available on nightly Rust (it was tested to work with
-*1.26.0-nightly (3bcda48a3 2018-02-09)*). Working on stable Rust
+*1.28.0-nighlty (5d0631a64 2018-05-30)*). Working on stable Rust
 will be supported later.
 
 ## Usage at a glance
@@ -62,8 +62,8 @@ Cargo.toml:
 
 ```toml
 [dev-dependencies]
-mockers = "0.11.0"
-mockers_derive = "0.11.0"
+mockers = "0.11.1"
+mockers_derive = "0.11.1"
 ```
 
 src/lib.rs:

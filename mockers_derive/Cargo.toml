@@ -5,7 +5,7 @@ keywords = ["mock", "test"]
 license = "MIT"
 name = "mockers_derive"
 repository = "https://github.com/kriomant/mockers"
-version = "0.11.0"
+version = "0.11.1"
 
 [dependencies]
 syn = { version = "0.11.11", features = ["full"] }
@@ -17,7 +17,7 @@ synom = "0.11.3"
 [build-dependencies]
 
 [dev-dependencies]
-mockers = { version = "0.11.0", path = "../mockers" }
+mockers = { version = "0.11.1", path = "../mockers" }
 
 [lib]
 name = "mockers_derive"
