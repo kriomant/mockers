@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::fmt::Debug;
 
 use std;
-use std::collections::range::RangeArgument;
+use std::ops::RangeBounds;
 use std::collections::Bound;
 use alloc::fmt::Write;
 
@@ -108,20 +108,20 @@ simple_matcher!(ne, NeMatchArg, !=, "equal to", PartialEq);
 simple_matcher!(ge, GeMatchArg, >=, "not greater than or equal to", PartialOrd);
 simple_matcher!(gt, GtMatchArg,  >, "not greater than", PartialOrd);
 
-pub struct RangeMatchArg<T: Ord + Debug, R: RangeArgument<T>> {
+pub struct RangeMatchArg<T: Ord + Debug, R: RangeBounds<T>> {
     range: R,
     _phantom: PhantomData<T>,
 }
-impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
+impl<T: Ord + Debug, R: RangeBounds<T>> RangeMatchArg<T, R> {
     fn format_range(&self) -> Result<String, std::fmt::Error> {
         let mut range_str = String::new();
-        match self.range.start() {
+        match self.range.start_bound() {
             Bound::Included(s) => try!(write!(range_str, "[{:?}", s)),
             Bound::Excluded(s) => try!(write!(range_str, "({:?}", s)),
             Bound::Unbounded => {},
         }
         try!(range_str.write_char(';'));
-        match self.range.end() {
+        match self.range.end_bound() {
             Bound::Included(e) => try!(write!(range_str, "{:?}]", e)),
             Bound::Excluded(e) => try!(write!(range_str, "{:?})", e)),
             Bound::Unbounded => {},
@@ -129,14 +129,14 @@ impl<T: Ord + Debug, R: RangeArgument<T>> RangeMatchArg<T, R> {
         Ok(range_str)
     }
 }
-impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
+impl<T: Ord + Debug, R: RangeBounds<T>> MatchArg<T> for RangeMatchArg<T, R> {
     fn matches(&self, arg: &T) -> Result<(), String> {
-        let matches_start = match self.range.start() {
+        let matches_start = match self.range.start_bound() {
             Bound::Included(s) => arg >= s,
             Bound::Excluded(s) => arg > s,
             Bound::Unbounded => true,
         };
-        let matches_end = match self.range.end() {
+        let matches_end = match self.range.end_bound() {
             Bound::Included(s) => arg <= s,
             Bound::Excluded(s) => arg < s,
             Bound::Unbounded => true,
@@ -153,7 +153,7 @@ impl<T: Ord + Debug, R: RangeArgument<T>> MatchArg<T> for RangeMatchArg<T, R> {
     }
 }
 
-pub fn in_range<T: Ord + Debug, R: RangeArgument<T>>(range: R) -> RangeMatchArg<T, R> {
+pub fn in_range<T: Ord + Debug, R: RangeBounds<T>>(range: R) -> RangeMatchArg<T, R> {
     RangeMatchArg { range: range, _phantom: PhantomData }
 }
 
