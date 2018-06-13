@@ -450,7 +450,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
 
     let debug_impl_item = quote!{
         impl<#(#assoc_types_ref),*> ::std::fmt::Debug for #mock_ident_ref<#(#assoc_types_ref),*> {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
             }
         }
