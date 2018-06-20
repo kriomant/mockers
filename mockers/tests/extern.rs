@@ -5,17 +5,17 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 
 use mockers::Scenario;
 use mockers::matchers::ANY;
 
-#[derive_mock(Foo)]
+#[mocked(Foo)]
 extern "Rust" {
     fn foo(arg: u32);
 }
 
-#[derive_mock(Bar)]
+#[mocked(Bar)]
 extern "Rust" {
     fn bar();
 }

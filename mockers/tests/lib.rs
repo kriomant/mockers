@@ -6,11 +6,11 @@ extern crate mockers_derive;
 use std::rc::Rc;
 use std::panic::AssertUnwindSafe;
 
-use mockers_derive::{derive_mock, mock};
+use mockers_derive::{mocked, mock};
 use mockers::{Scenario, Sequence};
 use mockers::matchers::{ANY, lt};
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn foo(&self);
     fn bar(&self, arg: u32);

@@ -5,11 +5,11 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 
 use mockers::Scenario;
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn foo(&self, key: i16, value: i32);
 }

@@ -2,9 +2,9 @@
 
 extern crate mockers_derive;
 extern crate mockers;
-use mockers_derive::{derive_mock, mock};
+use mockers_derive::{mocked, mock};
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn foo(&self);
 }

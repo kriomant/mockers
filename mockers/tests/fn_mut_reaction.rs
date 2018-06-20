@@ -3,12 +3,12 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 use mockers::Scenario;
 
 pub struct NonClonable;
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn create0(&self) -> NonClonable;
     fn create1(&self, a0: ()) -> NonClonable;

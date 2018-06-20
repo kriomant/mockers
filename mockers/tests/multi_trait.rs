@@ -9,17 +9,17 @@ extern crate mockers_derive;
 use mockers::Scenario;
 use mockers::matchers::ANY;
 
-/// Test mocking of inherited trait using `derive_mock`.
+/// Test mocking of inherited trait using `mocked`.
 mod derive_inherited_trait {
     use super::*;
-    use mockers_derive::derive_mock;
+    use mockers_derive::mocked;
 
-    #[derive_mock(module="::derive_inherited_trait")]
+    #[mocked(module="::derive_inherited_trait")]
     pub trait A {
         fn foo(&self, a: u32);
     }
 
-    #[derive_mock(refs="A => ::derive_inherited_trait::A")]
+    #[mocked(refs="A => ::derive_inherited_trait::A")]
     pub trait B: A {
         fn bar(&self, b: u32);
     }
@@ -37,23 +37,23 @@ mod derive_inherited_trait {
     }
 }
 
-/// Test mocking of inherited trait in different modules using `derive_mock`.
+/// Test mocking of inherited trait in different modules using `mocked`.
 mod derive_inherited_trait_different_modules {
     use super::*;
 
     mod a {
-        use mockers_derive::derive_mock;
+        use mockers_derive::mocked;
 
-        #[derive_mock(module="::derive_inherited_trait_different_modules::a")]
+        #[mocked(module="::derive_inherited_trait_different_modules::a")]
         pub trait A {
             fn foo(&self, a: u32);
         }
     }
 
     mod b {
-        use mockers_derive::derive_mock;
+        use mockers_derive::mocked;
 
-        #[derive_mock(refs="super::a::A => ::derive_inherited_trait_different_modules::a::A")]
+        #[mocked(refs="super::a::A => ::derive_inherited_trait_different_modules::a::A")]
         pub trait B: super::a::A {
             fn bar(&self, b: u32);
         }

@@ -7,14 +7,14 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 
 use mockers::Scenario;
 use mockers::matchers::ANY;
 
 type Result<T> = std::result::Result<T, String>;
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn foo(&self, a: &u32) -> Result<u32>;
 }

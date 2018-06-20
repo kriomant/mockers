@@ -110,18 +110,24 @@ fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
 }
 
 #[proc_macro_attribute]
+pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
+    derive_mock(attr, input)
+}
+
+// To be deprecated
+#[proc_macro_attribute]
 pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
     let opts = match parse_options(attr) {
         Ok(opts) => opts,
         Err(err) => panic!("{}", err),
     };
-    match derive_mock_impl(input, &opts) {
+    match mocked_impl(input, &opts) {
         Ok(tokens) => tokens,
         Err(err) => panic!("{}", err),
     }
 }
 
-fn derive_mock_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
+fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
     let mut source = input.to_string();
     let source_item = syn::parse_item(&source)?;
     let (tokens, include_source) = generate_mock(&source_item, opts)?;

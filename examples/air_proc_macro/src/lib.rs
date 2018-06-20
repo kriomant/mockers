@@ -4,9 +4,9 @@
 #[cfg(test)] extern crate mockers;
 #[cfg(test)] mod tests;
 
-#[cfg(test)] use mockers_derive::derive_mock;
+#[cfg(test)] use mockers_derive::mocked;
 
-#[cfg_attr(test, derive_mock)]
+#[cfg_attr(test, mocked)]
 pub trait AirConditioner {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);

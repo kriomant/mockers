@@ -91,10 +91,10 @@ Enable `proc_macro` feature and import the `mockers` and `mockers_derive` crates
 …
 ```
 
-Add `#[derive_mock]` attribute to trait:
+Add `#[mocked]` attribute to trait:
 
 ```rust
-#[derive_mock]
+#[mocked]
 pub trait AirConditioner {
   …
 }
@@ -180,7 +180,7 @@ scenario.expect(cond.make_hotter_call(4).and_return(()));
 
 Here we create a mock object which implements the `AirConditioner` trait and
 add expectations. Note that the concrete mock type is not specified. In fact the
-`#[derive_mock]` attribute will generate an `AirConditionerMock` struct, i.e.
+`#[mocked]` attribute will generate an `AirConditionerMock` struct, i.e.
 it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
 Don't rely on it. You can [set mock name explicitly](#specifying-mock-type-name-explicitly).
 
@@ -237,7 +237,7 @@ The `matchers` module contains other matchers which may be useful:
 	* `any` will match any value, just like `ANY`, but may be used for generic
 	  params when compiler is unable to infer type:
 		```rust
-		#[derive_mock]
+		#[mocked]
 		trait A {
 			fn foo<T>(t: T);
 		}
@@ -433,7 +433,7 @@ There is an implicit checkpoint call when a scenario object is destroyed.
 
 ### Usage from Test Crate
 
-Using `#[derive_mock]` is the easiest way to create a mock.
+Using `#[mocked]` is the easiest way to create a mock.
 
 However sometimes you don't want to have tests-related code in your `src` directory. Or a trait you want to mock is from another crate.
 
@@ -480,7 +480,7 @@ to copy-paste the definition.
 You can explicitly set mock type name like this:
 
 ```rust
-#[derive_mock(MockName)]
+#[mocked(MockName)]
 trait A { … }
 ```
 
@@ -506,13 +506,13 @@ Sometimes it is needed to create new mocks and establish expectations on them fr
 Say you have factory and item traits and want to check that factory is used to create item and then some method is called on that item:
 
 ```rust
-#[derive_mock]
+#[mocked]
 pub trait Factory {
     type Item;
     fn create(&self) -> Self::Item;
 }
 
-#[derive_mock]
+#[mocked]
 pub trait Item {
     fn foo(&self);
 }
@@ -615,7 +615,7 @@ fn test_target() {
 Traits with associated types are supported, you may use them as usual:
 
 ```rust
-#[derive_mock]
+#[mocked]
 pub trait A {
     type Item;
     fn create(&self) -> Self::Item;
@@ -693,7 +693,7 @@ Traits must be specified ordered from base to derived ones.
 You can mock whole foreign module:
 
 ```rust
-#[derive_mock(LibFooMock)]
+#[mocked(LibFooMock)]
 extern "C" {
   fn foo();
 }
@@ -770,7 +770,7 @@ impl AirConditioner {
     fn get_temperature(&self) -> i16 { … }
 }
 
-#[derive_mock]
+#[mocked]
 pub trait AirConditionerTrait {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);

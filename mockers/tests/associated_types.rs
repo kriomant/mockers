@@ -5,16 +5,16 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 use mockers::Scenario;
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     type Item;
     fn create(&self) -> Self::Item;
 }
 
-#[derive_mock]
+#[mocked]
 pub trait B {
     type Item;
     fn create(&self, item: Self::Item) -> Vec<(bool, Self::Item)>;

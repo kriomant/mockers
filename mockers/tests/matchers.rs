@@ -4,11 +4,11 @@
 extern crate mockers;
 extern crate mockers_derive;
 
-use mockers_derive::derive_mock;
+use mockers_derive::mocked;
 use mockers::Scenario;
 use mockers::matchers::*;
 
-#[derive_mock]
+#[mocked]
 pub trait A {
     fn bar(&self, arg: u32);
     fn noarg(&self);
@@ -368,7 +368,7 @@ fn test_some_inner_mismatch() {
     mock.cmplx(Some(2));
 }
 
-#[derive_mock]
+#[mocked]
 trait ResultTest {
     fn func(&self, arg: Result<usize, &'static str>);
 }

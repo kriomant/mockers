@@ -15,7 +15,7 @@ Inspired by Google Mock library for C++.
 
 ## Note: breaking change
 
-Previous version were implemented as compiler plugin and used
+Versions before 0.10.0 were implemented as compiler plugin and used
 `syntex` crate for parsing. Compiler plugins are now deprecated, and
 `syntex` crate is not maintained anymore.
 
@@ -26,7 +26,11 @@ It is possible that support for stable Rust will be implemented even before
 `proc_macro_attribute` feature stabilization.
 
 In trivial cases migration of your tests to new `mockers` version is as
-simple as replacing `#[derive(Mock)]` with `#[derive_mock]`.
+simple as replacing `#[derive(Mock)]` with `#[mocked]`.
+
+In version 0.12.0 macro attribute was renamed from "derive_mock" to
+"mocked". "derive_mock" attribute is still available and is alias to "mocked",
+but it will eventually be deprecated.
 
 ## Limitations
 
@@ -34,6 +38,9 @@ For now it is not a full-featured mocking library, but just
 a prototype to gather feedback. For example, only methods with
 four or fewer arguments are supported, non-'static lifetimes are not
 supported and so on.
+
+Features are added on demand, so feel free to contact me and explain your
+needs.
 
 Mocking magic is implemented using `proc_macro_attribute` attribute
 which is only available on nightly Rust (it was tested to work with
@@ -73,9 +80,9 @@ src/lib.rs:
 
 #[cfg(test)] extern crate mockers_derive;
 
-#[cfg(test)] use mockers_derive::derive_mock;
+#[cfg(test)] use mockers_derive::mocked;
 
-#[cfg_attr(test, derive_mock)]
+#[cfg_attr(test, mocked)]
 pub trait AirConditioner {
     fn make_hotter(&mut self, by: i16);
     fn make_cooler(&mut self, by: i16);
