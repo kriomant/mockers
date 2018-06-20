@@ -34,6 +34,7 @@ lazy_static! {
 }
 
 struct MockAttrOptions {
+    mock_name: Option<Ident>,
     module_path: Option<Path>,
     refs: HashMap<Path, Path>,
 }
@@ -44,6 +45,7 @@ fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
     let attr = syn::parse_outer_attr(&format!("#[mocked({})]", attr_tokens)).expect("parsed");
     assert!(attr.style == syn::AttrStyle::Outer);
 
+    let mut mock_name: Option<Ident> = None;
     let mut module_path: Option<Path> = None;
     let mut refs: HashMap<Path, Path> = HashMap::new();
 
@@ -89,6 +91,10 @@ fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
                         module_path = Some(path);
                     },
 
+                    NestedMetaItem::MetaItem(MetaItem::Word(ref ident)) => {
+                        mock_name = Some(ident.clone());
+                    },
+
                     _ => return Err("unexpected attribute parameter".to_string()),
                 }
             }
@@ -99,7 +105,7 @@ fn parse_options(attr_tokens: TokenStream) -> Result<MockAttrOptions, String> {
         MetaItem::NameValue(_, _) => return Err(format!("unexpected name-value attribute param")),
     }
 
-    Ok(MockAttrOptions { module_path, refs })
+    Ok(MockAttrOptions { mock_name, module_path, refs })
 }
 
 #[proc_macro_attribute]
@@ -137,7 +143,7 @@ fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<quote::Tokens, S
         ItemKind::Trait(ref _unsafety, ref _generics, ref bounds, ref _subitems) => bounds,
         _ => return Err("Attribute may be used on traits only".to_string()),
     };
-    let mock_ident = Ident::new(format!("{}Mock", item.ident));
+    let mock_ident = opts.mock_name.clone().unwrap_or_else(|| Ident::new(format!("{}Mock", item.ident)));
 
     // Find definitions for referenced traits.
     let referenced_items = bounds.iter().map(|b| {

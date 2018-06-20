@@ -20,6 +20,7 @@ It is inspired by [Google Mock].
 	- [Matching calls](#matching-calls)
 	- [Checkpoints](#checkpoints)
 	- [Usage from Test Crate](#usage-from-test-crate)
+	- [Specifying mock type name explicitly](#specifying-mock-type-name-explicitly)
 	- [Named mockers](#named-mockers)
 	- [Creating mocks and expectations from within actions](#creating-mocks-and-expectations-from-within-actions)
 	- [Mocks cloning](#mocks-cloning)
@@ -180,7 +181,8 @@ Here we create a mock object which implements the `AirConditioner` trait and
 add expectations. Note that the concrete mock type is not specified. In fact the
 `#[derive_mock]` attribute will generate an `AirConditionerMock` struct, i.e.
 it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
-Don't rely on it.
+Don't rely on it. You can [set mock name explicitly](#specifying-mock-type-name-explicitly).
+
 
 In addition to methods from the `AirConditioner` trait, the mock object has a second
 set of methods which are named after trait methods, but with an additional
@@ -471,6 +473,15 @@ fn test() {
 Unfortunately, compiler plugins work on syntax level and
 can't infer the trait definition just by its name. So you have
 to copy-paste the definition.
+
+### Specifying mock type name explicitly
+
+You can explicitly set mock type name like this:
+
+```rust
+#[derive_mock(MockName)]
+trait A { … }
+```
 
 ### Named mockers
 
