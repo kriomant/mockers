@@ -16,7 +16,8 @@ use syn::{Item, ItemKind, Ident, Path, TraitItem, Unsafety, TyParamBound, TraitB
           PathParameters, PathSegment, TraitItemKind, Ty, Generics, TyParam, Constness,
           AngleBracketedParameterData, FnDecl, ImplItem, Defaultness, Visibility, ImplItemKind,
           Expr, ExprKind, TypeBinding, FnArg, FunctionRetTy, Pat, BindingMode, Mutability,
-          QSelf, BareFnTy, MutTy, ParenthesizedParameterData, PolyTraitRef, BareFnArg};
+          QSelf, BareFnTy, MutTy, ParenthesizedParameterData, PolyTraitRef, BareFnArg,
+          ForeignItemKind};
 
 use std::str::FromStr;
 use quote::ToTokens;
@@ -123,12 +124,15 @@ pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
 fn derive_mock_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
     let mut source = input.to_string();
     let source_item = syn::parse_item(&source)?;
-    let tokens = generate_mock(&source_item, opts)?;
+    let (tokens, include_source) = generate_mock(&source_item, opts)?;
 
     if cfg!(feature="debug") {
         println!("{}", tokens.to_string());
     }
 
+    if !include_source {
+        source.clear();
+    }
     source.push_str(tokens.as_str());
     TokenStream::from_str(&source).map_err(|e| format!("{:?}", e))
 }
@@ -138,10 +142,15 @@ struct TraitDesc {
     trait_item: Item,
 }
 
-fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<quote::Tokens, String> {
+fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(quote::Tokens, bool), String> {
     let bounds = match item.node {
         ItemKind::Trait(ref _unsafety, ref _generics, ref bounds, ref _subitems) => bounds,
-        _ => return Err("Attribute may be used on traits only".to_string()),
+        ItemKind::ForeignMod(ref foreign_mod) => {
+            let mock_name = opts.mock_name.as_ref().ok_or_else(||
+                "mock type name must be set explicitly for extern block".to_string())?;
+            return Ok((generate_extern_mock(foreign_mod, mock_name)?, false))
+        },
+        _ => return Err("Attribute may be used on traits and extern blocks only".to_string()),
     };
     let mock_ident = opts.mock_name.clone().unwrap_or_else(|| Ident::new(format!("{}Mock", item.ident)));
 
@@ -192,7 +201,7 @@ fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<quote::Tokens, S
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
-    generate_mock_for_traits(mock_ident, &all_traits, true)
+    Ok((generate_mock_for_traits(mock_ident, &all_traits, true)?, true))
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
@@ -279,27 +288,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
         }
     }
 
-    // Create mock structure. Structure is quite simple and basically contains only reference
-    // to scenario and own ID.
-    // Associated types of original trait are converted to type parameters.
-
-    // Since type parameters are unused, we have to use PhantomData for each of them.
-    // We use tuple of |PhantomData| to create just one struct field.
-    let phantom_types: Vec<_> = assoc_types.iter()
-        .map(|ty_param| {
-            quote!{ ::std::marker::PhantomData<#ty_param> }
-        })
-        .collect();
-    let phantom_tuple_type = quote!{ (#(#phantom_types),*) };
-
-    let assoc_types_ref = &assoc_types;
-    let struct_item = quote!{
-        pub struct #mock_ident_ref<#(#assoc_types_ref),*> {
-            scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
-            mock_id: usize,
-            _phantom_data: #phantom_tuple_type,
-        }
-    };
+    let struct_item = generate_mock_struct(&mock_ident, &assoc_types);
 
     // Generic parameters used for impls. It is part inside angles in
     // `impl<A: ::std::fmt::Debug, B: ::std::fmt::Debug, ...> ...`.
@@ -432,28 +421,10 @@ fn generate_mock_for_traits(mock_ident: Ident,
         })
         .join("+");
 
-    let phantom_data_initializers: Vec<_> = assoc_types.iter()
-        .map(|_| {
-            quote!{ ::std::marker::PhantomData }
-        })
-        .collect();
-    let mock_impl_item = quote!{
-        impl<#(#assoc_types_ref),*> ::mockers::Mock for #mock_ident_ref<#(#assoc_types_ref),*> {
-            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
-                #mock_ident_ref {
-                    scenario: scenario_int,
-                    mock_id: id,
-                    _phantom_data: (#(#phantom_data_initializers),*),
-                }
-            }
-
-            fn mocked_class_name() -> &'static str {
-                #mocked_class_name
-            }
-        }
-    };
+    let mock_impl_item = generate_mock_impl(&mock_ident, &mocked_class_name, &assoc_types, &quote!{});
     generated_items.push(mock_impl_item);
 
+    let assoc_types_ref = &assoc_types;
     let debug_impl_item = quote!{
         impl<#(#assoc_types_ref),*> ::std::fmt::Debug for #mock_ident_ref<#(#assoc_types_ref),*> {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -490,6 +461,53 @@ fn generate_mock_for_traits(mock_ident: Ident,
     }
 
     Ok(quote!{ #(#generated_items)* })
+}
+
+/// Create mock structure. Structure is quite simple and basically contains only reference
+/// to scenario and own ID.
+/// Associated types of original trait are converted to type parameters.
+/// Since type parameters are unused, we have to use PhantomData for each of them.
+/// We use tuple of |PhantomData| to create just one struct field.
+fn generate_mock_struct(mock_ident: &Ident, associated_type_idents: &[Ident]) -> quote::Tokens {
+    let phantom_types: Vec<_> = associated_type_idents.iter()
+        .map(|ty_param| {
+            quote!{ ::std::marker::PhantomData<#ty_param> }
+        })
+        .collect();
+    let phantom_tuple_type = quote!{ (#(#phantom_types),*) };
+
+    quote!{
+        pub struct #mock_ident<#(#associated_type_idents),*> {
+            scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
+            mock_id: usize,
+            _phantom_data: #phantom_tuple_type,
+        }
+    }
+}
+
+fn generate_mock_impl(mock_ident: &Ident, mocked_class_name: &str, associated_type_idents: &[Ident],
+                      custom_init_code: &quote::Tokens) -> quote::Tokens {
+    let phantom_data_initializers: Vec<_> = associated_type_idents.iter()
+        .map(|_| {
+            quote!{ ::std::marker::PhantomData }
+        })
+        .collect();
+    quote!{
+        impl<#(#associated_type_idents),*> ::mockers::Mock for #mock_ident<#(#associated_type_idents),*> {
+            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
+                #custom_init_code
+                #mock_ident {
+                    scenario: scenario_int,
+                    mock_id: id,
+                    _phantom_data: (#(#phantom_data_initializers),*),
+                }
+            }
+
+            fn mocked_class_name() -> &'static str {
+                #mocked_class_name
+            }
+        }
+    }
 }
 
 struct GeneratedMethods {
@@ -539,7 +557,7 @@ fn generate_trait_methods(method_ident: Ident,
                                                        args,
                                                        &return_type);
     let impl_method =
-        generate_impl_method(mock_type_id, method_ident, generics, args, &return_type, trait_path);
+        generate_impl_method_for_trait(mock_type_id, method_ident, generics, args, &return_type, trait_path);
 
     if let (Ok(tim), Ok(im)) = (trait_impl_method, impl_method) {
         Ok(GeneratedMethods {
@@ -581,6 +599,20 @@ fn generate_trait_impl_method(mock_type_id: usize,
                               args: &[FnArg],
                               return_type: &Ty)
                               -> Result<quote::Tokens, String> {
+    let get_info_expr = quote!{ (self.mock_id, &self.scenario) };
+    generate_stub_code(mock_type_id, &method_ident, generics, Some(self_arg), get_info_expr,
+                       args, return_type, false)
+}
+
+fn generate_stub_code(mock_type_id: usize,
+                      method_ident: &Ident,
+                      generics: &Generics,
+                      self_arg: Option<&FnArg>,
+                      get_info_expr: quote::Tokens,
+                      args: &[FnArg],
+                      return_type: &Ty,
+                      is_unsafe: bool)
+                      -> Result<quote::Tokens, String> {
     let method_name = method_ident.to_string();
     // Generate expression returning tuple of all method arguments.
     let arg_values: Vec<Expr> = args.iter()
@@ -597,14 +629,6 @@ fn generate_trait_impl_method(mock_type_id: usize,
         return Err("".to_string());
     }
 
-    let mut call_match_args: Vec<_> = args.iter()
-        .map(|arg| match *arg {
-            FnArg::Captured(ref _pat, ref ty) => ty.clone(),
-            _ => unreachable!(),
-        })
-        .collect();
-    call_match_args.push(return_type.clone());
-
     let verify_fn = Ident::from(format!("verify{}", args.len()));
 
     let mut impl_args: Vec<FnArg> = args.iter()
@@ -617,20 +641,22 @@ fn generate_trait_impl_method(mock_type_id: usize,
                             ty)
         })
         .collect();
-    impl_args.insert(0, self_arg.clone());
+    if let Some(arg) = self_arg {
+        impl_args.insert(0, arg.clone());
+    }
 
-    let trait_impl_subitem = quote!{
+    let unsafe_t = if is_unsafe { Some(quote!{ unsafe })} else { None };
+    Ok(quote!{
         #[allow(unused_mut)]
-        fn #method_ident #generics (#(#impl_args),*) -> #return_type {
-            let method_data = ::mockers::MethodData { mock_id: self.mock_id,
+        #unsafe_t fn #method_ident #generics (#(#impl_args),*) -> #return_type {
+            let (mock_id, scenario) = #get_info_expr;
+            let method_data = ::mockers::MethodData { mock_id: mock_id,
                                                       mock_type_id: #mock_type_id,
                                                       method_name: #method_name, };
-            let action = self.scenario.borrow_mut().#verify_fn(method_data, #(#arg_values),*);
+            let action = scenario.borrow_mut().#verify_fn(method_data, #(#arg_values),*);
             action.call()
         }
-    };
-
-    Ok(trait_impl_subitem)
+    })
 }
 
 /// Generate mock implementation method for creating expectations.
@@ -651,18 +677,50 @@ fn generate_trait_impl_method(mock_type_id: usize,
 ///                                Box::new(arg0))
 /// }
 /// ```
+fn generate_impl_method_for_trait(mock_type_id: usize,
+                                  method_ident: Ident,
+                                  generics: &Generics,
+                                  args: &[FnArg],
+                                  return_type: &Ty,
+                                  trait_path: &Path)
+                                  -> Result<quote::Tokens, String> {
+    // Types of arguments and resul tmay refer to `Self`, which is ambiguos in the
+    // context of trait implementation. All references to `Self` must be replaced
+    // with `<Self as Trait>`
+    let fixed_return_type = qualify_self(return_type, trait_path);
+    let fixed_args = args.iter().map(|arg| {
+        match arg {
+            self_arg @ FnArg::SelfRef(..) => self_arg.clone(),
+            self_arg @ FnArg::SelfValue(..) => self_arg.clone(),
+            FnArg::Captured(pat, ty) => FnArg::Captured(pat.clone(), qualify_self(ty, trait_path)),
+            FnArg::Ignored(ty) => FnArg::Ignored(qualify_self(ty, trait_path)),
+        }
+    }).collect::<Vec<_>>();
+
+    generate_impl_method(mock_type_id, method_ident, &generics, &fixed_args, &fixed_return_type)
+}
+
+/// Generate mock implementation method for creating expectations.
+///
+/// Implementation of each method just packs all arguments into tuple and
+/// sends them to scenario object.
+///
+/// Example of method generated for trait method `fn bar(a: u32)`:
+/// ```
+/// #[allow(dead_code)]
+/// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
+///                                                      arg0: Arg0Match)
+///  -> ::mockers::CallMatch1<u32, ()> {
+///     ::mockers::CallMatch1::new(self.mock_id, 1usize /* mock_id */,
+///                                Box::new(arg0))
+/// }
+/// ```
 fn generate_impl_method(mock_type_id: usize,
                         method_ident: Ident,
                         generics: &Generics,
                         args: &[FnArg],
-                        return_type: &Ty,
-                        trait_path: &Path)
+                        return_type: &Ty)
                         -> Result<quote::Tokens, String> {
-    // Types of arguments may refer to `Self`, which is ambiguos in the
-    // context of implementation. All references to `Self` must be replaced
-    // with `<Self as Trait>`
-    let fixed_return_type = qualify_self(return_type, trait_path);
-
     // For each argument generate...
     let mut arg_matcher_types = Vec::<quote::Tokens>::new();
     let mut inputs = Vec::<quote::Tokens>::new();
@@ -679,11 +737,10 @@ fn generate_impl_method(mock_type_id: usize,
     let mut new_arg_types = Vec::new();
 
     for (i, arg) in args.iter().enumerate() {
-        let (_ident, ty) = match *arg {
+        let (_ident, arg_type) = match *arg {
             FnArg::Captured(Pat::Ident(_, ref ident, _), ref ty) => (ident.clone(), ty.clone()),
             _ => unreachable!(),
         };
-        let arg_type = qualify_self(&ty, trait_path);
         let arg_type_ident = Ident::from(format!("Arg{}Match", i));
         let arg_ident = Ident::from(format!("arg{}", i));
 
@@ -724,7 +781,7 @@ fn generate_impl_method(mock_type_id: usize,
     let call_match_ident = Ident::from(format!("CallMatch{}", args.len()));
 
     let mut call_match_args: Vec<_> = new_arg_types;
-    call_match_args.push(quote!{ #fixed_return_type });
+    call_match_args.push(quote!{ #return_type });
     let ret_type = quote!{ ::mockers::#call_match_ident<#(#call_match_args),*> };
 
     let output = ret_type.clone();
@@ -749,6 +806,85 @@ fn generate_impl_method(mock_type_id: usize,
     };
 
     Ok(impl_subitem)
+}
+
+
+fn generate_extern_mock(foreign_mod: &syn::ForeignMod, mock_ident: &Ident) -> Result<quote::Tokens, String> {
+    let mock_type_id = unsafe {
+        let id = NEXT_MOCK_TYPE_ID;
+        NEXT_MOCK_TYPE_ID += 1;
+        id
+    };
+
+    let (mock_items, stub_items): (Vec<_>, Vec<_>) = foreign_mod.items.iter().map(|item| {
+        match item.node {
+            ForeignItemKind::Fn(ref decl, ref generics) => {
+                let ret_ty = match decl.output {
+                    FunctionRetTy::Ty(ref ty) => ty.clone(),
+                    FunctionRetTy::Default => Ty::Tup(vec![]),
+                };
+                let mock_method = generate_impl_method(mock_type_id, item.ident.clone(), &generics, &decl.inputs, &ret_ty)?;
+
+                let get_info_expr = quote!{
+                    ::mockers::EXTERN_MOCKS.with(|mocks| {
+                        mocks.borrow().get(&#mock_type_id).expect("Mock instance not found").clone()
+                    })
+                };
+                let stub_method = generate_stub_code(mock_type_id, &item.ident, &generics, None,
+                                                     get_info_expr, &decl.inputs, &ret_ty, true)?;
+
+                Ok((mock_method, stub_method))
+            },
+
+            ForeignItemKind::Static(..) =>
+                return Err("extern statics are not supported".to_string()),
+        }
+    }).collect::<Result<Vec<_>, _>>()?.into_iter().unzip();
+
+    let mock_class_name = mock_ident.to_string();
+
+    let mock_struct = quote!{
+        pub struct #mock_ident {
+            mock_id: usize,
+        }
+    };
+    let mock_impl = quote!{
+        impl ::mockers::Mock for #mock_ident {
+            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
+                ::mockers::EXTERN_MOCKS.with(|mocks| {
+                    let mut mocks = mocks.borrow_mut();
+                    if mocks.contains_key(&#mock_type_id) {
+                        panic!("Mock {} for extern block already exists", #mock_class_name);
+                    }
+                    mocks.insert(#mock_type_id, (id, scenario_int.clone()));
+                });
+                #mock_ident {
+                    mock_id: id,
+                }
+            }
+
+            fn mocked_class_name() -> &'static str {
+                #mock_class_name
+            }
+        }
+    };
+
+    Ok(quote!{
+        #mock_struct
+        #mock_impl
+        impl Drop for #mock_ident {
+            fn drop(&mut self) {
+                ::mockers::EXTERN_MOCKS.with(|mocks| {
+                    let mut mocks = mocks.borrow_mut();
+                    mocks.remove(&#mock_type_id);
+                });
+            }
+        }
+        impl #mock_ident {
+            #(#mock_items)*
+        }
+        #(#stub_items)*
+    })
 }
 
 /// Replace all unqualified references to `Self` with qualified ones.

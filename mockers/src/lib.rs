@@ -21,6 +21,12 @@ pub mod clone;
 use cardinality::{Cardinality, CardinalityCheckResult};
 use dbg::dbg;
 
+thread_local! {
+    // Mapping from mock_type_id of 'extern' block mock to corresponding mock object.
+    // It is needed since mock is object but mocked functions are static.
+    pub static EXTERN_MOCKS: RefCell<HashMap<usize, (usize, Rc<RefCell<ScenarioInternals>>)>> = RefCell::new(HashMap::new());
+}
+
 type Action0<T> = box_fn::BoxFn0<T>;
 type ActionClone0<T> = Rc<RefCell<FnMut() -> T>>;
 

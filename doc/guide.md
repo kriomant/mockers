@@ -27,6 +27,7 @@ It is inspired by [Google Mock].
 	- [Associated types](#associated-types)
 	- [Trait type parameters](#trait-type-parameters)
 	- [Inherited traits & mocking several traits](#inherited-traits-mocking-several-traits)
+- [Mocking external functions](#mocking-external-functions)
 - [Mocking structures](#mocking-structures)
 - [Error messages](#error-messages)
 - [Debugging](#debugging)
@@ -686,6 +687,32 @@ do it, because this information may be used in the
 future.
 
 Traits must be specified ordered from base to derived ones.
+
+## Mocking external functions
+
+You can mock whole foreign module:
+
+```rust
+#[derive_mock(LibFooMock)]
+extern "C" {
+  fn foo();
+}
+
+#[test]
+fn test() {
+  let scenario = Scenario::new();
+  let mock = scenario.create_mock::<LibFooMock>();
+
+  scenario.expect(mock.foo_call().and_return(()));
+  unsafe { foo() };
+}
+```
+
+Note that mock type name is mandatory in this case, because
+"extern" blocks don't have name to base mock name on.
+
+There may be only one mock created for each foreign module mock class (per thread). Attempt to create second one will lead to panic. Mocks
+for different foreign modules may be created and used simultaneously.
 
 ## Mocking structures
 
