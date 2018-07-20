@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+//#![feature(proc_macro)]
 
 extern crate proc_macro;
 extern crate syn;

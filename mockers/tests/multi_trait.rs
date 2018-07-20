@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 ///! Test that mockers can mock several traits using one mock.
 ///! In particular, it should work for mocking inherited traits.

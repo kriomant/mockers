@@ -83,7 +83,7 @@ Enable `proc_macro` feature and import the `mockers` and `mockers_derive` crates
 ```rust
 // src/lib.rs
 
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 #[cfg(test)] extern crate mockers;
 #[cfg(test)] extern crate mockers_derive;

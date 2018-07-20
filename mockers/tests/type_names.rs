@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 ///! Test that generated code doesn't conflict with types defined
 ///! in user code. The most often example is defining local `Result`

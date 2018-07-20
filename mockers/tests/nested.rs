@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 ///! Test that plugin can generate mock for
 ///! trait placed in some other module.

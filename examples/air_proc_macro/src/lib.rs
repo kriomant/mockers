@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 #[cfg(test)] extern crate mockers_derive;
 #[cfg(test)] extern crate mockers;

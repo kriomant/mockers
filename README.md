@@ -76,7 +76,7 @@ mockers_derive = "0.12.0"
 src/lib.rs:
 
 ```rust
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 #[cfg(test)] extern crate mockers_derive;
 

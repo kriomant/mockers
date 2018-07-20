@@ -1,4 +1,4 @@
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
 
 ///! Tests that expectations may be set from inside expectation action.
 
