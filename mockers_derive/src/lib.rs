@@ -581,12 +581,12 @@ fn generate_trait_methods(method_ident: Ident,
 /// sends them to scenario object.
 ///
 /// For example, for trait method:
-/// ```
+/// ```ignore
 /// fn method(&self, foo: i32, bar: u16) -> u8;
 /// ```
 ///
 /// following implementation will be generated:
-/// ```
+/// ```ignore
 /// fn method(&self, foo: i32, bar: u16) -> u8 {
 ///     let actin = result: Box<u8> = unsafe { Box::from_raw(result_ptr as *mut u8) };
 ///     let method_data =
@@ -674,7 +674,7 @@ fn generate_stub_code(mock_type_id: usize,
 /// sends them to scenario object.
 ///
 /// Example of method generated for trait method `fn bar(a: u32)`:
-/// ```
+/// ```ignore
 /// #[allow(dead_code)]
 /// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
 ///                                                      arg0: Arg0Match)
@@ -712,7 +712,7 @@ fn generate_impl_method_for_trait(mock_type_id: usize,
 /// sends them to scenario object.
 ///
 /// Example of method generated for trait method `fn bar(a: u32)`:
-/// ```
+/// ```ignore
 /// #[allow(dead_code)]
 /// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
 ///                                                      arg0: Arg0Match)
@@ -754,7 +754,7 @@ fn generate_impl_method(mock_type_id: usize,
         // and modify parameter type to adopt new lifetime.
         // Generated method signature for reference parameter looks like this:
         //
-        // ```rust
+        // ```ignore
         // pub fn foo_call<'a0, Arg0Match: ::mockers::MatchArg<&'a0 u32> + 'static>
         //                (&self, arg0: Arg0Match)
         //  -> ::mockers::CallMatch1<&'a0 u32, ()>;
