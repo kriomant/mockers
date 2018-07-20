@@ -391,6 +391,10 @@ impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
             where F: FnOnce(Arg0) -> Res + 'static {
         Expectation1 { call_match: self, action: Some(Action1::new(func)) }
     }
+
+    pub fn never(self) -> ExpectationNever<Self> {
+        ExpectationNever { call_match: self }
+    }
 }
 impl<Arg0, Res: Clone + 'static> CallMatch1<Arg0, Res> {
     pub fn and_return_clone(self, result: Res) -> Reaction1<Arg0, Res> {
@@ -561,6 +565,10 @@ impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
     pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
             where F: FnOnce(Arg0, Arg1) -> Res + 'static {
         Expectation2 { call_match: self, action: Some(Action2::new(func)) }
+    }
+
+    pub fn never(self) -> ExpectationNever<Self> {
+        ExpectationNever { call_match: self }
     }
 }
 impl<Arg0, Arg1, Res: Clone + 'static> CallMatch2<Arg0, Arg1, Res> {
@@ -740,6 +748,10 @@ impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
             where F: FnOnce(Arg0, Arg1, Arg2) -> Res + 'static {
         Expectation3 { call_match: self, action: Some(Action3::new(func)) }
+    }
+
+    pub fn never(self) -> ExpectationNever<Self> {
+        ExpectationNever { call_match: self }
     }
 }
 impl<Arg0, Arg1, Arg2, Res: Clone + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
@@ -924,6 +936,10 @@ impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Re
     pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
             where F: FnOnce(Arg0, Arg1, Arg2, Arg3) -> Res + 'static {
         Expectation4 { call_match: self, action: Some(Action4::new(func)) }
+    }
+
+    pub fn never(self) -> ExpectationNever<Self> {
+        ExpectationNever { call_match: self }
     }
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res: Clone + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {

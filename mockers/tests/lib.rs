@@ -175,6 +175,14 @@ fn test_never_satisfied() {
 }
 
 #[test]
+fn test_never_on_call_with_args() {
+    let scenario = Scenario::new();
+    let mock = scenario.create_mock_for::<A>();
+
+    scenario.expect(mock.bar_call(ANY).never());
+}
+
+#[test]
 #[should_panic(expected="A#0.foo should never be called")]
 fn test_never_not_satisfied() {
     let scenario = Scenario::new();
