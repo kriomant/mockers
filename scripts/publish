@@ -1,0 +1,68 @@
+#!/usr/bin/env run-cargo-script
+
+//! ```cargo
+//! [dependencies]
+//! toml = "0.4.6"
+//! scopeguard = "0.3.3"
+//! ```
+
+extern crate toml;
+#[macro_use(defer)] extern crate scopeguard;
+
+use std::fs::File;
+use std::path::PathBuf;
+use std::process::Command;
+
+use std::io::Read;
+use std::io::Write;
+
+fn main() -> std::result::Result<(), Box<std::error::Error>> {
+    // Get path to mockers_derive's Cargo.toml manifest
+    let script_path = PathBuf::from(std::env::var_os("CARGO_SCRIPT_SCRIPT_PATH")
+            .expect("CARGO_SCRIPT_SCRIPT_PATH env var expected"));
+    let project_dir = script_path.parent().unwrap().join("..");
+    let manifest_path = project_dir.join("mockers_derive").join("Cargo.toml");
+
+    // Backup original file
+    let manifest_backup_path = manifest_path.with_file_name("Cargo.toml.bak");
+    std::fs::copy(&manifest_path, &manifest_backup_path)?;
+
+    // Load manifest
+    let mut file = File::open(&manifest_path)?;
+    let mut manifest_contents = Vec::<u8>::new();
+    file.read_to_end(&mut manifest_contents)?;
+    let mut manifest: toml::value::Table = toml::from_slice(&manifest_contents)?;
+
+    // Remove dev dependency
+    {
+        let deps = manifest.get_mut("dev-dependencies")
+                .expect("[dev-dependencies] section not found")
+                .as_table_mut().unwrap();
+        deps.remove("mockers").expect("mockers dependency not found");
+    }
+
+    // Ensure backup is restored in any case
+    defer!{{
+        std::fs::copy(&manifest_backup_path, &manifest_path).unwrap();
+    }};
+
+    // Save manifest
+    let new_manifest_contents = toml::to_vec(&manifest)?;
+    let mut file = File::create(&manifest_path)?;
+    file.write_all(&new_manifest_contents)?;
+
+    // Publish crates
+    let mut process = Command::new("cargo")
+            .current_dir(project_dir.join("mockers"))
+            .args(&["publish"])
+            .spawn()?;
+    process.wait()?;
+
+    let mut process = Command::new("cargo")
+            .current_dir(project_dir.join("mockers_derive"))
+            .args(&["publish", "--allow-dirty"])
+            .spawn()?;
+    process.wait()?;
+
+    Ok(())
+}
