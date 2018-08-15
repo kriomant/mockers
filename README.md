@@ -44,7 +44,7 @@ needs.
 
 Mocking magic is implemented using `proc_macro_attribute` attribute
 which is only available on nightly Rust (it was tested to work with
-*1.28.0-nighlty (5d0631a64 2018-05-30)*). Working on stable Rust
+*1.30.0-nightly (67390c0c3 2018-08-14)*). Working on stable Rust
 will be supported later.
 
 ## Usage at a glance

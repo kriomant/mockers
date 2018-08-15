@@ -1,5 +1,4 @@
-#![feature(fnbox, inclusive_range_methods, alloc, collections_range,
-           inclusive_range, inclusive_range_fields, specialization)]
+#![feature(fnbox, alloc, specialization)]
 
 extern crate alloc;
 
