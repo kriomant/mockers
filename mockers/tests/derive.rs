@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 ///! Test deriving
 
 extern crate mockers;

@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 #[cfg(test)] extern crate mockers_derive;
 #[cfg(test)] extern crate mockers;
 #[cfg(test)] mod tests;

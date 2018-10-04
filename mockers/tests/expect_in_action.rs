@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 ///! Tests that expectations may be set from inside expectation action.
 
 extern crate mockers;

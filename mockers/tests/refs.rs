@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 ///! Test that mockers can mock methods with reference parameters.
 
 extern crate mockers;

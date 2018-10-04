@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 ///! Test that mockers can mock generic methods.
 
 extern crate mockers;

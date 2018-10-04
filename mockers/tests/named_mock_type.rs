@@ -1,5 +1,3 @@
-#![feature(use_extern_macros)]
-
 ///! Test that mock may be named using attribute parameter.
 
 extern crate mockers;
