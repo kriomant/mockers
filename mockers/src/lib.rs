@@ -1,6 +1,4 @@
-#![feature(fnbox, alloc, specialization)]
-
-extern crate alloc;
+#![feature(fnbox, specialization)]
 
 use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
