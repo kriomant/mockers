@@ -4,9 +4,9 @@ use std::marker::PhantomData;
 use std::fmt::Debug;
 
 use std;
+use std::fmt::Write;
 use std::ops::RangeBounds;
 use std::collections::Bound;
-use alloc::fmt::Write;
 
 pub use self::ext::*;
 pub use self::option::*;
