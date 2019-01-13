@@ -133,7 +133,7 @@ fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream
     let (tokens, include_source) = generate_mock(&source_item, opts)?;
 
     if cfg!(feature="debug") {
-        println!("{}", tokens.to_string());
+        eprintln!("{}", tokens.to_string());
     }
 
     if !include_source {
@@ -1176,7 +1176,7 @@ fn mock_impl(input: TokenStream) -> Result<TokenStream, String> {
     let tokens = generate_mock_for_traits(args.0, &args.1, false)?;
 
     if cfg!(feature="debug") {
-        println!("{}", tokens.to_string());
+        eprintln!("{}", tokens.to_string());
     }
 
     Ok(tokens.parse().unwrap())
