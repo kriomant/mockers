@@ -26,6 +26,7 @@ It is inspired by [Google Mock].
 	- [Mocks cloning](#mocks-cloning)
 	- [Associated types](#associated-types)
 	- [Static methods](#static-methods)
+	- [Extern modules](#extern-modules)
 	- [Trait type parameters](#trait-type-parameters)
 	- [Inherited traits & mocking several traits](#inherited-traits-mocking-several-traits)
 - [Mocking external functions](#mocking-external-functions)
@@ -698,6 +699,29 @@ fn mock_trait_with_ctor() {
 
 Note: more convenient syntax like `scenario.expect(FooMock::new_call())` is
 planned, but not ready yet.
+
+### Extern modules
+
+`mocked` attribute can also be applied to extern modules, but you have to
+provide mock type name explicitly. After that, mock object may be created as
+usual, but only one mock of each such type may exist at a time.
+
+```
+#[mocked(Foo)]
+extern "Rust" {
+    fn foo(arg: u32);
+}
+
+#[test]
+fn test_extern_function() {
+    let scenario = Scenario::new();
+    let mock = scenario.create_mock::<Foo>();
+
+    scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
+
+    unsafe { foo(3) };
+}
+```
 
 ### Trait type parameters
 
