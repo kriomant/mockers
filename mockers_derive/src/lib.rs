@@ -326,28 +326,39 @@ fn generate_mock_for_traits(mock_ident: Ident,
         gen
     };
     // Type of mock struct with all type parameters specified.
-    let struct_type = Ty::Path(None,
-                               Path {
-                                   global: false,
-                                   segments: vec![PathSegment {
-                                  ident: mock_ident.clone(),
-                                  parameters:
-                                      PathParameters::AngleBracketed(AngleBracketedParameterData {
-                                      lifetimes: vec![],
-                                      types: assoc_types.iter()
-                                          .cloned()
-                                          .map(|ident| Ty::Path(None, Path::from(ident)))
-                                          .collect(),
-                                      bindings: vec![],
+    let struct_path = Path { global: false,
+                             segments: vec![PathSegment {
+                                 ident: mock_ident.clone(),
+                                 parameters:
+                                     PathParameters::AngleBracketed(AngleBracketedParameterData {
+                                     lifetimes: vec![],
+                                     types: assoc_types.iter()
+                                         .cloned()
+                                         .map(|ident| Ty::Path(None, Path::from(ident)))
+                                         .collect(),
+                                     bindings: vec![],
                                   }),
                               }],
-                               });
+                            };
+    let struct_type = Ty::Path(None, struct_path.clone());
 
     let mut generated_items = vec![struct_item];
+    let mut has_static_methods = false;
+    let mut mock_type_ids = vec![];
 
     for &(ref trait_path, ref members) in &traits {
         let mut impl_methods = Vec::new();
         let mut trait_impl_methods = Vec::new();
+
+        let mut static_impl_methods = Vec::new();
+        let mut static_trait_impl_methods = Vec::new();
+
+        let mock_type_id = unsafe {
+            let id = NEXT_MOCK_TYPE_ID;
+            NEXT_MOCK_TYPE_ID += 1;
+            id
+        };
+        mock_type_ids.push(mock_type_id);
 
         for member in members.iter() {
             match member.node {
@@ -366,9 +377,16 @@ fn generate_mock_for_traits(mock_ident: Ident,
                     let methods = generate_trait_methods(member.ident.clone(),
                                                          &sig.decl,
                                                          &sig.generics,
-                                                         &trait_path)?;
-                    impl_methods.push(methods.impl_method);
-                    trait_impl_methods.push(methods.trait_impl_method);
+                                                         &trait_path,
+                                                         mock_type_id,
+                                                         &struct_path)?;
+                    if methods.is_static {
+                        static_impl_methods.push(methods.impl_method);
+                        static_trait_impl_methods.push(methods.trait_impl_method);
+                    } else {
+                        impl_methods.push(methods.impl_method);
+                        trait_impl_methods.push(methods.trait_impl_method);
+                    }
                 }
                 TraitItemKind::Type(ref bounds, ref _dflt) => {
                     if !bounds.is_empty() {
@@ -412,11 +430,60 @@ fn generate_mock_for_traits(mock_ident: Ident,
             impl #generics #trait_path for #struct_type {
                 #(#trait_type_items)*
                 #(#trait_impl_items)*
+                #(#static_trait_impl_methods)*
             }
         };
 
         generated_items.push(impl_item);
         generated_items.push(trait_impl_item);
+
+        if !static_impl_methods.is_empty() {
+            has_static_methods = true;
+
+            let static_mock_name = format!("{}Static", mock_ident);
+            let static_mock_ident = Ident::new(static_mock_name.clone());
+            let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
+            let static_struct_type = Ty::Path(None,
+                                       Path {
+                                           global: false,
+                                           segments: vec![PathSegment {
+                                          ident: static_mock_ident.clone(),
+                                          parameters:
+                                              PathParameters::AngleBracketed(AngleBracketedParameterData {
+                                              lifetimes: vec![],
+                                              types: assoc_types.iter()
+                                                  .cloned()
+                                                  .map(|ident| Ty::Path(None, Path::from(ident)))
+                                                  .collect(),
+                                              bindings: vec![],
+                                          }),
+                                      }],
+                                       });
+
+            // `impl<...> AMockStatic<...> { pub fn foo_call(...) { ... } }`
+            let static_impl_item = quote!{
+                impl #generics #static_struct_type {
+                    #(#static_impl_methods)*
+                }
+            };
+
+            let custom_init_code = quote!{
+                ::mockers::EXTERN_MOCKS.with(|mocks| {
+                    let mut mocks = mocks.borrow_mut();
+                    for mock_type_id in &#mock_type_ids {
+                        if mocks.contains_key(mock_type_id) {
+                            panic!("Mock {} for static methods already exists", #static_mock_name);
+                        }
+                        mocks.insert(*mock_type_id, (id, scenario_int.clone()));
+                    }
+                });
+            };
+            let static_mock_impl = generate_mock_impl(&static_mock_ident, &static_mock_name, &assoc_types, &custom_init_code);
+
+            generated_items.push(static_struct_item);
+            generated_items.push(static_impl_item);
+            generated_items.push(static_mock_impl);
+        }
     }
 
     let mocked_class_name = traits.iter()
@@ -446,7 +513,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
             TraitItemKind::Method(ref sig, _) => !sig.generics.ty_params.is_empty(),
             _ => false
         });
-    if local && !has_generic_method {
+    if local && !has_generic_method && !has_static_methods {
         let (ref trait_path, _) = traits[traits.len()-1];
 
         // Create path for trait being mocked. Path includes bindings for all associated types.
@@ -519,30 +586,20 @@ fn generate_mock_impl(mock_ident: &Ident, mocked_class_name: &str, associated_ty
 struct GeneratedMethods {
     trait_impl_method: quote::Tokens,
     impl_method: quote::Tokens,
+    is_static: bool,
 }
 
 fn generate_trait_methods(method_ident: Ident,
                           decl: &FnDecl,
                           generics: &Generics,
-                          trait_path: &Path)
+                          trait_path: &Path,
+                          mock_type_id: usize,
+                          mock_struct_path: &Path)
                           -> Result<GeneratedMethods, String> {
-    // There must be at least `self` arg.
-    if decl.inputs.is_empty() {
-        return Err("Methods without `self` parameter are not supported".to_string());
-    }
-
-    // Arguments without `&self`.
-    let self_arg = &decl.inputs[0];
-    let args = &decl.inputs[1..];
-
-    match *self_arg {
-        FnArg::SelfRef(..) |
-        FnArg::SelfValue(..) => {}
-        _ => {
-            return Err("only non-static methods (with `self`, `&self` or `&mut self` argument) \
-                        are supported"
-                .to_string())
-        }
+    let is_static = match decl.inputs.first() {
+        Some(FnArg::SelfRef(..)) |
+        Some(FnArg::SelfValue(..)) => false,
+        _ => true,
     };
 
     let return_type = match decl.output {
@@ -550,11 +607,35 @@ fn generate_trait_methods(method_ident: Ident,
         FunctionRetTy::Ty(ref ty) => ty.clone(),
     };
 
-    let mock_type_id = unsafe {
-        let id = NEXT_MOCK_TYPE_ID;
-        NEXT_MOCK_TYPE_ID += 1;
-        id
-    };
+    if is_static {
+        // Let imagine we have
+        // trait A {
+        //     fn new() -> Self;
+        //     fn foo(&self);
+        // }
+        // Implementation of method `new` goes to `AMockStatic`, but `Self` must be
+        // resolved to `AMock`.
+        let adjusted_return_type = set_self(&return_type, mock_struct_path);
+        let mock_method = generate_impl_method(mock_type_id, method_ident.clone(), &generics, &decl.inputs, &adjusted_return_type)?;
+
+        let get_info_expr = quote!{
+            ::mockers::EXTERN_MOCKS.with(|mocks| {
+                mocks.borrow().get(&#mock_type_id).expect("Mock instance not found").clone()
+            })
+        };
+        let stub_method = generate_stub_code(mock_type_id, &method_ident, &generics, None,
+                                             get_info_expr, &decl.inputs, &adjusted_return_type, false)?;
+
+        return Ok(GeneratedMethods {
+            is_static: true,
+            trait_impl_method: stub_method,
+            impl_method: mock_method,
+        });
+    }
+
+    // Arguments without `&self`.
+    let self_arg = &decl.inputs[0];
+    let args = &decl.inputs[1..];
 
     let trait_impl_method = generate_trait_impl_method(mock_type_id,
                                                        method_ident.clone(),
@@ -567,6 +648,7 @@ fn generate_trait_methods(method_ident: Ident,
 
     if let (Ok(tim), Ok(im)) = (trait_impl_method, impl_method) {
         Ok(GeneratedMethods {
+            is_static: false,
             trait_impl_method: tim,
             impl_method: im,
         })
@@ -690,7 +772,7 @@ fn generate_impl_method_for_trait(mock_type_id: usize,
                                   return_type: &Ty,
                                   trait_path: &Path)
                                   -> Result<quote::Tokens, String> {
-    // Types of arguments and resul tmay refer to `Self`, which is ambiguos in the
+    // Types of arguments and result may refer to `Self`, which is ambiguos in the
     // context of trait implementation. All references to `Self` must be replaced
     // with `<Self as Trait>`
     let fixed_return_type = qualify_self(return_type, trait_path);
@@ -893,22 +975,23 @@ fn generate_extern_mock(foreign_mod: &syn::ForeignMod, mock_ident: &Ident) -> Re
     })
 }
 
-/// Replace all unqualified references to `Self` with qualified ones.
-fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
-    fn qualify_ty(ty: &Ty, trait_path: &Path) -> Ty {
+fn replace_self<Func>(ty: &Ty, func: Func) -> Ty
+        where Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Ty {
+    fn process_ty<Func>(ty: &Ty, func: &Func) -> Ty
+            where Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Ty {
         match *ty {
-            Ty::Slice(ref t) => Ty::Slice(Box::new(qualify_ty(&t, trait_path))),
-            Ty::Array(ref t, ref n) => Ty::Array(Box::new(qualify_ty(&t, trait_path)), n.clone()),
+            Ty::Slice(ref t) => Ty::Slice(Box::new(process_ty(&t, func))),
+            Ty::Array(ref t, ref n) => Ty::Array(Box::new(process_ty(&t, func)), n.clone()),
             Ty::Ptr(ref t) => {
                 Ty::Ptr(Box::new(MutTy {
-                    ty: qualify_ty(&t.ty, trait_path),
+                    ty: process_ty(&t.ty, func),
                     mutability: t.mutability,
                 }))
             }
             Ty::Rptr(ref lifetime, ref t) => {
                 Ty::Rptr(lifetime.clone(),
                          Box::new(MutTy {
-                             ty: qualify_ty(&t.ty, trait_path),
+                             ty: process_ty(&t.ty, func),
                              mutability: t.mutability,
                          }))
             }
@@ -919,59 +1002,46 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
                     lifetimes: fnty.lifetimes.clone(),
                     inputs: fnty.inputs
                         .iter()
-                        .map(|i| qualify_bare_fn_arg(&i, trait_path))
+                        .map(|i| process_bare_fn_arg(&i, func))
                         .collect(),
-                    output: qualify_function_ret_ty(&fnty.output, trait_path),
+                    output: process_function_ret_ty(&fnty.output, func),
                     variadic: fnty.variadic,
                 }))
             }
             Ty::Never => Ty::Never,
-            Ty::Tup(ref ts) => Ty::Tup(ts.iter().map(|t| qualify_ty(t, trait_path)).collect()),
+            Ty::Tup(ref ts) => Ty::Tup(ts.iter().map(|t| process_ty(t, func)).collect()),
             Ty::Path(ref qself, ref path) => {
                 if qself.is_none() &&
                    path.segments.first().map(|s| s.ident.as_ref() == "Self").unwrap_or(false) {
                     let self_seg = path.segments.first().unwrap();
-                    let self_ty = Ty::Path(None,
-                                           Path {
-                                               global: false,
-                                               segments: vec![self_seg.clone()],
-                                           });
-                    let new_qself = QSelf {
-                        ty: Box::new(self_ty),
-                        position: trait_path.segments.len(),
-                    };
-                    let mut new_segments = trait_path.segments.clone();
-                    new_segments.extend_from_slice(&path.segments[1..]);
-                    let a = Ty::Path(Some(new_qself),
-                                     Path {
-                                         global: false,
-                                         segments: new_segments,
-                                     });
-                    a
+                    func(&self_seg, &path.segments[1..])
                 } else {
-                    Ty::Path(qself.clone(), qualify_path(&path, trait_path))
+                    Ty::Path(qself.clone(), process_path(&path, func))
                 }
             }
             ref t @ Ty::TraitObject(..) => t.clone(),
             Ty::ImplTrait(ref bounds) => Ty::ImplTrait(bounds.clone()),
-            Ty::Paren(ref t) => Ty::Paren(Box::new(qualify_ty(&t, trait_path))),
+            Ty::Paren(ref t) => Ty::Paren(Box::new(process_ty(&t, func))),
             Ty::Infer => Ty::Infer,
             Ty::Mac(ref mac) => Ty::Mac(mac.clone()),
         }
     }
-    fn qualify_bare_fn_arg(arg: &BareFnArg, trait_path: &Path) -> BareFnArg {
+    fn process_bare_fn_arg<Func>(arg: &BareFnArg, func: &Func) -> BareFnArg
+            where Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Ty {
         BareFnArg {
             name: arg.name.clone(),
-            ty: qualify_ty(&arg.ty, trait_path),
+            ty: process_ty(&arg.ty, func),
         }
     }
-    fn qualify_function_ret_ty(ret_ty: &FunctionRetTy, trait_path: &Path) -> FunctionRetTy {
+    fn process_function_ret_ty<Func>(ret_ty: &FunctionRetTy, func: &Func) -> FunctionRetTy
+            where Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Ty {
         match *ret_ty {
             FunctionRetTy::Default => FunctionRetTy::Default,
-            FunctionRetTy::Ty(ref ty) => FunctionRetTy::Ty(qualify_ty(&ty, trait_path)),
+            FunctionRetTy::Ty(ref ty) => FunctionRetTy::Ty(process_ty(&ty, func)),
         }
     }
-    fn qualify_path(path: &Path, trait_path: &Path) -> Path {
+    fn process_path<Func>(path: &Path, func: &Func) -> Path
+            where Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Ty {
         Path {
             global: path.global,
             segments: path.segments
@@ -985,14 +1055,14 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
                                     lifetimes: data.lifetimes.clone(),
                                     types: data.types
                                         .iter()
-                                        .map(|t| qualify_ty(t, trait_path))
+                                        .map(|t| process_ty(t, func))
                                         .collect(),
                                     bindings: data.bindings
                                         .iter()
                                         .map(|binding| {
                                             TypeBinding {
                                                 ident: binding.ident.clone(),
-                                                ty: qualify_ty(&binding.ty, trait_path),
+                                                ty: process_ty(&binding.ty, func),
                                             }
                                         })
                                         .collect(),
@@ -1003,9 +1073,9 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
                                 PathParameters::Parenthesized(ParenthesizedParameterData {
                                     inputs: data.inputs
                                         .iter()
-                                        .map(|i| qualify_ty(i, trait_path))
+                                        .map(|i| process_ty(i, func))
                                         .collect(),
-                                    output: data.output.as_ref().map(|o| qualify_ty(o, trait_path)),
+                                    output: data.output.as_ref().map(|o| process_ty(o, func)),
                                 })
                             }
                         },
@@ -1015,7 +1085,34 @@ fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
         }
     }
 
-    qualify_ty(&ty, trait_path)
+    process_ty(&ty, &func)
+}
+
+/// Replace all unqualified references to `Self` with qualified ones.
+fn qualify_self(ty: &Ty, trait_path: &Path) -> Ty {
+    replace_self(ty, |self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
+        let self_ty = Ty::Path(None,
+                               Path {
+                                   global: false,
+                                   segments: vec![self_seg.clone()],
+                               });
+        let new_qself = QSelf {
+            ty: Box::new(self_ty),
+            position: trait_path.segments.len(),
+        };
+        let mut new_segments = trait_path.segments.clone();
+        new_segments.extend_from_slice(rest);
+        Ty::Path(Some(new_qself), Path { global: false, segments: new_segments })
+    })
+}
+
+/// Replace all references to `Self` with given type reference.
+fn set_self(ty: &Ty, mock_struct_path: &Path) -> Ty {
+    replace_self(ty, |_self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
+        let mut new_segments = mock_struct_path.segments.clone();
+        new_segments.extend_from_slice(rest);
+        Ty::Path(None, Path { global: false, segments: new_segments })
+    })
 }
 
 fn mk_implitem(ident: Ident, node: ImplItemKind) -> ImplItem {
