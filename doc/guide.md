@@ -25,6 +25,7 @@ It is inspired by [Google Mock].
 	- [Creating mocks and expectations from within actions](#creating-mocks-and-expectations-from-within-actions)
 	- [Mocks cloning](#mocks-cloning)
 	- [Associated types](#associated-types)
+	- [Static methods](#static-methods)
 	- [Trait type parameters](#trait-type-parameters)
 	- [Inherited traits & mocking several traits](#inherited-traits-mocking-several-traits)
 - [Mocking external functions](#mocking-external-functions)
@@ -638,6 +639,65 @@ If you use mock type directly, note that every associated type becomes type para
 ```rust
 scenario.create_mock::<AMock<i32>>();
 ```
+
+### Static methods
+
+Static trait methods may be mocked. However, since they are not tied to concrete
+mock object, but rather to mock type, special `<MockedTraitName>MockStatic`
+type should be used for creating expectations for static methods:
+
+```rust
+#[mocked]
+trait Bar {
+    fn bar();
+}
+
+let scenario = Scenario::new();
+let mock_static = scenario.create_mock::<BarMockStatic>();
+
+scenario.expect(mock_static.bar_call().and_return(()).times(1));
+
+<BarMock as Bar>::bar();
+```
+
+Only one object of each type `*MockStatic` can exist at any time, creation
+of second one will fail. So you have to serialize tests using same static
+methods.
+
+Here is an example of testing typical trait with constructor method:
+
+```rust
+#[mocked]
+trait WithCtor {
+    fn new() -> Self;
+    fn foo(&self);
+}
+
+fn create_and_use<T: WithCtor>() {
+    let t = T::new();
+    t.foo();
+}
+
+#[test]
+fn mock_trait_with_ctor() {
+    let scenario = Scenario::new();
+    let static_mock = scenario.create_mock::<WithCtorMockStatic>();
+
+    scenario.expect(static_mock.new_call().and_call({
+        let scenario = scenario.handle();
+        move || {
+            let mock = scenario.create_mock::<WithCtorMock>();
+            scenario.expect(mock.foo_call().and_return(()));
+            mock
+        }
+    }));
+
+    create_and_use::<WithCtorMock>();
+}
+```
+
+Note: more convenient syntax like `scenario.expect(FooMock::new_call())` is
+planned, but not ready yet.
 
 ### Trait type parameters
 
