@@ -3,7 +3,6 @@ use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
 use std::result::Result;
-use std::str::FromStr;
 use std::sync::Mutex;
 use syn::{
     parse_quote, punctuated::Punctuated, AngleBracketedGenericArguments, ArgCaptured, BareFnArg,
@@ -31,8 +30,8 @@ lazy_static! {
 }
 
 pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
-    let mut source = input.to_string();
-    let source_item: Item = syn::parse_str(&source).map_err(|e| e.to_string())?;
+    let mut result = input.clone();
+    let source_item: Item = syn::parse2(input).map_err(|e| e.to_string())?;
     let (tokens, include_source) = generate_mock(&source_item, opts)?;
 
     if cfg!(feature = "debug") {
@@ -40,10 +39,10 @@ pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenSt
     }
 
     if !include_source {
-        source.clear();
+        result = TokenStream::new();
     }
-    source.push_str(&tokens.to_string());
-    TokenStream::from_str(&source).map_err(|e| format!("{:?}", e))
+    result.extend(tokens);
+    Ok(result)
 }
 
 fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), String> {
