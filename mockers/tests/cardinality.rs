@@ -1,8 +1,7 @@
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::cardinality::never;
+use mockers::Scenario;
 
 #[mocked]
 pub trait A {
@@ -21,7 +20,7 @@ fn test_times_exactly_satisfied() {
 }
 
 #[test]
-#[should_panic(expected="Some expectations are not satisfied:
+#[should_panic(expected = "Some expectations are not satisfied:
 `A#0.foo() must be called exactly 2 times, called 1 times`
 ")]
 fn test_times_exactly_not_satisfied_less() {
@@ -34,7 +33,9 @@ fn test_times_exactly_not_satisfied_less() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 3rd time, but expected to be called exactly 2 times")]
+#[should_panic(
+    expected = "A#0.foo is called for the 3rd time, but expected to be called exactly 2 times"
+)]
 fn test_times_exactly_not_satisfied_more() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -70,7 +71,7 @@ fn test_times_range_upper_bound() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
+#[should_panic(expected = "A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
 fn test_times_range_less() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -81,7 +82,9 @@ fn test_times_range_less() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 4th time, but expected to be called at most 3 times")]
+#[should_panic(
+    expected = "A#0.foo is called for the 4th time, but expected to be called at most 3 times"
+)]
 fn test_times_range_more() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -118,7 +121,7 @@ fn test_times_range_inclusive_upper_bound() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo() must be called from 2 to 4 times, called 1 times")]
+#[should_panic(expected = "A#0.foo() must be called from 2 to 4 times, called 1 times")]
 fn test_times_range_inclusive_less() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -129,7 +132,9 @@ fn test_times_range_inclusive_less() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 5th time, but expected to be called at most 4 times")]
+#[should_panic(
+    expected = "A#0.foo is called for the 5th time, but expected to be called at most 4 times"
+)]
 fn test_times_range_inclusive_more() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -167,7 +172,7 @@ fn test_times_range_from_more() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
+#[should_panic(expected = "A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
 fn test_times_range_from_less() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -199,7 +204,9 @@ fn test_times_range_to_less() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 3rd time, but expected to be called less than 3 times")]
+#[should_panic(
+    expected = "A#0.foo is called for the 3rd time, but expected to be called less than 3 times"
+)]
 fn test_times_range_to_more() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -233,7 +240,9 @@ fn test_times_range_to_inclusive_less() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 3rd time, but expected to be called at most 2 times")]
+#[should_panic(
+    expected = "A#0.foo is called for the 3rd time, but expected to be called at most 2 times"
+)]
 fn test_times_range_to_inclusive_more() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -273,7 +282,7 @@ fn test_times_never_no_call() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo is called for the 1st time, but expected to be never called")]
+#[should_panic(expected = "A#0.foo is called for the 1st time, but expected to be never called")]
 fn test_times_never_call() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();

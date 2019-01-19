@@ -1,9 +1,8 @@
 ///! Test that static methods may be mocked.
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::matchers::ANY;
+use mockers::Scenario;
 
 #[mocked]
 trait Foo {
@@ -37,7 +36,7 @@ fn static_methods_can_be_mocked() {
 }
 
 #[test]
-#[should_panic(expected="Mock FooMockStatic for static methods already exists")]
+#[should_panic(expected = "Mock FooMockStatic for static methods already exists")]
 fn only_one_mock_instance_of_same_type_is_allowed() {
     let scenario = Scenario::new();
     let _mock1 = scenario.create_mock::<FooMockStatic>();

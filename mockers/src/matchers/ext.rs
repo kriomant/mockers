@@ -1,22 +1,26 @@
-
-use std::marker::PhantomData;
-use std::fmt::Debug;
 use crate::MatchArg;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
 pub trait MatchArgExt<T: Debug, M: MatchArg<T>> {
     fn with_custom_msg<F: Fn(&T) -> String>(self, msg_fn: F) -> WithMessageFn<T, M, F>;
-    fn with_description_fn<F: Fn() -> String>(self, description_fn: F) -> WithDescriptionFn<T, M, F>;
+    fn with_description_fn<F: Fn() -> String>(
+        self,
+        description_fn: F,
+    ) -> WithDescriptionFn<T, M, F>;
 }
 
 impl<T: Debug, M: MatchArg<T>> MatchArgExt<T, M> for M {
     fn with_custom_msg<F: Fn(&T) -> String>(self, msg_fn: F) -> WithMessageFn<T, M, F> {
         WithMessageFn::new(self, msg_fn)
     }
-    fn with_description_fn<F: Fn() -> String>(self, description_fn: F) -> WithDescriptionFn<T, M, F> {
+    fn with_description_fn<F: Fn() -> String>(
+        self,
+        description_fn: F,
+    ) -> WithDescriptionFn<T, M, F> {
         WithDescriptionFn::new(self, description_fn)
     }
 }
-
 
 pub struct WithDescriptionFn<T: Debug, M: MatchArg<T>, F: Fn() -> String> {
     matcher: M,
@@ -44,7 +48,6 @@ impl<T: Debug, M: MatchArg<T>, F: Fn() -> String> MatchArg<T> for WithDescriptio
         self.description()
     }
 }
-
 
 pub struct WithMessageFn<T: Debug, M: MatchArg<T>, F: Fn(&T) -> String> {
     matcher: M,

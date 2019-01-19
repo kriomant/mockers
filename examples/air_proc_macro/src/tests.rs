@@ -1,4 +1,4 @@
-use super::{AirConditioner, set_temperature_20};
+use super::{set_temperature_20, AirConditioner};
 use mockers::Scenario;
 
 #[test]

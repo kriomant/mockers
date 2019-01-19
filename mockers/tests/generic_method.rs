@@ -1,9 +1,8 @@
 ///! Test that mockers can mock generic methods.
-
 use mockers_derive::mocked;
 
+use mockers::matchers::{any, ANY};
 use mockers::Scenario;
-use mockers::matchers::{ANY, any};
 
 #[mocked]
 pub trait A {

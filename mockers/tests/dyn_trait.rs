@@ -1,7 +1,6 @@
+use mockers::{matchers::ANY, Scenario};
 ///! Test mocking methods with 'dyn Trait' parameters.
-
 use mockers_derive::mocked;
-use mockers::{Scenario, matchers::ANY};
 
 use std::fmt::Debug;
 

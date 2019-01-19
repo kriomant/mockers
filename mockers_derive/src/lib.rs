@@ -3,15 +3,16 @@ extern crate proc_macro;
 #[macro_use]
 extern crate quote;
 
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 
 use proc_macro::TokenStream;
 
-mod options;
 mod codegen;
+mod options;
 
-use crate::options::parse_attr_options;
 use crate::codegen::{mock_impl, mocked_impl};
+use crate::options::parse_attr_options;
 
 #[proc_macro_attribute]
 pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
@@ -28,7 +29,8 @@ pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
     match mocked_impl(input.into(), &opts) {
         Ok(tokens) => tokens,
         Err(err) => panic!("{}", err),
-    }.into()
+    }
+    .into()
 }
 
 #[proc_macro]
@@ -36,5 +38,6 @@ pub fn mock(input: TokenStream) -> TokenStream {
     match mock_impl(input.into()) {
         Ok(tokens) => tokens,
         Err(err) => panic!("{}", err),
-    }.into()
+    }
+    .into()
 }

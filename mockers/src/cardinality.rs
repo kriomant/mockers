@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::ops::{Range, RangeFrom, RangeTo, RangeFull};
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::ops::{RangeInclusive, RangeToInclusive};
 
 /// Result of checking call count against cardinality constraints
@@ -40,7 +40,7 @@ impl Cardinality for u32 {
         match *self {
             0 => "never called".to_string(),
             1 => "called exactly one time".to_string(),
-            n => format!("called exactly {} times", n)
+            n => format!("called exactly {} times", n),
         }
     }
 
@@ -75,7 +75,7 @@ impl Cardinality for Range<u32> {
         if self.end == 1 {
             "never called".to_string()
         } else {
-            format!("called at most {} times", self.end-1)
+            format!("called at most {} times", self.end - 1)
         }
     }
 }
@@ -113,8 +113,7 @@ impl Cardinality for RangeInclusive<u32> {
 impl Cardinality for RangeFrom<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         match count.cmp(&self.start) {
-            Ordering::Equal |
-            Ordering::Greater => CardinalityCheckResult::Satisfied,
+            Ordering::Equal | Ordering::Greater => CardinalityCheckResult::Satisfied,
             Ordering::Less => CardinalityCheckResult::Possible,
         }
     }
@@ -136,8 +135,7 @@ impl Cardinality for RangeTo<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         match count.cmp(&self.end) {
             Ordering::Less => CardinalityCheckResult::Satisfied,
-            Ordering::Equal |
-            Ordering::Greater => CardinalityCheckResult::Wrong,
+            Ordering::Equal | Ordering::Greater => CardinalityCheckResult::Wrong,
         }
     }
 
@@ -160,8 +158,7 @@ impl Cardinality for RangeTo<u32> {
 impl Cardinality for RangeToInclusive<u32> {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         match count.cmp(&self.end) {
-            Ordering::Less |
-            Ordering::Equal => CardinalityCheckResult::Satisfied,
+            Ordering::Less | Ordering::Equal => CardinalityCheckResult::Satisfied,
             Ordering::Greater => CardinalityCheckResult::Wrong,
         }
     }
@@ -200,7 +197,9 @@ impl Cardinality for RangeFull {
 }
 
 pub struct Never;
-pub fn never() -> Never { Never }
+pub fn never() -> Never {
+    Never
+}
 impl Cardinality for Never {
     fn check(&self, count: u32) -> CardinalityCheckResult {
         if count == 0 {

@@ -1,9 +1,8 @@
 ///! Test that mockers can mock methods with reference parameters.
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::matchers::ANY;
+use mockers::Scenario;
 
 #[mocked]
 pub trait A {

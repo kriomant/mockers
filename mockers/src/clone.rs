@@ -64,10 +64,11 @@ macro_rules! mock_clone {
         #[cfg(test)]
         impl Clone for $mock_name {
             fn clone(&self) -> Self {
-                let method_data =
-                    ::mockers::MethodData{mock_id: self.mock_id,
-                                          mock_type_id: 0usize,
-                                          method_name: "clone",};
+                let method_data = ::mockers::MethodData {
+                    mock_id: self.mock_id,
+                    mock_type_id: 0usize,
+                    method_name: "clone",
+                };
                 let action = self.scenario.borrow_mut().verify0(method_data);
                 action.call()
             }
@@ -75,8 +76,7 @@ macro_rules! mock_clone {
 
         impl $mock_name {
             #[allow(dead_code)]
-            pub fn clone_call(&self)
-             -> ::mockers::CallMatch0<Self> {
+            pub fn clone_call(&self) -> ::mockers::CallMatch0<Self> {
                 ::mockers::CallMatch0::new(self.mock_id, 0usize, "clone")
             }
         }

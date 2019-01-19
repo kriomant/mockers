@@ -1,12 +1,12 @@
 use super::MatchArg;
 
-use std::marker::PhantomData;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use std;
+use std::collections::Bound;
 use std::fmt::Write;
 use std::ops::RangeBounds;
-use std::collections::Bound;
 
 pub use self::ext::*;
 pub use self::option::*;
@@ -27,7 +27,9 @@ impl<T> MatchArg<T> for MatchAny {
         Ok(())
     }
 
-    fn describe(&self) -> String { "_".to_owned() }
+    fn describe(&self) -> String {
+        "_".to_owned()
+    }
 }
 /// Matches any value.
 pub const ANY: MatchAny = MatchAny;
@@ -38,7 +40,9 @@ impl<T> MatchArg<T> for MatchAnyT<T> {
         Ok(())
     }
 
-    fn describe(&self) -> String { "_".to_owned() }
+    fn describe(&self) -> String {
+        "_".to_owned()
+    }
 }
 
 pub fn any<T>() -> MatchAnyT<T> {
@@ -118,13 +122,13 @@ impl<T: Ord + Debug, R: RangeBounds<T>> RangeMatchArg<T, R> {
         match self.range.start_bound() {
             Bound::Included(s) => write!(range_str, "[{:?}", s)?,
             Bound::Excluded(s) => write!(range_str, "({:?}", s)?,
-            Bound::Unbounded => {},
+            Bound::Unbounded => {}
         }
         range_str.write_char(';')?;
         match self.range.end_bound() {
             Bound::Included(e) => write!(range_str, "{:?}]", e)?,
             Bound::Excluded(e) => write!(range_str, "{:?})", e)?,
-            Bound::Unbounded => {},
+            Bound::Unbounded => {}
         }
         Ok(range_str)
     }
@@ -144,7 +148,11 @@ impl<T: Ord + Debug, R: RangeBounds<T>> MatchArg<T> for RangeMatchArg<T, R> {
         if matches_start && matches_end {
             Ok(())
         } else {
-            Err(format!("{:?} is not in range {}", arg, self.format_range().unwrap()))
+            Err(format!(
+                "{:?} is not in range {}",
+                arg,
+                self.format_range().unwrap()
+            ))
         }
     }
 
@@ -154,7 +162,10 @@ impl<T: Ord + Debug, R: RangeBounds<T>> MatchArg<T> for RangeMatchArg<T, R> {
 }
 
 pub fn in_range<T: Ord + Debug, R: RangeBounds<T>>(range: R) -> RangeMatchArg<T, R> {
-    RangeMatchArg { range: range, _phantom: PhantomData }
+    RangeMatchArg {
+        range: range,
+        _phantom: PhantomData,
+    }
 }
 
 pub struct NotMatchArg<T: Debug, M: MatchArg<T>>(M, PhantomData<T>);
@@ -162,7 +173,11 @@ impl<T: Debug, M: MatchArg<T>> MatchArg<T> for NotMatchArg<T, M> {
     fn matches(&self, arg: &T) -> Result<(), String> {
         match self.0.matches(arg) {
             Err(_) => Ok(()),
-            Ok(()) => Err(format!("{:?} matches (but shouldn't): {}", arg, self.0.describe())),
+            Ok(()) => Err(format!(
+                "{:?} matches (but shouldn't): {}",
+                arg,
+                self.0.describe()
+            )),
         }
     }
 
@@ -174,10 +189,7 @@ pub fn not<T: Debug, M: MatchArg<T>>(matcher: M) -> NotMatchArg<T, M> {
     NotMatchArg(matcher, PhantomData)
 }
 
-
-pub struct AndMatchArg<T: Debug,
-                       M0: MatchArg<T>,
-                       M1: MatchArg<T>>(M0, M1, PhantomData<T>);
+pub struct AndMatchArg<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(M0, M1, PhantomData<T>);
 impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for AndMatchArg<T, M0, M1> {
     fn matches(&self, arg: &T) -> Result<(), String> {
         match self.0.matches(arg) {
@@ -185,7 +197,7 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for AndMatchArg<T, 
             Ok(()) => match self.1.matches(arg) {
                 err @ Err(_) => err,
                 Ok(()) => Ok(()),
-            }
+            },
         }
     }
 
@@ -193,14 +205,14 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for AndMatchArg<T, 
         format!("and({}, {})", self.0.describe(), self.1.describe())
     }
 }
-pub fn and<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(matcher0: M0, matcher1: M1) -> AndMatchArg<T, M0, M1> {
+pub fn and<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(
+    matcher0: M0,
+    matcher1: M1,
+) -> AndMatchArg<T, M0, M1> {
     AndMatchArg(matcher0, matcher1, PhantomData)
 }
 
-
-pub struct OrMatchArg<T: Debug,
-                      M0: MatchArg<T>,
-                      M1: MatchArg<T>>(M0, M1, PhantomData<T>);
+pub struct OrMatchArg<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(M0, M1, PhantomData<T>);
 impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for OrMatchArg<T, M0, M1> {
     fn matches(&self, arg: &T) -> Result<(), String> {
         match self.0.matches(arg) {
@@ -216,10 +228,12 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for OrMatchArg<T, M
         format!("or({}, {})", self.0.describe(), self.1.describe())
     }
 }
-pub fn or<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(matcher0: M0, matcher1: M1) -> OrMatchArg<T, M0, M1> {
+pub fn or<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(
+    matcher0: M0,
+    matcher1: M1,
+) -> OrMatchArg<T, M0, M1> {
     OrMatchArg(matcher0, matcher1, PhantomData)
 }
-
 
 pub struct FnMatchArg<T, F: Fn(&T) -> Result<(), String>> {
     func: F,
@@ -242,7 +256,6 @@ impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
         "<function>".to_owned()
     }
 }
-
 
 pub struct BoolFnMatchArg<T, F: Fn(&T) -> bool> {
     func: F,
@@ -270,9 +283,11 @@ impl<T, F: Fn(&T) -> bool> MatchArg<T> for BoolFnMatchArg<T, F> {
     }
 }
 pub fn check<T, F: Fn(&T) -> bool>(f: F) -> BoolFnMatchArg<T, F> {
-    BoolFnMatchArg { func: f, _phantom: PhantomData }
+    BoolFnMatchArg {
+        func: f,
+        _phantom: PhantomData,
+    }
 }
-
 
 #[macro_export]
 macro_rules! arg {
@@ -280,14 +295,11 @@ macro_rules! arg {
         use $crate::matchers::MatchArgExt;
 
         let pattern_str = stringify!($p);
-        $crate::matchers::FnMatchArg::new(move |arg| {
-            match arg {
-                &$p => Ok(()),
-                _ => Err(format!("{:?} isn't matched by {}", arg, pattern_str)),
-            }
-        }).with_description_fn(move || {
-            format!("arg!({})", pattern_str)
+        $crate::matchers::FnMatchArg::new(move |arg| match arg {
+            &$p => Ok(()),
+            _ => Err(format!("{:?} isn't matched by {}", arg, pattern_str)),
         })
+        .with_description_fn(move || format!("arg!({})", pattern_str))
     }};
 }
 
@@ -298,11 +310,7 @@ macro_rules! check {
 
         let lambda_str = stringify!($e);
         $crate::matchers::BoolFnMatchArg::new($e)
-            .with_custom_msg(move |arg| {
-                format!("{:?} doesn't satisfy to {}", arg, lambda_str)
-            })
-            .with_description_fn(move || {
-                format!("check!({})", lambda_str)
-            })
+            .with_custom_msg(move |arg| format!("{:?} doesn't satisfy to {}", arg, lambda_str))
+            .with_description_fn(move || format!("check!({})", lambda_str))
     }};
 }

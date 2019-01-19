@@ -1,9 +1,8 @@
 ///! Test that mock may be named using attribute parameter.
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::matchers::ANY;
+use mockers::Scenario;
 
 #[mocked(MockForA)]
 pub trait A {

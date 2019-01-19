@@ -1,6 +1,5 @@
-
-use mockers_derive::mocked;
 use mockers::Scenario;
+use mockers_derive::mocked;
 
 pub struct NonClonable;
 
@@ -19,10 +18,26 @@ fn test_fn_mut() {
     let mock = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.create0_call().and_call_clone(|| NonClonable).times(1));
-    scenario.expect(mock.create1_call(()).and_call_clone(|_| NonClonable).times(1));
-    scenario.expect(mock.create2_call((), ()).and_call_clone(|_, _| NonClonable).times(1));
-    scenario.expect(mock.create3_call((), (), ()).and_call_clone(|_, _, _| NonClonable).times(1));
-    scenario.expect(mock.create4_call((), (), (), ()).and_call_clone(|_, _, _, _| NonClonable).times(1));
+    scenario.expect(
+        mock.create1_call(())
+            .and_call_clone(|_| NonClonable)
+            .times(1),
+    );
+    scenario.expect(
+        mock.create2_call((), ())
+            .and_call_clone(|_, _| NonClonable)
+            .times(1),
+    );
+    scenario.expect(
+        mock.create3_call((), (), ())
+            .and_call_clone(|_, _, _| NonClonable)
+            .times(1),
+    );
+    scenario.expect(
+        mock.create4_call((), (), (), ())
+            .and_call_clone(|_, _, _, _| NonClonable)
+            .times(1),
+    );
 
     let _ = mock.create0();
     let _ = mock.create1(());

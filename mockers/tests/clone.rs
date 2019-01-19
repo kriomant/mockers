@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate mockers;
 
-use mockers_derive::mock;
 use mockers::Scenario;
+use mockers_derive::mock;
 
 pub trait A {
     fn foo(&self, a: u32);
 }
 
 // This mock shares expectations between clones.
-mock!{
+mock! {
     AShared,
     self,
     trait A {
@@ -19,7 +19,7 @@ mock!{
 mock_clone!(AShared, share_expectations);
 
 // This mock mocks `clone` method.
-mock!{
+mock! {
     AMock,
     self,
     trait A {

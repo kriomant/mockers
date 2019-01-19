@@ -1,9 +1,8 @@
 ///! Test that extern functions may be mocked.
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::matchers::ANY;
+use mockers::Scenario;
 
 #[mocked(Foo)]
 extern "Rust" {
@@ -26,7 +25,7 @@ fn extern_function_can_be_mocked() {
 }
 
 #[test]
-#[should_panic(expected="Mock Foo for extern block already exists")]
+#[should_panic(expected = "Mock Foo for extern block already exists")]
 fn only_one_mock_instance_of_same_type_is_allowed() {
     let scenario = Scenario::new();
     let _mock1 = scenario.create_mock::<Foo>();

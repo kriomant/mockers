@@ -11,9 +11,13 @@ impl<T: Debug, E: Debug, M: MatchArg<T>> MatchArg<Result<T, E>> for MatchOk<T, M
             Err(..) => Err(format!("{:?} is not Ok", result)),
         }
     }
-    fn describe(&self) -> String { format!("ok({})", self.0.describe()) }
+    fn describe(&self) -> String {
+        format!("ok({})", self.0.describe())
+    }
 }
-pub fn ok<T, M: MatchArg<T>>(m: M) -> MatchOk<T, M> { MatchOk(m, PhantomData) }
+pub fn ok<T, M: MatchArg<T>>(m: M) -> MatchOk<T, M> {
+    MatchOk(m, PhantomData)
+}
 
 pub struct MatchErr<E, M: MatchArg<E>>(M, PhantomData<E>);
 impl<E: Debug, T: Debug, M: MatchArg<E>> MatchArg<Result<T, E>> for MatchErr<E, M> {
@@ -23,6 +27,10 @@ impl<E: Debug, T: Debug, M: MatchArg<E>> MatchArg<Result<T, E>> for MatchErr<E, 
             Ok(..) => Err(format!("{:?} is not Err", result)),
         }
     }
-    fn describe(&self) -> String { format!("err({})", self.0.describe()) }
+    fn describe(&self) -> String {
+        format!("err({})", self.0.describe())
+    }
 }
-pub fn err<E, M: MatchArg<E>>(m: M) -> MatchErr<E, M> { MatchErr(m, PhantomData) }
+pub fn err<E, M: MatchArg<E>>(m: M) -> MatchErr<E, M> {
+    MatchErr(m, PhantomData)
+}

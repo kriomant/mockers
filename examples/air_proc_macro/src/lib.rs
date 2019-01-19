@@ -1,6 +1,8 @@
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;
 
-#[cfg(test)] use mockers_derive::mocked;
+#[cfg(test)]
+use mockers_derive::mocked;
 
 #[cfg_attr(test, mocked)]
 pub trait AirConditioner {

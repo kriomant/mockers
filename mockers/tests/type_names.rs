@@ -1,11 +1,10 @@
 ///! Test that generated code doesn't conflict with types defined
 ///! in user code. The most often example is defining local `Result`
 ///! and `Error` types.
-
 use mockers_derive::mocked;
 
-use mockers::Scenario;
 use mockers::matchers::ANY;
+use mockers::Scenario;
 
 type Result<T> = std::result::Result<T, String>;
 

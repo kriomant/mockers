@@ -5,7 +5,9 @@ use std::fmt::Debug;
 
 // Strictly speaking, this matcher is not needed, as you
 // may just use `None`, but it is added for symmetry.
-pub fn none<T>() -> Option<T> { None }
+pub fn none<T>() -> Option<T> {
+    None
+}
 
 pub struct MatchSome<T, M: MatchArg<T>>(M, PhantomData<T>);
 impl<T: Debug, M: MatchArg<T>> MatchArg<Option<T>> for MatchSome<T, M> {
@@ -15,6 +17,10 @@ impl<T: Debug, M: MatchArg<T>> MatchArg<Option<T>> for MatchSome<T, M> {
             None => Err("is None".to_owned()),
         }
     }
-    fn describe(&self) -> String { format!("some({})", self.0.describe()) }
+    fn describe(&self) -> String {
+        format!("some({})", self.0.describe())
+    }
 }
-pub fn some<T, M: MatchArg<T>>(m: M) -> MatchSome<T, M> { MatchSome(m, PhantomData) }
+pub fn some<T, M: MatchArg<T>>(m: M) -> MatchSome<T, M> {
+    MatchSome(m, PhantomData)
+}

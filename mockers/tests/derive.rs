@@ -1,7 +1,6 @@
-///! Test deriving
-
-use mockers_derive::mocked;
 use mockers::Scenario;
+///! Test deriving
+use mockers_derive::mocked;
 
 #[mocked]
 pub trait A {

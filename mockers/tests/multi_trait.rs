@@ -1,21 +1,20 @@
+use mockers::matchers::ANY;
+use mockers::Scenario;
 ///! Test that mockers can mock several traits using one mock.
 ///! In particular, it should work for mocking inherited traits.
-
 use mockers_derive;
-use mockers::Scenario;
-use mockers::matchers::ANY;
 
 /// Test mocking of inherited trait using `mocked`.
 mod derive_inherited_trait {
     use super::*;
     use mockers_derive::mocked;
 
-    #[mocked(module="::derive_inherited_trait")]
+    #[mocked(module = "::derive_inherited_trait")]
     pub trait A {
         fn foo(&self, a: u32);
     }
 
-    #[mocked(refs="A => ::derive_inherited_trait::A")]
+    #[mocked(refs = "A => ::derive_inherited_trait::A")]
     pub trait B: A {
         fn bar(&self, b: u32);
     }
@@ -40,7 +39,7 @@ mod derive_inherited_trait_different_modules {
     mod a {
         use mockers_derive::mocked;
 
-        #[mocked(module="::derive_inherited_trait_different_modules::a")]
+        #[mocked(module = "::derive_inherited_trait_different_modules::a")]
         pub trait A {
             fn foo(&self, a: u32);
         }
@@ -49,7 +48,7 @@ mod derive_inherited_trait_different_modules {
     mod b {
         use mockers_derive::mocked;
 
-        #[mocked(refs="super::a::A => ::derive_inherited_trait_different_modules::a::A")]
+        #[mocked(refs = "super::a::A => ::derive_inherited_trait_different_modules::a::A")]
         pub trait B: super::a::A {
             fn bar(&self, b: u32);
         }
@@ -71,7 +70,6 @@ mod derive_inherited_trait_different_modules {
     }
 }
 
-
 // Test mocking of inherited trait.
 mod inherited_trait {
     use super::*;
@@ -85,7 +83,7 @@ mod inherited_trait {
         fn bar(&self, b: u32);
     }
 
-    mock!{
+    mock! {
         BMock,
 
         self,
@@ -125,7 +123,7 @@ mod multi_trait {
         fn bar(&self, b: u32);
     }
 
-    mock!{
+    mock! {
         ABMock,
 
         self,
@@ -139,7 +137,7 @@ mod multi_trait {
         }
     }
 
-    fn accept_cd<T: A+B>(t: T) {
+    fn accept_cd<T: A + B>(t: T) {
         t.foo(1);
         t.bar(2);
     }
@@ -170,7 +168,7 @@ mod inherited_trait_with_specified_parent {
         fn bar(&self, b: u32);
     }
 
-    mock!{
+    mock! {
         BMock,
 
         self,

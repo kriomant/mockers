@@ -1,6 +1,5 @@
 ///! Test that plugin can generate mock for
 ///! trait placed in some other module.
-
 use mockers_derive::mock;
 
 mod nested {
@@ -9,7 +8,7 @@ mod nested {
     }
 }
 
-mock!{
+mock! {
     AMock,
     nested,
     trait A {

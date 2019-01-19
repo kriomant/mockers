@@ -1,10 +1,9 @@
-
-use std::rc::Rc;
 use std::panic::AssertUnwindSafe;
+use std::rc::Rc;
 
-use mockers_derive::{mocked, mock};
+use mockers::matchers::{lt, ANY};
 use mockers::{Scenario, Sequence};
-use mockers::matchers::{ANY, lt};
+use mockers_derive::{mock, mocked};
 
 #[mocked]
 pub trait A {
@@ -19,7 +18,7 @@ pub trait A {
     fn consume_rc(&self, arg: Rc<usize>);
 }
 
-mock!{
+mock! {
     AMockByMacro,
     self,
     trait A {
@@ -36,7 +35,7 @@ mock!{
 }
 
 #[test]
-#[should_panic(expected="unexpected call to `A#0.foo()`")]
+#[should_panic(expected = "unexpected call to `A#0.foo()`")]
 fn test_unit() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -52,9 +51,8 @@ fn test_return() {
     assert_eq!(2, mock.baz());
 }
 
-
 #[test]
-#[should_panic(expected="4 is not less than 3")]
+#[should_panic(expected = "4 is not less than 3")]
 fn test_arg_match_failure() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -70,18 +68,16 @@ fn test_arg_match_success() {
     mock.bar(2);
 }
 
-
 #[test]
-#[should_panic(expected="Some expectations are not satisfied:\n`A#0.bar(_)`\n")]
+#[should_panic(expected = "Some expectations are not satisfied:\n`A#0.bar(_)`\n")]
 fn test_expected_call_not_performed() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
     scenario.expect(mock.bar_call(ANY).and_return(()));
 }
 
-
 #[test]
-#[should_panic(expected="boom!")]
+#[should_panic(expected = "boom!")]
 fn test_panic_result() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -106,7 +102,7 @@ fn test_value_self_method() {
 }
 
 #[test]
-#[should_panic(expected="unexpected call to `amock.foo()`")]
+#[should_panic(expected = "unexpected call to `amock.foo()`")]
 fn test_named_mock() {
     let scenario = Scenario::new();
     let mock = scenario.create_named_mock_for::<A>("amock".to_owned());
@@ -118,7 +114,7 @@ fn test_named_mock() {
 /// expectations are not checked and don't cause panic-during-drop
 /// which will lead to ugly failure with not very useful message.
 #[test]
-#[should_panic(expected="caboom!")]
+#[should_panic(expected = "caboom!")]
 fn test_failed_with_remaining_expectations() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -134,7 +130,7 @@ fn test_expect_and_call() {
     let mock = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
-    scenario.expect(mock.ask_call(2).and_call(|arg| { arg+1 }));
+    scenario.expect(mock.ask_call(2).and_call(|arg| arg + 1));
     assert_eq!(mock.ask(2), 3);
 }
 
@@ -151,7 +147,7 @@ fn test_expect_is_unordered() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo was already called earlier")]
+#[should_panic(expected = "A#0.foo was already called earlier")]
 fn test_expect_consumes_one_call_only() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -179,7 +175,7 @@ fn test_never_on_call_with_args() {
 }
 
 #[test]
-#[should_panic(expected="A#0.foo should never be called")]
+#[should_panic(expected = "A#0.foo should never be called")]
 fn test_never_not_satisfied() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -206,7 +202,7 @@ fn test_consume_call_result() {
     let mock = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
-    scenario.expect(mock.consume_result_call().and_call(move || { result }));
+    scenario.expect(mock.consume_result_call().and_call(move || result));
 
     assert_eq!(mock.consume_result(), "ho-ho");
 }
@@ -216,7 +212,7 @@ fn test_consume_argument() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
 
-    scenario.expect(mock.consume_arg_call(ANY).and_call(|arg| { arg }));
+    scenario.expect(mock.consume_arg_call(ANY).and_call(|arg| arg));
 
     let arg = "ho-ho".to_owned();
     assert_eq!(mock.consume_arg(arg), "ho-ho");
@@ -242,7 +238,7 @@ fn test_arguments_are_dropped_on_panic() {
 }
 
 #[test]
-#[should_panic(expected="`A#0.foo() must be called exactly 2 times, called 1 times`")]
+#[should_panic(expected = "`A#0.foo() must be called exactly 2 times, called 1 times`")]
 fn test_checkpoint() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -263,7 +259,7 @@ fn test_create_mock() {
 }
 
 #[test]
-#[should_panic(expected="unexpected call to `A#0.bar(12)`")]
+#[should_panic(expected = "unexpected call to `A#0.bar(12)`")]
 fn test_format_args() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -275,7 +271,7 @@ fn test_format_args() {
 // for other mock object of the same type must be checked.
 #[test]
 // Message without ANSI codes is "expectation `A#0.bar(12)`"
-#[should_panic(expected="expectation `\x1b[1mA#0\x1b[0m.bar(12)`")]
+#[should_panic(expected = "expectation `\x1b[1mA#0\x1b[0m.bar(12)`")]
 fn test_check_other_mock_object_expectations() {
     let scenario = Scenario::new();
     let mock0 = scenario.create_mock_for::<A>();
@@ -301,7 +297,7 @@ fn test_sequence() {
 }
 
 #[test]
-#[should_panic(expected="unexpected call to `A#0.bar(4)`")]
+#[should_panic(expected = "unexpected call to `A#0.bar(4)`")]
 fn test_sequence_invalid_order() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
@@ -331,7 +327,7 @@ fn test_sequence_times() {
 }
 
 #[test]
-#[should_panic(expected="unexpected call to `A#0.bar(4)`")]
+#[should_panic(expected = "unexpected call to `A#0.bar(4)`")]
 fn test_sequence_times_invalid() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A>();
