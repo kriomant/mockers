@@ -47,28 +47,31 @@ pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenSt
 }
 
 fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), String> {
-    let (bounds, ident, trait_item) = match item {
-        Item::Trait(trait_item) => (
-            trait_item.supertraits.clone(),
-            trait_item.ident.clone(),
-            trait_item.clone(),
-        ),
-        Item::ForeignMod(ref foreign_mod) => {
+    match item {
+        Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
+        Item::ForeignMod(foreign_mod) => {
             let mock_name = opts.mock_name.as_ref().ok_or_else(|| {
                 "mock type name must be set explicitly for extern block".to_string()
             })?;
-            return Ok((generate_extern_mock(foreign_mod, mock_name)?, false));
+            Ok((generate_extern_mock(foreign_mod, mock_name)?, false))
         }
-        _ => return Err("Attribute may be used on traits and extern blocks only".to_string()),
-    };
+        _ => Err("Attribute may be used on traits and extern blocks only".to_string()),
+    }
+}
+
+fn generate_trait_mock(
+    item_trait: &ItemTrait,
+    opts: &MockAttrOptions,
+) -> Result<TokenStream, String> {
     let mock_ident = opts
         .mock_name
         .clone()
-        .unwrap_or_else(|| Ident::new(&format!("{}Mock", ident), Span::call_site()));
+        .unwrap_or_else(|| Ident::new(&format!("{}Mock", item_trait.ident), Span::call_site()));
 
     // Find definitions for referenced traits.
     let referenced_items =
-        bounds
+        item_trait
+            .supertraits
             .iter()
             .map(|b| {
                 let path = match *b {
@@ -115,10 +118,12 @@ fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bo
     // another trait.
     if let Some(ref module_path) = opts.module_path {
         let mut full_path = module_path.clone();
-        full_path.segments.push(PathSegment::from(ident.clone()));
+        full_path
+            .segments
+            .push(PathSegment::from(item_trait.ident.clone()));
         KNOWN_TRAITS.lock().unwrap().insert(
             full_path.into_token_stream().to_string(),
-            item.into_token_stream().to_string(),
+            item_trait.into_token_stream().to_string(),
         );
     }
 
@@ -127,14 +132,11 @@ fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bo
             leading_colon: None,
             segments: Punctuated::new(),
         },
-        trait_item: trait_item,
+        trait_item: item_trait.clone(),
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
-    Ok((
-        generate_mock_for_traits(mock_ident, &all_traits, true)?,
-        true,
-    ))
+    generate_mock_for_traits(mock_ident, &all_traits, true)
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
