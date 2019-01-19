@@ -8,11 +8,11 @@ repository = "https://github.com/kriomant/mockers"
 version = "0.13.0"
 
 [dependencies]
-syn = { version = "0.11.11", features = ["full"] }
-quote = "0.3.15"
+syn = { version = "0.15.24", features = ["full", "extra-traits"] }
+quote = "0.6.10"
 itertools = "0.4.13"
 lazy_static = "0.2.9"
-synom = "0.11.3"
+proc-macro2 = "0.4.24"
 
 [build-dependencies]
 
