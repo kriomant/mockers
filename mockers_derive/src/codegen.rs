@@ -6,12 +6,12 @@ use std::result::Result;
 use std::str::FromStr;
 use std::sync::Mutex;
 use syn::{
-    punctuated::Punctuated, AngleBracketedGenericArguments, ArgCaptured, BareFnArg, Binding, Expr,
-    ExprPath, FnArg, FnDecl, ForeignItem, ForeignItemFn, GenericArgument, GenericParam, Generics,
-    Ident, ImplItemType, Item, ItemTrait, Lifetime, ParenthesizedGenericArguments, Pat, PatIdent,
-    Path, PathArguments, PathSegment, QSelf, ReturnType, Token, TraitBound, TraitBoundModifier,
-    TraitItem, TraitItemMethod, TraitItemType, Type, TypeArray, TypeBareFn, TypeGroup, TypeParam,
-    TypeParamBound, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice, TypeTuple, Visibility,
+    parse_quote, punctuated::Punctuated, AngleBracketedGenericArguments, ArgCaptured, BareFnArg,
+    Binding, Expr, FnArg, FnDecl, ForeignItem, ForeignItemFn, GenericArgument, GenericParam,
+    Generics, Ident, ImplItemType, Item, ItemTrait, Lifetime, ParenthesizedGenericArguments, Pat,
+    PatIdent, Path, PathArguments, PathSegment, QSelf, ReturnType, Token, TraitBound,
+    TraitBoundModifier, TraitItem, TraitItemMethod, TraitItemType, Type, TypeArray, TypeBareFn,
+    TypeGroup, TypeParamBound, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice, TypeTuple,
 };
 
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
@@ -251,63 +251,18 @@ fn generate_mock_for_traits(
         gen.params = assoc_types
             .iter()
             .cloned()
-            .map(|param| {
-                let bounds = vec![
-                    // nighlty: cx.typarambound(quote_path!(cx, ::std::fmt::Debug)),
-                    TypeParamBound::Trait(TraitBound {
-                        paren_token: None,
-                        lifetimes: None,
-                        path: Path {
-                            leading_colon: Some(syn::token::Colon2(Span::call_site())),
-                            segments: Punctuated::from_iter(
-                                vec![
-                                    PathSegment::from(Ident::new("std", Span::call_site())),
-                                    PathSegment::from(Ident::new("fmt", Span::call_site())),
-                                    PathSegment::from(Ident::new("Debug", Span::call_site())),
-                                ]
-                                .into_iter(),
-                            ),
-                        },
-                        modifier: TraitBoundModifier::None,
-                    }),
-                ];
-                GenericParam::Type(TypeParam {
-                    colon_token: None,
-                    eq_token: None,
-                    ident: param,
-                    attrs: vec![],
-                    bounds: Punctuated::from_iter(bounds.into_iter()),
-                    default: None,
-                })
+            .map(|param| -> GenericParam {
+                parse_quote! { #param: ::std::fmt::Debug }
             })
             .collect();
         gen
     };
     // Type of mock struct with all type parameters specified.
-    let struct_path = Path {
-        leading_colon: None,
-        segments: Punctuated::from_iter(
-            vec![PathSegment {
-                ident: mock_ident.clone(),
-                arguments: PathArguments::AngleBracketed(AngleBracketedGenericArguments {
-                    colon2_token: None,
-                    lt_token: Token![<](Span::call_site()),
-                    gt_token: Token![>](Span::call_site()),
-                    args: Punctuated::from_iter(assoc_types.iter().cloned().map(|ident| {
-                        GenericArgument::Type(Type::Path(TypePath {
-                            qself: None,
-                            path: Path::from(ident),
-                        }))
-                    })),
-                }),
-            }]
-            .into_iter(),
-        ),
+    let struct_path: Path = {
+        let assoc_types = &assoc_types;
+        parse_quote! { #mock_ident<#(#assoc_types),*> }
     };
-    let struct_type = Type::Path(TypePath {
-        qself: None,
-        path: struct_path.clone(),
-    });
+    let struct_type: Type = parse_quote! { #struct_path };
 
     let mut generated_items = vec![struct_item];
     let mut has_static_methods = false;
@@ -386,33 +341,9 @@ fn generate_mock_for_traits(
             .iter()
             .cloned()
             .zip(assoc_types.iter().cloned())
-            .map(|(assoc, param)| {
-                let path = Path {
-                    leading_colon: None,
-                    segments: Punctuated::from_iter(
-                        vec![PathSegment {
-                            ident: param,
-                            arguments: PathArguments::None,
-                        }]
-                        .into_iter(),
-                    ),
-                };
-                ImplItemType {
-                    ident: assoc.clone(),
-                    defaultness: None,
-                    ty: Type::Path(TypePath { qself: None, path }),
-                    attrs: vec![],
-                    vis: Visibility::Inherited,
-                    type_token: Token![type](Span::call_site()),
-                    generics: Generics {
-                        lt_token: None,
-                        params: Punctuated::new(),
-                        gt_token: None,
-                        where_clause: None,
-                    },
-                    eq_token: Token![=](Span::call_site()),
-                    semi_token: Token![;](Span::call_site()),
-                }
+            .map(|(assoc, param)| -> ImplItemType {
+                let path: Path = parse_quote! { #param };
+                parse_quote! { type #assoc = #path; }
             });
         let trait_impl_item = quote! {
             impl #generics #trait_path for #struct_type {
@@ -431,33 +362,7 @@ fn generate_mock_for_traits(
             let static_mock_name = format!("{}Static", mock_ident);
             let static_mock_ident = Ident::new(&static_mock_name.clone(), Span::call_site());
             let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
-            let static_struct_type = Type::Path(TypePath {
-                qself: None,
-                path: Path {
-                    leading_colon: None,
-                    segments: Punctuated::from_iter(
-                        vec![PathSegment {
-                            ident: static_mock_ident.clone(),
-                            arguments: PathArguments::AngleBracketed(
-                                AngleBracketedGenericArguments {
-                                    args: Punctuated::from_iter(assoc_types.iter().cloned().map(
-                                        |ident| {
-                                            GenericArgument::Type(Type::Path(TypePath {
-                                                qself: None,
-                                                path: Path::from(ident),
-                                            }))
-                                        },
-                                    )),
-                                    colon2_token: None,
-                                    lt_token: Token![<](Span::call_site()),
-                                    gt_token: Token![>](Span::call_site()),
-                                },
-                            ),
-                        }]
-                        .into_iter(),
-                    ),
-                },
-            });
+            let static_struct_type: Type = parse_quote! { #static_mock_ident<#(assoc_types),*> };
 
             // `impl<...> AMockStatic<...> { pub fn foo_call(...) { ... } }`
             let static_impl_item = quote! {
@@ -616,10 +521,7 @@ fn generate_trait_methods(
     };
 
     let return_type = match decl.output {
-        ReturnType::Default => Type::Tuple(TypeTuple {
-            paren_token: syn::token::Paren(Span::call_site()),
-            elems: Punctuated::new(),
-        }),
+        ReturnType::Default => parse_quote! { () },
         ReturnType::Type(_, ref ty) => *ty.clone(),
     };
 
@@ -759,11 +661,7 @@ fn generate_stub_code(
                 ..
             }) = i
             {
-                Some(Expr::from(Expr::Path(ExprPath {
-                    attrs: vec![],
-                    qself: None,
-                    path: Path::from(ident.clone()),
-                })))
+                Some(parse_quote!(#ident))
             } else {
                 // cx.span_err(i.pat.span, "Only identifiers are accepted in argument list");
                 None
@@ -787,16 +685,7 @@ fn generate_stub_code(
                 }) => (ident.clone(), ty.clone()),
                 _ => panic!("argument pattern"),
             };
-            FnArg::Captured(ArgCaptured {
-                pat: Pat::Ident(PatIdent {
-                    by_ref: None,
-                    mutability: Some(Token![mut](Span::call_site())),
-                    ident,
-                    subpat: None,
-                }),
-                colon_token: Token![:](Span::call_site()),
-                ty,
-            })
+            parse_quote! { mut #ident: #ty }
         })
         .collect();
     if let Some(arg) = self_arg {
@@ -854,11 +743,10 @@ fn generate_impl_method_for_trait(
     let fixed_args = Punctuated::from_iter(args.iter().map(|arg| match arg {
         self_arg @ FnArg::SelfRef(..) => self_arg.clone(),
         self_arg @ FnArg::SelfValue(..) => self_arg.clone(),
-        FnArg::Captured(ArgCaptured { pat, ty, .. }) => FnArg::Captured(ArgCaptured {
-            pat: pat.clone(),
-            ty: qualify_self(ty, trait_path),
-            colon_token: Token![:](Span::call_site()),
-        }),
+        FnArg::Captured(ArgCaptured { pat, ty, .. }) => {
+            let qty = qualify_self(ty, trait_path);
+            parse_quote! { #pat: #qty }
+        }
         FnArg::Ignored(ty) => FnArg::Ignored(qualify_self(ty, trait_path)),
         FnArg::Inferred(pat) => FnArg::Inferred(pat.clone()),
     }));
@@ -1016,10 +904,7 @@ fn generate_extern_mock(
             }) => {
                 let ret_ty = match decl.output {
                     ReturnType::Type(_, ref ty) => *ty.clone(),
-                    ReturnType::Default => Type::Tuple(TypeTuple {
-                        paren_token: syn::token::Paren(Span::call_site()),
-                        elems: Punctuated::new(),
-                    }),
+                    ReturnType::Default => parse_quote! { () },
                 };
                 let mock_method = generate_impl_method(
                     mock_type_id,
@@ -1256,13 +1141,7 @@ fn qualify_self(ty: &Type, trait_path: &Path) -> Type {
     replace_self(
         ty,
         |self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
-            let self_ty = Type::Path(TypePath {
-                qself: None,
-                path: Path {
-                    leading_colon: None,
-                    segments: Punctuated::from_iter(vec![self_seg.clone()].into_iter()),
-                },
-            });
+            let self_ty = parse_quote! { #self_seg };
             let new_qself = QSelf {
                 as_token: Some(Token![as](Span::call_site())),
                 gt_token: Token![>](Span::call_site()),
@@ -1290,13 +1169,7 @@ fn set_self(ty: &Type, mock_struct_path: &Path) -> Type {
         |_self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
             let mut new_segments = mock_struct_path.segments.clone();
             new_segments.extend(rest.iter().cloned());
-            Type::Path(TypePath {
-                qself: None,
-                path: Path {
-                    leading_colon: None,
-                    segments: new_segments,
-                },
-            })
+            parse_quote! { #new_segments }
         },
     )
 }
