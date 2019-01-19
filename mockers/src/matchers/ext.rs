@@ -1,7 +1,7 @@
 
 use std::marker::PhantomData;
 use std::fmt::Debug;
-use MatchArg;
+use crate::MatchArg;
 
 pub trait MatchArgExt<T: Debug, M: MatchArg<T>> {
     fn with_custom_msg<F: Fn(&T) -> String>(self, msg_fn: F) -> WithMessageFn<T, M, F>;

@@ -15,8 +15,8 @@ pub mod cardinality;
 #[macro_use]
 pub mod clone;
 
-use cardinality::{Cardinality, CardinalityCheckResult};
-use dbg::dbg;
+use crate::cardinality::{Cardinality, CardinalityCheckResult};
+use crate::dbg::dbg;
 
 thread_local! {
     // Mapping from mock_type_id of 'extern' block mock to corresponding mock object.

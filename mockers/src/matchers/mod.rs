@@ -116,14 +116,14 @@ impl<T: Ord + Debug, R: RangeBounds<T>> RangeMatchArg<T, R> {
     fn format_range(&self) -> Result<String, std::fmt::Error> {
         let mut range_str = String::new();
         match self.range.start_bound() {
-            Bound::Included(s) => try!(write!(range_str, "[{:?}", s)),
-            Bound::Excluded(s) => try!(write!(range_str, "({:?}", s)),
+            Bound::Included(s) => write!(range_str, "[{:?}", s)?,
+            Bound::Excluded(s) => write!(range_str, "({:?}", s)?,
             Bound::Unbounded => {},
         }
-        try!(range_str.write_char(';'));
+        range_str.write_char(';')?;
         match self.range.end_bound() {
-            Bound::Included(e) => try!(write!(range_str, "{:?}]", e)),
-            Bound::Excluded(e) => try!(write!(range_str, "{:?})", e)),
+            Bound::Included(e) => write!(range_str, "{:?}]", e)?,
+            Bound::Excluded(e) => write!(range_str, "{:?})", e)?,
             Bound::Unbounded => {},
         }
         Ok(range_str)

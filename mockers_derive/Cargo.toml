@@ -6,6 +6,7 @@ license = "MIT"
 name = "mockers_derive"
 repository = "https://github.com/kriomant/mockers"
 version = "0.13.0"
+edition = "2018"
 
 [dependencies]
 syn = { version = "0.15.24", features = ["full", "extra-traits"] }

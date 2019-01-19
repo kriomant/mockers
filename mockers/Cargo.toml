@@ -8,6 +8,7 @@ documentation = "https://github.com/kriomant/mockers/blob/0.13.0/README.md"
 keywords = ["mock", "test"]
 readme = "../README.md"
 license = "MIT"
+edition = "2018"
 
 [lib]
 name = "mockers"

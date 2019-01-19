@@ -330,7 +330,7 @@ fn generate_mock_for_traits(mock_ident: Ident,
         };
 
         // `impl<...> A for AMock<...> { ... }`
-        let mut trait_impl_items = trait_impl_methods;
+        let trait_impl_items = trait_impl_methods;
         let trait_type_items =
             assoc_types.iter().cloned().zip(assoc_types.iter().cloned()).map(|(assoc, param)| {
                 let path = Path {
