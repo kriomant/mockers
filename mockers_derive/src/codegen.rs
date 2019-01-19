@@ -12,7 +12,7 @@ use std::str::FromStr;
 use quote::ToTokens;
 use itertools::Itertools;
 
-use crate::options::MockAttrOptions;
+use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
 
 use std::iter::FromIterator;
 
@@ -42,25 +42,6 @@ pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenSt
     }
     source.push_str(&tokens.to_string());
     TokenStream::from_str(&source).map_err(|e| format!("{:?}", e))
-}
-
-struct TraitDesc {
-    mod_path: Path,
-    trait_item: ItemTrait,
-}
-
-impl syn::parse::Parse for TraitDesc {
-    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
-        let mod_path = if input.peek(Token![self]) {
-            input.parse::<Token![self]>()?;
-            Path { leading_colon: None, segments: Punctuated::new() }
-        } else {
-            input.parse::<Path>()?
-        };
-        input.parse::<Token![,]>()?;
-        let trait_item = input.parse::<ItemTrait>()?;
-        Ok(TraitDesc{ mod_path, trait_item })
-    }
 }
 
 fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), String> {
@@ -1075,22 +1056,8 @@ fn set_self(ty: &Type, mock_struct_path: &Path) -> Type {
     })
 }
 
-struct MockMacroArgs {
-    ident: Ident,
-    traits: Vec<TraitDesc>,
-}
-
-impl syn::parse::Parse for MockMacroArgs {
-    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
-        let ident = input.parse::<Ident>()?;
-        input.parse::<Token![,]>()?;
-        let traits: Punctuated<TraitDesc, Token![,]> = input.parse_terminated(TraitDesc::parse)?;
-        Ok(MockMacroArgs{ ident: ident, traits: traits.into_iter().collect() })
-    }
-}
-
 pub fn mock_impl(input: TokenStream) -> Result<TokenStream, String> {
-    let args = syn::parse2::<MockMacroArgs>(input).map_err(|_| "can't parse macro input".to_string())?;
+    let args = parse_macro_args(input).map_err(|_| "can't parse macro input".to_string())?;
     let tokens = generate_mock_for_traits(args.ident, &args.traits, false)?;
 
     if cfg!(feature="debug") {

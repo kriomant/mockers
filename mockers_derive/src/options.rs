@@ -3,7 +3,16 @@
 use std::collections::HashMap;
 
 use proc_macro2::{TokenStream, Span};
-use syn::{Ident, Path, Meta, NestedMeta, MetaNameValue, Token, parse::ParseStream};
+use syn::{Ident, Path, Meta, NestedMeta, MetaNameValue, Token, parse::ParseStream,
+          punctuated::Punctuated, ItemTrait};
+
+pub fn parse_attr_options(attr_tokens: TokenStream) -> syn::parse::Result<MockAttrOptions> {
+    syn::parse2::<MockAttrOptions>(attr_tokens)
+}
+
+pub fn parse_macro_args(tokens: TokenStream) -> syn::parse::Result<MockMacroArgs> {
+    syn::parse2::<MockMacroArgs>(tokens)
+}
 
 pub struct MockAttrOptions {
     pub mock_name: Option<Ident>,
@@ -71,6 +80,35 @@ impl syn::parse::Parse for MockAttrOptions {
     }
 }
 
-pub fn parse_options(attr_tokens: TokenStream) -> syn::parse::Result<MockAttrOptions> {
-    syn::parse2::<MockAttrOptions>(attr_tokens)
+pub struct TraitDesc {
+    pub mod_path: Path,
+    pub trait_item: ItemTrait,
+}
+
+impl syn::parse::Parse for TraitDesc {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
+        let mod_path = if input.peek(Token![self]) {
+            input.parse::<Token![self]>()?;
+            Path { leading_colon: None, segments: Punctuated::new() }
+        } else {
+            input.parse::<Path>()?
+        };
+        input.parse::<Token![,]>()?;
+        let trait_item = input.parse::<ItemTrait>()?;
+        Ok(TraitDesc{ mod_path, trait_item })
+    }
+}
+
+pub struct MockMacroArgs {
+    pub ident: Ident,
+    pub traits: Vec<TraitDesc>,
+}
+
+impl syn::parse::Parse for MockMacroArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
+        let ident = input.parse::<Ident>()?;
+        input.parse::<Token![,]>()?;
+        let traits: Punctuated<TraitDesc, Token![,]> = input.parse_terminated(TraitDesc::parse)?;
+        Ok(MockMacroArgs{ ident: ident, traits: traits.into_iter().collect() })
+    }
 }
