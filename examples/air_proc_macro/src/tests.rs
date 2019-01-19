@@ -1,5 +1,3 @@
-extern crate mockers;
-
 use super::{AirConditioner, set_temperature_20};
 use mockers::Scenario;
 

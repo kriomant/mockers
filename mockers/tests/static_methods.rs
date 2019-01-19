@@ -1,7 +1,4 @@
-///! Test that extern functions may be mocked.
-
-extern crate mockers;
-extern crate mockers_derive;
+///! Test that static methods may be mocked.
 
 use mockers_derive::mocked;
 

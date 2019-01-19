@@ -1,5 +1,3 @@
-#[cfg(test)] extern crate mockers_derive;
-#[cfg(test)] extern crate mockers;
 #[cfg(test)] mod tests;
 
 #[cfg(test)] use mockers_derive::mocked;

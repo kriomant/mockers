@@ -25,19 +25,19 @@ thread_local! {
 }
 
 type Action0<T> = box_fn::BoxFn0<T>;
-type ActionClone0<T> = Rc<RefCell<FnMut() -> T>>;
+type ActionClone0<T> = Rc<RefCell<dyn FnMut() -> T>>;
 
 type Action1<Arg0, T> = box_fn::BoxFn1<Arg0, T>;
-type ActionClone1<Arg0, T> = Rc<RefCell<FnMut(Arg0) -> T>>;
+type ActionClone1<Arg0, T> = Rc<RefCell<dyn FnMut(Arg0) -> T>>;
 
 type Action2<Arg0, Arg1, T> = box_fn::BoxFn2<Arg0, Arg1, T>;
-type ActionClone2<Arg0, Arg1, T> = Rc<RefCell<FnMut(Arg0, Arg1) -> T>>;
+type ActionClone2<Arg0, Arg1, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1) -> T>>;
 
 type Action3<Arg0, Arg1, Arg2, T> = box_fn::BoxFn3<Arg0, Arg1, Arg2, T>;
-type ActionClone3<Arg0, Arg1, Arg2, T> = Rc<RefCell<FnMut(Arg0, Arg1, Arg2) -> T>>;
+type ActionClone3<Arg0, Arg1, Arg2, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1, Arg2) -> T>>;
 
 type Action4<Arg0, Arg1, Arg2, Arg3, T> = box_fn::BoxFn4<Arg0, Arg1, Arg2, Arg3, T>;
-type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Rc<RefCell<FnMut(Arg0, Arg1, Arg2, Arg3) -> T>>;
+type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1, Arg2, Arg3) -> T>>;
 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
@@ -60,7 +60,7 @@ pub trait CallMatch {
 }
 
 pub trait Expectation {
-    fn call_match(&self) -> &CallMatch;
+    fn call_match(&self) -> &dyn CallMatch;
     fn is_satisfied(&self) -> bool;
     fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8>;
     fn describe(&self) -> String;
@@ -70,7 +70,7 @@ pub struct ExpectationNever<CM: CallMatch> {
     call_match: CM,
 }
 impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -138,16 +138,16 @@ impl<Res> Reaction0<Res> {
 pub struct ExpectationTimes0<Res> {
     action: ActionClone0<Res>,
     call_match: CallMatch0<Res>,
-    cardinality: Box<Cardinality>,
+    cardinality: Box<dyn Cardinality>,
     count: u32,
 }
 impl<Res> ExpectationTimes0<Res> {
-    fn new(call_match: CallMatch0<Res>, action: ActionClone0<Res>, cardinality: Box<Cardinality>) -> Self {
+    fn new(call_match: CallMatch0<Res>, action: ActionClone0<Res>, cardinality: Box<dyn Cardinality>) -> Self {
         ExpectationTimes0 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Res: 'static> Expectation for ExpectationTimes0<Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -181,7 +181,7 @@ pub struct Expectation0<Res> {
     action: Option<Action0<Res>>,
 }
 impl<Res: 'static> Expectation for Expectation0<Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -247,12 +247,12 @@ pub struct CallMatch1<Arg0, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
-    arg0: Box<MatchArg<Arg0>>,
+    arg0: Box<dyn MatchArg<Arg0>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Res> CallMatch1<Arg0, Res> {
-    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str, arg0: Box<MatchArg<Arg0>>) -> Self {
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str, arg0: Box<dyn MatchArg<Arg0>>) -> Self {
         CallMatch1 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
@@ -306,16 +306,16 @@ impl<Arg0, Res> Reaction1<Arg0, Res> {
 pub struct ExpectationTimes1<Arg0, Res> {
     action: ActionClone1<Arg0, Res>,
     call_match: CallMatch1<Arg0, Res>,
-    cardinality: Box<Cardinality>,
+    cardinality: Box<dyn Cardinality>,
     count: u32,
 }
 impl<Arg0, Res> ExpectationTimes1<Arg0, Res> {
-    fn new(call_match: CallMatch1<Arg0, Res>, action: ActionClone1<Arg0, Res>, cardinality: Box<Cardinality>) -> Self {
+    fn new(call_match: CallMatch1<Arg0, Res>, action: ActionClone1<Arg0, Res>, cardinality: Box<dyn Cardinality>) -> Self {
         ExpectationTimes1 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Res: 'static> Expectation for ExpectationTimes1<Arg0, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -350,7 +350,7 @@ pub struct Expectation1<Arg0, Res> {
     action: Option<Action1<Arg0, Res>>,
 }
 impl<Arg0: 'static, Res: 'static> Expectation for Expectation1<Arg0, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -415,15 +415,15 @@ pub struct CallMatch2<Arg0, Arg1, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
-    arg0: Box<MatchArg<Arg0>>,
-    arg1: Box<MatchArg<Arg1>>,
+    arg0: Box<dyn MatchArg<Arg0>>,
+    arg1: Box<dyn MatchArg<Arg1>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
     pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
-               arg0: Box<MatchArg<Arg0>>,
-               arg1: Box<MatchArg<Arg1>>) -> Self {
+               arg0: Box<dyn MatchArg<Arg0>>,
+               arg1: Box<dyn MatchArg<Arg1>>) -> Self {
         CallMatch2 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
@@ -481,16 +481,16 @@ impl<Arg0, Arg1, Res> Reaction2<Arg0, Arg1, Res> {
 pub struct ExpectationTimes2<Arg0, Arg1, Res> {
     action: ActionClone2<Arg0, Arg1, Res>,
     call_match: CallMatch2<Arg0, Arg1, Res>,
-    cardinality: Box<Cardinality>,
+    cardinality: Box<dyn Cardinality>,
     count: u32,
 }
 impl<Arg0, Arg1, Res> ExpectationTimes2<Arg0, Arg1, Res> {
-    fn new(call_match: CallMatch2<Arg0, Arg1, Res>, action: ActionClone2<Arg0, Arg1, Res>, cardinality: Box<Cardinality>) -> Self {
+    fn new(call_match: CallMatch2<Arg0, Arg1, Res>, action: ActionClone2<Arg0, Arg1, Res>, cardinality: Box<dyn Cardinality>) -> Self {
         ExpectationTimes2 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation for ExpectationTimes2<Arg0, Arg1, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -525,7 +525,7 @@ pub struct Expectation2<Arg0, Arg1, Res> {
     action: Option<Action2<Arg0, Arg1, Res>>,
 }
 impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation for Expectation2<Arg0, Arg1, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -591,17 +591,17 @@ pub struct CallMatch3<Arg0, Arg1, Arg2, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
-    arg0: Box<MatchArg<Arg0>>,
-    arg1: Box<MatchArg<Arg1>>,
-    arg2: Box<MatchArg<Arg2>>,
+    arg0: Box<dyn MatchArg<Arg0>>,
+    arg1: Box<dyn MatchArg<Arg1>>,
+    arg2: Box<dyn MatchArg<Arg2>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
     pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
-               arg0: Box<MatchArg<Arg0>>,
-               arg1: Box<MatchArg<Arg1>>,
-               arg2: Box<MatchArg<Arg2>>) -> Self {
+               arg0: Box<dyn MatchArg<Arg0>>,
+               arg1: Box<dyn MatchArg<Arg1>>,
+               arg2: Box<dyn MatchArg<Arg2>>) -> Self {
         CallMatch3 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
@@ -664,16 +664,16 @@ impl<Arg0, Arg1, Arg2, Res> Reaction3<Arg0, Arg1, Arg2, Res> {
 pub struct ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
     action: ActionClone3<Arg0, Arg1, Arg2, Res>,
     call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    cardinality: Box<Cardinality>,
+    cardinality: Box<dyn Cardinality>,
     count: u32,
 }
 impl<Arg0, Arg1, Arg2, Res> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-    fn new(call_match: CallMatch3<Arg0, Arg1, Arg2, Res>, action: ActionClone3<Arg0, Arg1, Arg2, Res>, cardinality: Box<Cardinality>) -> Self {
+    fn new(call_match: CallMatch3<Arg0, Arg1, Arg2, Res>, action: ActionClone3<Arg0, Arg1, Arg2, Res>, cardinality: Box<dyn Cardinality>) -> Self {
         ExpectationTimes3 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -708,7 +708,7 @@ pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
     action: Option<Action3<Arg0, Arg1, Arg2, Res>>,
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation for Expectation3<Arg0, Arg1, Arg2, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -773,19 +773,19 @@ pub struct CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
-    arg0: Box<MatchArg<Arg0>>,
-    arg1: Box<MatchArg<Arg1>>,
-    arg2: Box<MatchArg<Arg2>>,
-    arg3: Box<MatchArg<Arg3>>,
+    arg0: Box<dyn MatchArg<Arg0>>,
+    arg1: Box<dyn MatchArg<Arg1>>,
+    arg2: Box<dyn MatchArg<Arg2>>,
+    arg3: Box<dyn MatchArg<Arg3>>,
 
     _phantom: PhantomData<Res>,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str,
-               arg0: Box<MatchArg<Arg0>>,
-               arg1: Box<MatchArg<Arg1>>,
-               arg2: Box<MatchArg<Arg2>>,
-               arg3: Box<MatchArg<Arg3>>) -> Self {
+               arg0: Box<dyn MatchArg<Arg0>>,
+               arg1: Box<dyn MatchArg<Arg1>>,
+               arg2: Box<dyn MatchArg<Arg2>>,
+               arg3: Box<dyn MatchArg<Arg3>>) -> Self {
         CallMatch4 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
@@ -852,16 +852,16 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
 pub struct ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
     action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
     call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    cardinality: Box<Cardinality>,
+    cardinality: Box<dyn Cardinality>,
     count: u32,
 }
 impl<Arg0, Arg1, Arg2, Arg3, Res> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn new(call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>, action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>, cardinality: Box<Cardinality>) -> Self {
+    fn new(call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>, action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>, cardinality: Box<dyn Cardinality>) -> Self {
         ExpectationTimes4 { call_match: call_match, action: action, cardinality: cardinality, count: 0 }
     }
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -896,7 +896,7 @@ pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
     action: Option<Action4<Arg0, Arg1, Arg2, Arg3, Res>>,
 }
 impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation for Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         &self.call_match
     }
     fn is_satisfied(&self) -> bool {
@@ -984,7 +984,7 @@ impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
 
 #[derive(Default)]
 pub struct Sequence {
-    expectations: Vec<Box<Expectation>>,
+    expectations: Vec<Box<dyn Expectation>>,
 }
 impl Sequence {
     pub fn new() -> Self {
@@ -997,7 +997,7 @@ impl Sequence {
     }
 }
 impl Expectation for Sequence {
-    fn call_match(&self) -> &CallMatch {
+    fn call_match(&self) -> &dyn CallMatch {
         self.expectations[0].call_match()
     }
     fn is_satisfied(&self) -> bool {
@@ -1031,7 +1031,7 @@ pub trait Mocked {
 }
 
 pub struct ScenarioInternals {
-    expectations: Vec<Box<Expectation>>,
+    expectations: Vec<Box<dyn Expectation>>,
 
     next_mock_id: usize,
 

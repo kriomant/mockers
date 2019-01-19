@@ -12,7 +12,7 @@ pub struct MockAttrOptions {
 }
 
 impl syn::parse::Parse for MockAttrOptions {
-    fn parse(input: ParseStream) -> syn::parse::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> syn::parse::Result<Self> {
         let mut mock_name: Option<Ident> = None;
         let mut module_path: Option<Path> = None;
         let mut refs: HashMap<Path, Path> = HashMap::new();
@@ -27,7 +27,7 @@ impl syn::parse::Parse for MockAttrOptions {
                     NestedMeta::Meta(Meta::NameValue(MetaNameValue{ident: ref name, lit: syn::Lit::Str(ref refs_lit), ..})) if name == "refs" => {
                         use syn::parse::Parser;
 
-                        let parser = |stream: ParseStream| {
+                        let parser = |stream: ParseStream<'_>| {
                            stream.parse_terminated::<(Path, Path), Token![,]>(|stream| {
                                let source = stream.parse::<Path>()?;
                                stream.parse::<Token![=>]>()?;

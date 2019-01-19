@@ -1,8 +1,5 @@
 ///! Test mocking methods with 'dyn Trait' parameters.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 use mockers::{Scenario, matchers::ANY};
 

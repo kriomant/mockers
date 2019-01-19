@@ -4,6 +4,7 @@ description = "Example of using `mockers` crate with 'procedural macro' nightly 
 version = "0.1.0"
 authors = ["Mikhail Trishchenkov <kriomant@gmail.com>"]
 publish = false
+edition = "2018"
 
 [dev-dependencies]
 mockers = { version = "0.13.0", path = "../../mockers" }

@@ -50,7 +50,7 @@ struct TraitDesc {
 }
 
 impl syn::parse::Parse for TraitDesc {
-    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
         let mod_path = if input.peek(Token![self]) {
             input.parse::<Token![self]>()?;
             Path { leading_colon: None, segments: Punctuated::new() }
@@ -1081,7 +1081,7 @@ struct MockMacroArgs {
 }
 
 impl syn::parse::Parse for MockMacroArgs {
-    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
         let ident = input.parse::<Ident>()?;
         input.parse::<Token![,]>()?;
         let traits: Punctuated<TraitDesc, Token![,]> = input.parse_terminated(TraitDesc::parse)?;

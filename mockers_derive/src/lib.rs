@@ -1,9 +1,8 @@
 extern crate proc_macro;
-extern crate proc_macro2;
-extern crate syn;
+
 #[macro_use]
 extern crate quote;
-extern crate itertools;
+
 #[macro_use] extern crate lazy_static;
 
 use proc_macro::TokenStream;

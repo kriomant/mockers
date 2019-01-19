@@ -1,8 +1,5 @@
 ///! Test that extern functions may be mocked.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 
 use mockers::Scenario;

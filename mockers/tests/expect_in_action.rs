@@ -1,8 +1,5 @@
 ///! Tests that expectations may be set from inside expectation action.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 use mockers::Scenario;
 

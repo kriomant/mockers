@@ -1,8 +1,5 @@
 ///! Test that traits with associated types can be mocked.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 use mockers::Scenario;
 

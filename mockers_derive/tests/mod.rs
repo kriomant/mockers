@@ -1,5 +1,5 @@
-extern crate mockers_derive;
-extern crate mockers;
+
+use mockers;
 use mockers_derive::{mocked, mock};
 
 #[mocked]

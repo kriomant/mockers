@@ -1,5 +1,3 @@
-extern crate mockers;
-extern crate mockers_derive;
 
 use std::rc::Rc;
 use std::panic::AssertUnwindSafe;

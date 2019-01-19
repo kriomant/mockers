@@ -2,9 +2,6 @@
 ///! in user code. The most often example is defining local `Result`
 ///! and `Error` types.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 
 use mockers::Scenario;

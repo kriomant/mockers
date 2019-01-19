@@ -1,8 +1,5 @@
 ///! Test that mockers can mock methods with reference parameters.
 
-extern crate mockers;
-extern crate mockers_derive;
-
 use mockers_derive::mocked;
 
 use mockers::Scenario;

@@ -80,13 +80,12 @@ pub fn set_temperature_20(cond: &mut AirConditioner) {
 }
 ```
 
-Enable `proc_macro` feature and import the `mockers` and `mockers_derive` crates:
+Import the `mockers` and `mockers_derive` crates (not required if your project
+uses 2018 Rust edition):
 
 ```rust
 // src/lib.rs
-
-#![feature(use_extern_macros)]
-
+// Not required in 2018 edition project
 #[cfg(test)] extern crate mockers;
 #[cfg(test)] extern crate mockers_derive;
 

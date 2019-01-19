@@ -1,9 +1,7 @@
 ///! Test that mockers can mock several traits using one mock.
 ///! In particular, it should work for mocking inherited traits.
 
-extern crate mockers;
-extern crate mockers_derive;
-
+use mockers_derive;
 use mockers::Scenario;
 use mockers::matchers::ANY;
 
