@@ -16,12 +16,6 @@ use crate::options::parse_attr_options;
 
 #[proc_macro_attribute]
 pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
-    derive_mock(attr, input).into()
-}
-
-// To be deprecated
-#[proc_macro_attribute]
-pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
     let opts = match parse_attr_options(attr.into()) {
         Ok(opts) => opts,
         Err(err) => panic!("{}", err),
@@ -31,6 +25,12 @@ pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => panic!("{}", err),
     }
     .into()
+}
+
+#[deprecated(since="0.14.0", note="`derive_mock` is deprecated, use `mocked` instead")]
+#[proc_macro_attribute]
+pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
+    mocked(attr, input)
 }
 
 #[proc_macro]
