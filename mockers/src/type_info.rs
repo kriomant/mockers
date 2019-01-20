@@ -20,7 +20,8 @@ pub fn fail_type_info_not_found() -> ! {
         "\n",
         "    use mockers::{register_types, mocked};\n",
         "\n",
-        "    ", colored!(bold: "register_types!(u32, &str);\n"),
+        "    ",
+        colored!(bold: "register_types!(u32, &str);\n"),
         "\n",
         "    #[mocked]\n",
         "    trait A {\n",
@@ -36,5 +37,6 @@ pub fn fail_type_info_not_found() -> ! {
         "        scenario.expect(mock.generic_method_call(\"foo\").and_return(()));\n",
         "        mock.generic_method(2u32);\n",
         "    }\n",
-        "\n"))
+        "\n"
+    ))
 }

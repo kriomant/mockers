@@ -27,7 +27,7 @@ fn test_generic_method_with_type_param() {
 }
 
 #[test]
-#[ignore]  // Support for references is to be done
+#[ignore] // Support for references is to be done
 fn test_generic_method_with_lifetime() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();
@@ -37,7 +37,7 @@ fn test_generic_method_with_lifetime() {
 }
 
 #[test]
-#[ignore]  // Support for references is to be done
+#[ignore] // Support for references is to be done
 fn test_generic_method_with_type_param_and_lifetime() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();
@@ -67,7 +67,7 @@ fn test_generic_method_with_parametrized_return_type() {
 /// Test that usage of unregistered type as parameter of mocked generic method
 /// causes descriptive error
 #[test]
-#[should_panic(expected="Generic method was called with unknown type parameter")]
+#[should_panic(expected = "Generic method was called with unknown type parameter")]
 fn test_usage_of_unregistered_parameter_type() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();
@@ -78,7 +78,7 @@ fn test_usage_of_unregistered_parameter_type() {
 /// Test that when call of generic method with some type parameters is expected
 /// call with other type parameters don't match.
 #[test]
-#[should_panic(expected="unexpected call to `A#0.foo(2)`")]
+#[should_panic(expected = "unexpected call to `A#0.foo(2)`")]
 fn test_two_instantiations_of_generic_method_dont_match() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock::<AMock>();
