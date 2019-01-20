@@ -350,7 +350,6 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
     fn matches_args(&self, call: &Call) -> bool {
-        eprintln!("{:?} - {:?}", self.method_name, call.method_data.method_name);
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
