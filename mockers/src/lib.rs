@@ -8,12 +8,17 @@ use std::rc::{Rc, Weak};
 use std::fmt::Write;
 use std::ops::DerefMut;
 
+#[macro_use]
+mod colors;
 mod box_fn;
 pub mod cardinality;
 mod dbg;
 pub mod matchers;
 #[macro_use]
 pub mod clone;
+pub mod type_info;
+
+pub use type_info::TypeInfo;
 
 use crate::cardinality::{Cardinality, CardinalityCheckResult};
 use crate::dbg::dbg;
@@ -42,20 +47,25 @@ type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1, 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
     fn matches(&self, call: &Call) -> bool {
-        self.matches_target(call) && self.matches_args(call)
+        self.matches_target(call) && self.matches_method(call) && self.matches_args(call)
     }
     fn matches_target(&self, call: &Call) -> bool {
         self.get_mock_id() == call.method_data.mock_id
+    }
+    fn matches_generic_method(&self, call: &Call) -> bool {
+        self.get_mock_type_id() == call.method_data.mock_type_id
             && self.get_method_name() == call.method_data.method_name
     }
     fn matches_method(&self, call: &Call) -> bool {
         self.get_mock_type_id() == call.method_data.mock_type_id
             && self.get_method_name() == call.method_data.method_name
+            && self.get_type_param_ids() == &call.method_data.type_param_ids[..]
     }
     fn validate(&self, call: &Call) -> Vec<Result<(), String>>;
     fn get_mock_id(&self) -> usize;
     fn get_mock_type_id(&self) -> usize;
     fn get_method_name(&self) -> &'static str;
+    fn get_type_param_ids(&self) -> &[usize];
     fn describe(&self) -> String;
 }
 
@@ -93,15 +103,16 @@ pub struct CallMatch0<Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
-
+    type_param_ids: Vec<usize>,
     _phantom: PhantomData<Res>,
 }
 impl<Res> CallMatch0<Res> {
-    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str) -> Self {
+    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str, type_param_ids: Vec<usize>) -> Self {
         CallMatch0 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
             method_name: method_name,
+            type_param_ids: type_param_ids,
             _phantom: PhantomData,
         }
     }
@@ -115,6 +126,7 @@ impl<Res> CallMatch for CallMatch0<Res> {
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
+                && call.method_data.type_param_ids == self.type_param_ids
         );
         true
     }
@@ -129,6 +141,9 @@ impl<Res> CallMatch for CallMatch0<Res> {
     }
     fn get_method_name(&self) -> &'static str {
         self.method_name
+    }
+    fn get_type_param_ids(&self) -> &[usize] {
+        &self.type_param_ids
     }
     fn describe(&self) -> String {
         format!("{}()", self.method_name)
@@ -302,6 +317,7 @@ pub struct CallMatch1<Arg0, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
+    type_param_ids: Vec<usize>,
     arg0: Box<dyn MatchArg<Arg0>>,
 
     _phantom: PhantomData<Res>,
@@ -311,12 +327,14 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
         mock_id: usize,
         mock_type_id: usize,
         method_name: &'static str,
+        type_param_ids: Vec<usize>,
         arg0: Box<dyn MatchArg<Arg0>>,
     ) -> Self {
         CallMatch1 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
             method_name: method_name,
+            type_param_ids: type_param_ids,
             arg0: arg0,
             _phantom: PhantomData,
         }
@@ -332,9 +350,11 @@ impl<Arg0, Res> CallMatch1<Arg0, Res> {
 }
 impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
     fn matches_args(&self, call: &Call) -> bool {
+        eprintln!("{:?} - {:?}", self.method_name, call.method_data.method_name);
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
+                && call.method_data.type_param_ids == self.type_param_ids
         );
 
         let args = Self::get_args_ref(call);
@@ -352,6 +372,9 @@ impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
     }
     fn get_method_name(&self) -> &'static str {
         self.method_name
+    }
+    fn get_type_param_ids(&self) -> &[usize] {
+        &self.type_param_ids
     }
     fn describe(&self) -> String {
         format!("{}({})", self.get_method_name(), self.arg0.describe())
@@ -525,6 +548,7 @@ pub struct CallMatch2<Arg0, Arg1, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
+    type_param_ids: Vec<usize>,
     arg0: Box<dyn MatchArg<Arg0>>,
     arg1: Box<dyn MatchArg<Arg1>>,
 
@@ -535,6 +559,7 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
         mock_id: usize,
         mock_type_id: usize,
         method_name: &'static str,
+        type_param_ids: Vec<usize>,
         arg0: Box<dyn MatchArg<Arg0>>,
         arg1: Box<dyn MatchArg<Arg1>>,
     ) -> Self {
@@ -542,6 +567,7 @@ impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
             method_name: method_name,
+            type_param_ids: type_param_ids,
             arg0: arg0,
             arg1: arg1,
             _phantom: PhantomData,
@@ -561,6 +587,7 @@ impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
+                && call.method_data.type_param_ids == self.type_param_ids
         );
 
         let args = Self::get_args_ref(call);
@@ -578,6 +605,9 @@ impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
     }
     fn get_method_name(&self) -> &'static str {
         self.method_name
+    }
+    fn get_type_param_ids(&self) -> &[usize] {
+        &self.type_param_ids
     }
     fn describe(&self) -> String {
         format!(
@@ -761,6 +791,7 @@ pub struct CallMatch3<Arg0, Arg1, Arg2, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
+    type_param_ids: Vec<usize>,
     arg0: Box<dyn MatchArg<Arg0>>,
     arg1: Box<dyn MatchArg<Arg1>>,
     arg2: Box<dyn MatchArg<Arg2>>,
@@ -772,6 +803,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
         mock_id: usize,
         mock_type_id: usize,
         method_name: &'static str,
+        type_param_ids: Vec<usize>,
         arg0: Box<dyn MatchArg<Arg0>>,
         arg1: Box<dyn MatchArg<Arg1>>,
         arg2: Box<dyn MatchArg<Arg2>>,
@@ -780,6 +812,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
             method_name: method_name,
+            type_param_ids: type_param_ids,
             arg0: arg0,
             arg1: arg1,
             arg2: arg2,
@@ -800,6 +833,7 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
+                && call.method_data.type_param_ids == self.type_param_ids
         );
 
         let args = Self::get_args_ref(call);
@@ -823,6 +857,9 @@ impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
     }
     fn get_method_name(&self) -> &'static str {
         self.method_name
+    }
+    fn get_type_param_ids(&self) -> &[usize] {
+        &self.type_param_ids
     }
     fn describe(&self) -> String {
         format!(
@@ -1009,6 +1046,7 @@ pub struct CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
     mock_id: usize,
     mock_type_id: usize,
     method_name: &'static str,
+    type_param_ids: Vec<usize>,
     arg0: Box<dyn MatchArg<Arg0>>,
     arg1: Box<dyn MatchArg<Arg1>>,
     arg2: Box<dyn MatchArg<Arg2>>,
@@ -1021,6 +1059,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
         mock_id: usize,
         mock_type_id: usize,
         method_name: &'static str,
+        type_param_ids: Vec<usize>,
         arg0: Box<dyn MatchArg<Arg0>>,
         arg1: Box<dyn MatchArg<Arg1>>,
         arg2: Box<dyn MatchArg<Arg2>>,
@@ -1030,6 +1069,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
             method_name: method_name,
+            type_param_ids: type_param_ids,
             arg0: arg0,
             arg1: arg1,
             arg2: arg2,
@@ -1051,6 +1091,7 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg
         assert!(
             call.method_data.mock_type_id == self.mock_type_id
                 && call.method_data.method_name == self.method_name
+                && call.method_data.type_param_ids == self.type_param_ids
         );
 
         let args = Self::get_args_ref(call);
@@ -1076,6 +1117,9 @@ impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg
     }
     fn get_method_name(&self) -> &'static str {
         self.method_name
+    }
+    fn get_type_param_ids(&self) -> &[usize] {
+        &self.type_param_ids
     }
     fn describe(&self) -> String {
         format!(
@@ -1564,107 +1608,18 @@ impl Drop for Call {
     }
 }
 
-// Copied from 'colorify' package because it has no plain 'bold' variant.
-macro_rules! colored {
-    (bold: $s:expr) => {
-        concat!("\x1b[1m", $s, "\x1b[0m")
-    };
-    (red: $s:expr) => {
-        concat!("\x1b[31m", $s, "\x1b[0m")
-    };
-    (red_bold: $s:expr) => {
-        concat!("\x1b[1;31m", $s, "\x1b[0m")
-    };
-    (green: $s:expr) => {
-        concat!("\x1b[32m", $s, "\x1b[0m")
-    };
-    (green_bold: $s:expr) => {
-        concat!("\x1b[1;32m", $s, "\x1b[0m")
-    };
-    (orange: $s:expr) => {
-        concat!("\x1b[33m", $s, "\x1b[0m")
-    };
-    (yellow_bold: $s:expr) => {
-        concat!("\x1b[1;33m", $s, "\x1b[0m")
-    };
-    (blue: $s:expr) => {
-        concat!("\x1b[34m", $s, "\x1b[0m")
-    };
-    (blue_bold: $s:expr) => {
-        concat!("\x1b[1;34m", $s, "\x1b[0m")
-    };
-    (purple: $s:expr) => {
-        concat!("\x1b[35m", $s, "\x1b[0m")
-    };
-    (purple_bold: $s:expr) => {
-        concat!("\x1b[1;35m", $s, "\x1b[0m")
-    };
-    (cyan: $s:expr) => {
-        concat!("\x1b[36m", $s, "\x1b[0m")
-    };
-    (cyan_bold: $s:expr) => {
-        concat!("\x1b[1;36m", $s, "\x1b[0m")
-    };
-    (light_grey: $s:expr) => {
-        concat!("\x1b[37m", $s, "\x1b[0m")
-    };
-    (white_bold: $s:expr) => {
-        concat!("\x1b[1;37m", $s, "\x1b[0m")
-    };
-    (dark_grey: $s:expr) => {
-        concat!("\x1b[90m", $s, "\x1b[0m")
-    };
-    (dark_grey_bold: $s:expr) => {
-        concat!("\x1b[1;90m", $s, "\x1b[0m")
-    };
-    (peach: $s:expr) => {
-        concat!("\x1b[91m", $s, "\x1b[0m")
-    };
-    (peach_bold: $s:expr) => {
-        concat!("\x1b[1;91m", $s, "\x1b[0m")
-    };
-    (lime: $s:expr) => {
-        concat!("\x1b[92m", $s, "\x1b[0m")
-    };
-    (lime_bold: $s:expr) => {
-        concat!("\x1b[1;92m", $s, "\x1b[0m")
-    };
-    (yellow: $s:expr) => {
-        concat!("\x1b[93m", $s, "\x1b[0m")
-    };
-    (yellow_bold: $s:expr) => {
-        concat!("\x1b[1;93m", $s, "\x1b[0m")
-    };
-    (royal_blue: $s:expr) => {
-        concat!("\x1b[94m", $s, "\x1b[0m")
-    };
-    (royal_blue_bold: $s:expr) => {
-        concat!("\x1b[1;94m", $s, "\x1b[0m")
-    };
-    (magenta: $s:expr) => {
-        concat!("\x1b[95m", $s, "\x1b[0m")
-    };
-    (magenta_bold: $s:expr) => {
-        concat!("\x1b[1;95m", $s, "\x1b[0m")
-    };
-    (teal: $s:expr) => {
-        concat!("\x1b[96m", $s, "\x1b[0m")
-    };
-    (teal_bold: $s:expr) => {
-        concat!("\x1b[1;96m", $s, "\x1b[0m")
-    };
-    (white: $s:expr) => {
-        concat!("\x1b[97m", $s, "\x1b[0m")
-    };
-    (white_bold: $s:expr) => {
-        concat!("\x1b[1;97m", $s, "\x1b[0m")
-    };
-}
-
 pub struct MethodData {
+    /// Unique ID of mock object
     pub mock_id: usize,
+
+    /// Unique ID of mock class
     pub mock_type_id: usize,
+
+    /// Called method name
     pub method_name: &'static str,
+
+    /// Type parameters of generic method
+    pub type_param_ids: Vec<usize>,
 }
 
 impl ScenarioInternals {
@@ -1862,7 +1817,7 @@ impl ScenarioInternals {
 
         let mut target_first_match = true;
         for expectation in self.expectations.iter().rev() {
-            if !expectation.is_satisfied() && expectation.call_match().matches_target(&call) {
+            if !expectation.is_satisfied() && expectation.call_match().matches_method(&call) {
                 if target_first_match {
                     write!(
                         &mut msg,

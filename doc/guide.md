@@ -26,6 +26,7 @@ It is inspired by [Google Mock].
 	- [Mocks cloning](#mocks-cloning)
 	- [Associated types](#associated-types)
 	- [Static methods](#static-methods)
+	- [Generic methods](#generic-methods)
 	- [Extern modules](#extern-modules)
 	- [Trait type parameters](#trait-type-parameters)
 	- [Inherited traits & mocking several traits](#inherited-traits-mocking-several-traits)
@@ -698,6 +699,44 @@ fn mock_trait_with_ctor() {
 
 Note: more convenient syntax like `scenario.expect(FooMock::new_call())` is
 planned, but not ready yet.
+
+### Generic methods
+
+Support for mocking generic methods is preliminary. Errors are not as great
+as they may be, some details may change in the future.
+
+In order to mock generic methods you must register all types which will be
+used as generic method type parameters with `register_types` macro:
+
+```rust
+use mockers_derive::register_types;
+
+register_types!(u32, &str, String);
+```
+
+After that, generic methods may be mocked almost as usual ones. There are two
+significant differences:
+  * you may not use `Scenario::create_mock_for`, only `Scenario::create_mock`,
+	* and you must use `any::<type>()` instead of `ANY` when matching parameters
+	  with generic type.
+
+```rust
+register_types!(u32);
+
+#[mocked]
+pub trait A {
+    fn foo<T>(&self, a: T);
+}
+
+#[test]
+fn test() {
+    let scenario = Scenario::new();
+    let mock = scenario.create_mock::<AMock>();
+
+    scenario.expect(mock.foo_call(any::<u32>()).and_return_default().times(1));
+    mock.foo(3u32);
+}
+```
 
 ### Extern modules
 

@@ -11,6 +11,7 @@ use syn::{
     PatIdent, Path, PathArguments, PathSegment, QSelf, ReturnType, Token, TraitBound,
     TraitBoundModifier, TraitItem, TraitItemMethod, TraitItemType, Type, TypeArray, TypeBareFn,
     TypeGroup, TypeParamBound, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice, TypeTuple,
+    ItemStruct, ItemImpl, TypeParam,
 };
 
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
@@ -23,6 +24,8 @@ use std::iter::FromIterator;
 /// It is same to use call matcher for inspecting call object only when
 /// both mock type ID and method name match.
 static mut NEXT_MOCK_TYPE_ID: usize = 0;
+
+static mut NEXT_REGISTERED_TYPE_ID: usize = 0;
 
 lazy_static! {
     //static ref KNOWN_TRAITS: Mutex<HashMap<Path, Item>> = Mutex::new(HashMap::new());
@@ -43,6 +46,49 @@ pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenSt
     }
     result.extend(tokens);
     Ok(result)
+}
+
+pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, String> {
+    use syn::parse::Parser;
+    let types = Punctuated::<Type, Token![,]>::parse_separated_nonempty
+        .parse2(input)
+        .map_err(|e| e.to_string())?;
+
+    // Generate struct local to crate, so that trait implementation can be written.
+    let item_struct: ItemStruct = parse_quote!{
+        struct MockersTypeRegistry<T> { data: ::std::marker::PhantomData<T> }
+    };
+
+    // Generate default TypeInfo implementation which will just return error for
+    // any type.
+    let dflt_impl: ItemImpl = parse_quote!{
+        impl<T> ::mockers::TypeInfo for MockersTypeRegistry<T> {
+            default fn get_type_id() -> usize { ::mockers::type_info::fail_type_info_not_found() }
+            default fn get_type_name() -> &'static str { ::mockers::type_info::fail_type_info_not_found() }
+        }
+    };
+
+    // Generate TypeInfo implmentation for each given type.
+    let type_impls: Vec<ItemImpl> = types.iter().map(|ty| {
+        let type_id = unsafe {
+            let id = NEXT_REGISTERED_TYPE_ID;
+            NEXT_REGISTERED_TYPE_ID += 1;
+            id
+        };
+        let type_name = ty.into_token_stream().to_string();
+        parse_quote!{
+            impl ::mockers::TypeInfo for MockersTypeRegistry<#ty> {
+                fn get_type_id() -> usize { #type_id }
+                fn get_type_name() -> &'static str { #type_name }
+            }
+        }
+    }).collect();
+
+    Ok(quote!{
+        #item_struct
+        #dflt_impl
+        #(#type_impls)*
+    })
 }
 
 fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), String> {
@@ -613,7 +659,8 @@ fn generate_trait_methods(
 ///     let method_data =
 ///         ::mockers::MethodData{mock_id: self.mock_id,
 ///                               mock_type_id: 15usize,
-///                               method_name: "method",};
+///                               method_name: "method",
+///                               type_param_ids: vec![] };
 ///     let action = self.scenario.borrow_mut().verify2(method_data, foo, bar);
 ///     action.call()
 /// }
@@ -696,13 +743,16 @@ fn generate_stub_code(
     } else {
         None
     };
+    let type_ids_expr = gen_type_ids_expr(generics);
+
     Ok(quote! {
         #[allow(unused_mut)]
         #unsafe_t fn #method_ident #generics (#(#impl_args),*) -> #return_type {
             let (mock_id, scenario) = #get_info_expr;
             let method_data = ::mockers::MethodData { mock_id: mock_id,
                                                       mock_type_id: #mock_type_id,
-                                                      method_name: #method_name, };
+                                                      method_name: #method_name,
+                                                      type_param_ids: #type_ids_expr };
             let action = scenario.borrow_mut().#verify_fn(method_data, #(#arg_values),*);
             action.call()
         }
@@ -791,6 +841,7 @@ fn generate_impl_method(
     new_args.push(quote! { #mock_type_id });
     let method_name = method_ident.to_string();
     new_args.push(quote! { #method_name });
+    new_args.push(gen_type_ids_expr(generics).into_token_stream());
 
     // Lifetimes used for reference-type parameters.
     let mut arg_lifetimes = Vec::new();
@@ -1182,4 +1233,16 @@ pub fn mock_impl(input: TokenStream) -> Result<TokenStream, String> {
     }
 
     Ok(tokens)
+}
+
+/// Given generic params, returns expression returning vector of type parameter IDs.
+fn gen_type_ids_expr(generics: &Generics) -> Expr {
+    let type_param_id_exprs = generics.params.iter().flat_map(|g| {
+        match g {
+            GenericParam::Type(TypeParam{ref ident, ..}) =>
+                Some(quote!(<MockersTypeRegistry<#ident> as ::mockers::TypeInfo>::get_type_id())),
+            _ => None,
+        }
+    });
+    parse_quote!(vec![#(#type_param_id_exprs),*])
 }
