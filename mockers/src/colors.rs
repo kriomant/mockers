@@ -1,4 +1,3 @@
-
 // Copied from 'colorify' package because it has no plain 'bold' variant.
 #[macro_export]
 macro_rules! colored {

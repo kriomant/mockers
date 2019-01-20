@@ -107,7 +107,12 @@ pub struct CallMatch0<Res> {
     _phantom: PhantomData<Res>,
 }
 impl<Res> CallMatch0<Res> {
-    pub fn new(mock_id: usize, mock_type_id: usize, method_name: &'static str, type_param_ids: Vec<usize>) -> Self {
+    pub fn new(
+        mock_id: usize,
+        mock_type_id: usize,
+        method_name: &'static str,
+        type_param_ids: Vec<usize>,
+    ) -> Self {
         CallMatch0 {
             mock_id: mock_id,
             mock_type_id: mock_type_id,
