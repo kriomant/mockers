@@ -96,6 +96,9 @@ uses 2018 Rust edition):
 Add `#[mocked]` attribute to trait:
 
 ```rust
+#[cfg(test)]
+use mockers_derive::mocked;
+
 #[mocked]
 pub trait AirConditioner {
   …
