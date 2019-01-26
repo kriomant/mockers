@@ -18,7 +18,7 @@ pub mod matchers;
 pub mod clone;
 pub mod type_info;
 
-pub use type_info::TypeInfo;
+pub use crate::type_info::TypeInfo;
 
 use crate::cardinality::{Cardinality, CardinalityCheckResult};
 use crate::dbg::dbg;
