@@ -116,6 +116,19 @@ mod test {
 }
 ```
 
+And if you're using `2018` edition:
+
+```rust
+#[cfg(test)] use mockers_derive::mocked;
+
+#[cfg_attr(test, mocked)]
+pub trait AirConditioner {
+    fn make_hotter(&mut self, by: i16);
+    fn make_cooler(&mut self, by: i16);
+    fn get_temperature(&self) -> i16;
+}
+```
+
 Run tests:
 
 ```
