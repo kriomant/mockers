@@ -33,3 +33,9 @@ fn test_b() {
     scenario.expect(b.bar_call().and_return(()));
     b.bar();
 }
+
+#[test]
+fn test_diagnostics() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/*.rs");
+}
