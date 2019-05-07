@@ -13,7 +13,7 @@ syn = { version = "0.15.24", features = ["full", "extra-traits"] }
 quote = "0.6.10"
 itertools = "0.4.13"
 lazy_static = "0.2.9"
-proc-macro2 = "0.4.24"
+proc-macro2 = { vesion = "0.4.24", features = ["nightly"] }
 
 [build-dependencies]
 
