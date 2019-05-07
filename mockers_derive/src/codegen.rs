@@ -16,7 +16,19 @@ use syn::{
 
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
 
-use std::iter::FromIterator;
+use std::iter::FromIterator as _;
+use syn::spanned::Spanned as _;
+
+pub enum Error {
+    General(String),
+    Spanned(Span, String),
+}
+
+impl From<String> for Error {
+    fn from(s: String) -> Error {
+        Error::General(s)
+    }
+}
 
 /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
 /// unique type ID. It is added to both call matchers produced by
@@ -32,10 +44,10 @@ lazy_static! {
     static ref KNOWN_TRAITS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
 }
 
-pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, String> {
+pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
     let mut result = input.clone();
     let source_item: Item = syn::parse2(input).map_err(|e| e.to_string())?;
-    let (tokens, include_source) = generate_mock(&source_item, opts)?;
+    let (tokens, include_source) = generate_mock(result.span(), &source_item, opts)?;
 
     if cfg!(feature = "debug") {
         eprintln!("{}", tokens.to_string());
@@ -94,7 +106,7 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, String> {
     })
 }
 
-fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), String> {
+fn generate_mock(span: Span, item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), Error> {
     match item {
         Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
         Item::ForeignMod(foreign_mod) => {
@@ -103,7 +115,7 @@ fn generate_mock(item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bo
             })?;
             Ok((generate_extern_mock(foreign_mod, mock_name)?, false))
         }
-        _ => Err("Attribute may be used on traits and extern blocks only".to_string()),
+        _ => Err(Error::Spanned(span, "Attribute may be used on traits and extern blocks only".to_string())),
     }
 }
 

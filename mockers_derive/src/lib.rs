@@ -13,7 +13,7 @@ use proc_macro::{TokenStream, Diagnostic, Level};
 mod codegen;
 mod options;
 
-use crate::codegen::{mock_impl, mocked_impl, register_types_impl};
+use crate::codegen::{mock_impl, mocked_impl, register_types_impl, Error};
 use crate::options::parse_attr_options;
 
 #[proc_macro_attribute]
@@ -25,7 +25,12 @@ pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
     match mocked_impl(input.into(), &opts) {
         Ok(tokens) => tokens,
         Err(err) => {
-            Diagnostic::new(Level::Error, err).emit();
+            match err {
+                Error::General(msg) =>
+                    Diagnostic::new(Level::Error, msg).emit(),
+                Error::Spanned(span, msg) =>
+                    Diagnostic::spanned(span.unstable(), Level::Error, msg).emit(),
+            }
             proc_macro2::TokenStream::new()
         },
     }

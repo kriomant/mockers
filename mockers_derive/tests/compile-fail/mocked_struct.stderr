@@ -1,1 +1,5 @@
 error: Attribute may be used on traits and extern blocks only
+ --> $DIR/mocked_struct.rs:4:1
+  |
+4 | struct A {
+  | ^^^^^^
