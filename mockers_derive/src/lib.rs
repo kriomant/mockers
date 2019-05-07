@@ -1,3 +1,5 @@
+#![feature(proc_macro_diagnostic)]
+
 extern crate proc_macro;
 
 #[macro_use]
@@ -6,7 +8,7 @@ extern crate quote;
 #[macro_use]
 extern crate lazy_static;
 
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream, Diagnostic, Level};
 
 mod codegen;
 mod options;
@@ -22,7 +24,10 @@ pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
     };
     match mocked_impl(input.into(), &opts) {
         Ok(tokens) => tokens,
-        Err(err) => panic!("{}", err),
+        Err(err) => {
+            Diagnostic::new(Level::Error, err).emit();
+            proc_macro2::TokenStream::new()
+        },
     }
     .into()
 }
