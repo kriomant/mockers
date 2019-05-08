@@ -16,21 +16,29 @@ mod options;
 use crate::codegen::{mock_impl, mocked_impl, register_types_impl, Error};
 use crate::options::parse_attr_options;
 
+use syn::spanned::Spanned as _;
+
+fn emit_error(err: Error) {
+    match err {
+        Error::General(msg) =>
+            Diagnostic::new(Level::Error, msg).emit(),
+        Error::Spanned(span, msg) =>
+            Diagnostic::spanned(span.unstable(), Level::Error, msg).emit(),
+    }
+}
+
 #[proc_macro_attribute]
 pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let opts = match parse_attr_options(attr.into()) {
+    let attr: proc_macro2::TokenStream = attr.into();
+    let opts_span  = attr.span();
+    let opts = match parse_attr_options(attr) {
         Ok(opts) => opts,
         Err(err) => panic!("{}", err),
     };
-    match mocked_impl(input.into(), &opts) {
+    match mocked_impl(input.into(), opts_span, &opts) {
         Ok(tokens) => tokens,
         Err(err) => {
-            match err {
-                Error::General(msg) =>
-                    Diagnostic::new(Level::Error, msg).emit(),
-                Error::Spanned(span, msg) =>
-                    Diagnostic::spanned(span.unstable(), Level::Error, msg).emit(),
-            }
+            emit_error(err);
             proc_macro2::TokenStream::new()
         },
     }
@@ -50,7 +58,10 @@ pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
 pub fn mock(input: TokenStream) -> TokenStream {
     match mock_impl(input.into()) {
         Ok(tokens) => tokens,
-        Err(err) => panic!("{}", err),
+        Err(err) => {
+            emit_error(err);
+            proc_macro2::TokenStream::new()
+        }
     }
     .into()
 }
@@ -59,7 +70,10 @@ pub fn mock(input: TokenStream) -> TokenStream {
 pub fn register_types(input: TokenStream) -> TokenStream {
     match register_types_impl(input.into()) {
         Ok(tokens) => tokens,
-        Err(err) => panic!("{}", err),
+        Err(err) => {
+            emit_error(err);
+            proc_macro2::TokenStream::new()
+        }
     }
     .into()
 }

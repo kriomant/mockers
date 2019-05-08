@@ -1,0 +1,9 @@
+error: Since extern blocks, unlike traits, don't have name, mock type name cannot be inferred and must be given explicitly for extern blocks:
+
+    #[mocked(ExternMock)]
+    extern { ... }
+
+ --> $DIR/extern_block_name.rs:3:1
+  |
+3 | #[mocked]
+  | ^^^^^^^^^

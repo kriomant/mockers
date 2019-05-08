@@ -1,0 +1,6 @@
+error: Extern specification for trait methods is not supported.
+
+ --> $DIR/extern_method.rs:5:5
+  |
+5 |     extern "C" fn foo();
+  |     ^^^^^^

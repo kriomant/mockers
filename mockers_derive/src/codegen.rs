@@ -13,6 +13,7 @@ use syn::{
     Type, TypeArray, TypeBareFn, TypeGroup, TypeParam, TypeParamBound, TypeParen, TypePath,
     TypePtr, TypeReference, TypeSlice, TypeTuple,
 };
+use indoc::indoc;
 
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
 
@@ -44,10 +45,10 @@ lazy_static! {
     static ref KNOWN_TRAITS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
 }
 
-pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
+pub fn mocked_impl(input: TokenStream, opts_span: Span, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
     let mut result = input.clone();
     let source_item: Item = syn::parse2(input).map_err(|e| e.to_string())?;
-    let (tokens, include_source) = generate_mock(result.span(), &source_item, opts)?;
+    let (tokens, include_source) = generate_mock(result.span(), &source_item, opts_span, opts)?;
 
     if cfg!(feature = "debug") {
         eprintln!("{}", tokens.to_string());
@@ -60,7 +61,7 @@ pub fn mocked_impl(input: TokenStream, opts: &MockAttrOptions) -> Result<TokenSt
     Ok(result)
 }
 
-pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, String> {
+pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, Error> {
     use syn::parse::Parser;
     let types = Punctuated::<Type, Token![,]>::parse_separated_nonempty
         .parse2(input)
@@ -106,12 +107,18 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, String> {
     })
 }
 
-fn generate_mock(span: Span, item: &Item, opts: &MockAttrOptions) -> Result<(TokenStream, bool), Error> {
+fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOptions) -> Result<(TokenStream, bool), Error> {
     match item {
         Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
         Item::ForeignMod(foreign_mod) => {
             let mock_name = opts.mock_name.as_ref().ok_or_else(|| {
-                "mock type name must be set explicitly for extern block".to_string()
+                Error::Spanned(opts_span,
+                               indoc!("
+                                   Since extern blocks, unlike traits, don't have name, mock type name cannot be inferred and must be given explicitly for extern blocks:
+
+                                       #[mocked(ExternMock)]
+                                       extern { ... }
+                                   ").to_string())
             })?;
             Ok((generate_extern_mock(foreign_mod, mock_name)?, false))
         }
@@ -122,7 +129,7 @@ fn generate_mock(span: Span, item: &Item, opts: &MockAttrOptions) -> Result<(Tok
 fn generate_trait_mock(
     item_trait: &ItemTrait,
     opts: &MockAttrOptions,
-) -> Result<TokenStream, String> {
+) -> Result<TokenStream, Error> {
     let mock_ident = opts
         .mock_name
         .clone()
@@ -135,8 +142,8 @@ fn generate_trait_mock(
             .iter()
             .map(|b| {
                 let path = match *b {
-                    TypeParamBound::Lifetime(..) => {
-                        return Err("lifetime parameters not supported yet".to_string());
+                    TypeParamBound::Lifetime(ref l) => {
+                        return Err(Error::Spanned(l.span(), "lifetime bounds aren't supported yet".to_string()));
                     }
                     TypeParamBound::Trait(TraitBound { ref path, .. }) => path,
                 };
@@ -146,9 +153,19 @@ fn generate_trait_mock(
                     match opts.refs.get(path) {
                         Some(p) => p,
                         None => {
-                            return Err(
-                                "parent trait path must be given using 'refs' param".to_string()
-                            );
+                            return Err(Error::Spanned(
+                                b.span(),
+                                indoc!(r#"
+                                    Unfortunately, macro can't get full path to referenced parent trait, so it must be be given using 'refs' parameter:
+
+                                        #[mocked]
+                                        trait A {}
+
+                                        #[mocked(refs = "A => ::full::path::to::A")]
+                                        trait B : A {}
+
+                                    "#).to_string()
+                            ));
                         }
                     }
                 };
@@ -169,10 +186,21 @@ fn generate_trait_mock(
                         trait_item: referenced_trait.clone(),
                     })
                 } else {
-                    Err(format!("Can't resolve trait reference: {:?}", path))
+                    Err(Error::Spanned(b.span(), indoc!(r#"
+                        Can't resolve trait reference.
+
+                        Please check that referenced trait also has #[mocked] attribute:
+
+                            #[mocked] // <- Parent trait must have this
+                            trait A {}
+
+                            #[mocked(refs = "A => ::A")]
+                            trait B : A {}
+
+                        "#).to_string()))
                 }
             })
-            .collect::<Result<Vec<TraitDesc>, String>>()?;
+            .collect::<Result<Vec<TraitDesc>, Error>>()?;
 
     // Remember full trait definition, so we can recall it when it is references by
     // another trait.
@@ -207,7 +235,7 @@ fn generate_mock_for_traits(
     mock_ident: Ident,
     trait_items: &[TraitDesc],
     local: bool,
-) -> Result<TokenStream, String> {
+) -> Result<TokenStream, Error> {
     let mock_ident_ref = &mock_ident;
     // Validate items, reject unsupported ones.
     let mut trait_paths = HashSet::<String>::new();
@@ -222,12 +250,16 @@ fn generate_mock_for_traits(
                     ref items,
                     ..
                 } => {
-                    if unsafety.is_some() {
-                        return Err("Unsafe traits are not supported yet".to_string());
+                    if let Some(unsafety) = unsafety {
+                        return Err(Error::Spanned(unsafety.span(), "Unsafe traits are not supported yet.\n".to_string()));
                     }
 
-                    if !generics.params.is_empty() || !generics.where_clause.is_none() {
-                        return Err("Parametrized traits are not supported yet".to_string());
+                    if let Some(lt) = generics.lt_token {
+                        return Err(Error::Spanned(lt.spans[0], "Parametrized traits are not supported yet\n".to_string()));
+                    }
+
+                    if let Some(ref where_clause) = generics.where_clause {
+                        return Err(Error::Spanned(where_clause.where_token.span(), "Where clauses are not supported yet.\n".to_string()));
                     }
 
                     for bound in supertraits {
@@ -248,21 +280,21 @@ fn generate_mock_for_traits(
                                         if !trait_paths
                                             .contains(&path.clone().into_token_stream().to_string())
                                         {
-                                            return Err("All base trait definitions must be \
+                                            return Err(Error::General("All base trait definitions must be \
                                                         provided"
-                                                .to_string());
+                                                .to_string()));
                                         }
                                     }
                                     _ => {
-                                        return Err("Type bound modifiers are not supported yet"
-                                            .to_string());
+                                        return Err(Error::General("Type bound modifiers are not supported yet"
+                                            .to_string()));
                                     }
                                 }
                             }
                             TypeParamBound::Lifetime(..) => {
-                                return Err(
+                                return Err(Error::General(
                                     "Lifetime parameter bounds are not supported yet".to_string()
-                                );
+                                ));
                             }
                         }
                     }
@@ -281,7 +313,7 @@ fn generate_mock_for_traits(
                 }
             }
         })
-        .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, String>>()?;
+        .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, Error>>()?;
 
     // Gather associated types from all traits, because they are used in mock
     // struct definition.
@@ -294,8 +326,8 @@ fn generate_mock_for_traits(
                 ..
             }) = member
             {
-                if !bounds.is_empty() {
-                    return Err("associated type bounds are not supported yet".to_string());
+                if let Some(bound) = bounds.first() {
+                    return Err(Error::Spanned(bound.span(), "Associated type bounds are not supported yet.\n".to_string()));
                 }
                 assoc_types.push(ident.clone());
             }
@@ -345,14 +377,15 @@ fn generate_mock_for_traits(
         for member in members.iter() {
             match member {
                 TraitItem::Method(TraitItemMethod { ref sig, .. }) => {
-                    if sig.unsafety.is_some() {
-                        return Err("unsafe trait methods are not supported".to_string());
+                    if let Some(unsafety) = sig.unsafety {
+                        return Err(Error::Spanned(unsafety.span(), "Unsafe trait methods are not supported.\n".to_string()));
                     }
-                    if sig.constness.is_some() {
-                        return Err("const trait methods are not supported".to_string());
-                    }
-                    if sig.abi != None {
-                        return Err("non-Rust ABIs for trait methods are not supported".to_string());
+
+                    // Trait methods may not be const.
+                    assert!(sig.constness.is_none());
+
+                    if let Some(abi) = &sig.abi {
+                        return Err(Error::Spanned(abi.span(), "Extern specification for trait methods is not supported.\n".to_string()));
                     }
 
                     let methods = generate_trait_methods(
@@ -373,17 +406,17 @@ fn generate_mock_for_traits(
                 }
                 TraitItem::Type(TraitItemType { ref bounds, .. }) => {
                     if !bounds.is_empty() {
-                        return Err("associated type bounds are not supported yet".to_string());
+                        return Err(Error::General("associated type bounds are not supported yet".to_string()));
                     }
                 }
                 TraitItem::Const(..) => {
-                    return Err("trait constants are not supported yet".to_string());
+                    return Err(Error::General("trait constants are not supported yet".to_string()));
                 }
                 TraitItem::Macro(..) => {
-                    return Err("trait macros are not supported yet".to_string());
+                    return Err(Error::General("trait macros are not supported yet".to_string()));
                 }
                 TraitItem::Verbatim(..) => {
-                    return Err("vertatim trait items are not supported".to_string());
+                    return Err(Error::General("verbatim trait items are not supported".to_string()));
                 }
             }
         }
@@ -636,7 +669,7 @@ fn generate_trait_methods(
         self_arg,
         &args,
         &return_type,
-    );
+    )?;
     let impl_method = generate_impl_method_for_trait(
         mock_type_id,
         method_ident,
@@ -644,17 +677,13 @@ fn generate_trait_methods(
         &args,
         &return_type,
         trait_path,
-    );
+    )?;
 
-    if let (Ok(tim), Ok(im)) = (trait_impl_method, impl_method) {
-        Ok(GeneratedMethods {
-            is_static: false,
-            trait_impl_method: tim,
-            impl_method: im,
-        })
-    } else {
-        Err("failed to generate impl".to_string())
-    }
+    Ok(GeneratedMethods {
+        is_static: false,
+        trait_impl_method,
+        impl_method,
+    })
 }
 
 /// Generate mocked trait method implementation for mock struct.
@@ -1239,7 +1268,7 @@ fn set_self(ty: &Type, mock_struct_path: &Path) -> Type {
     )
 }
 
-pub fn mock_impl(input: TokenStream) -> Result<TokenStream, String> {
+pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let args = parse_macro_args(input).map_err(|_| "can't parse macro input".to_string())?;
     let tokens = generate_mock_for_traits(args.ident, &args.traits, false)?;
 
