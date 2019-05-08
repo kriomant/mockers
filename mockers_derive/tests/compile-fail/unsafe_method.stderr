@@ -1,0 +1,6 @@
+error: Unsafe trait methods are not supported.
+
+ --> $DIR/unsafe_method.rs:5:5
+  |
+5 |     unsafe fn foo();
+  |     ^^^^^^

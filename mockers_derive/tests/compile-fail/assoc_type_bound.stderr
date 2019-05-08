@@ -1,0 +1,6 @@
+error: Associated type bounds are not supported yet.
+
+ --> $DIR/assoc_type_bound.rs:5:17
+  |
+5 |     type Item : Sized;
+  |                 ^^^^^

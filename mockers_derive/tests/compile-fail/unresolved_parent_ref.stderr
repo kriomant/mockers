@@ -1,0 +1,14 @@
+error: Can't resolve trait reference.
+
+Please check that referenced trait also has #[mocked] attribute:
+
+    #[mocked] // <- Parent trait must have this
+    trait A {}
+
+    #[mocked(refs = "A => ::A")]
+    trait B : A {}
+
+ --> $DIR/unresolved_parent_ref.rs:6:11
+  |
+6 | trait B : A {}
+  |           ^

@@ -1,0 +1,12 @@
+error: Unfortunately, macro can't get full path to referenced parent trait, so it must be be given using 'refs' parameter:
+
+    #[mocked]
+    trait A {}
+
+    #[mocked(refs = "A => ::full::path::to::A")]
+    trait B : A {}
+
+ --> $DIR/parent_ref.rs:6:11
+  |
+6 | trait B : A {}
+  |           ^

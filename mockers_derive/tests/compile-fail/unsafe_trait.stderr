@@ -1,0 +1,6 @@
+error: Unsafe traits are not supported yet.
+
+ --> $DIR/unsafe_trait.rs:4:1
+  |
+4 | unsafe trait A {}
+  | ^^^^^^
