@@ -120,7 +120,12 @@ fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOption
                                        extern { ... }
                                    ").to_string())
             })?;
-            Ok((generate_extern_mock(foreign_mod, mock_name)?, false))
+            let handle_name = opts
+                .mock_name
+                .clone()
+                .unwrap_or_else(|| Ident::new(&format!("{}Handle", mock_name), Span::call_site()));
+
+            Ok((generate_extern_mock(foreign_mod, mock_name, &handle_name)?, false))
         }
         _ => Err(Error::Spanned(span, "Attribute may be used on traits and extern blocks only".to_string())),
     }
@@ -134,6 +139,8 @@ fn generate_trait_mock(
         .mock_name
         .clone()
         .unwrap_or_else(|| Ident::new(&format!("{}Mock", item_trait.ident), Span::call_site()));
+
+    let handle_ident = Ident::new(&format!("{}Handle", mock_ident), Span::call_site());
 
     // Find definitions for referenced traits.
     let referenced_items =
@@ -224,7 +231,7 @@ fn generate_trait_mock(
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
-    generate_mock_for_traits(mock_ident, &all_traits, true)
+    generate_mock_for_traits(mock_ident, handle_ident, &all_traits, true)
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
@@ -233,6 +240,7 @@ fn generate_trait_mock(
 /// allows to use `scenario.create_mock_for::<Trait>`.
 fn generate_mock_for_traits(
     mock_ident: Ident,
+    handle_ident: Ident,
     trait_items: &[TraitDesc],
     local: bool,
 ) -> Result<TokenStream, Error> {
@@ -334,7 +342,9 @@ fn generate_mock_for_traits(
         }
     }
 
+    assert_ne!(mock_ident, handle_ident);
     let struct_item = generate_mock_struct(&mock_ident, &assoc_types);
+    let handle_struct_item = generate_mock_struct(&handle_ident, &assoc_types);
 
     // Generic parameters used for impls. It is part inside angles in
     // `impl<A: ::std::fmt::Debug, B: ::std::fmt::Debug, ...> ...`.
@@ -356,7 +366,7 @@ fn generate_mock_for_traits(
     };
     let struct_type: Type = parse_quote! { #struct_path };
 
-    let mut generated_items = vec![struct_item];
+    let mut generated_items = vec![struct_item, handle_struct_item];
     let mut has_static_methods = false;
     let mut mock_type_ids = Punctuated::<usize, Token![,]>::new();
 
@@ -477,6 +487,7 @@ fn generate_mock_for_traits(
             };
             let static_mock_impl = generate_mock_impl(
                 &static_mock_ident,
+                &static_mock_ident,
                 &static_mock_name,
                 &assoc_types,
                 &custom_init_code,
@@ -498,7 +509,7 @@ fn generate_mock_for_traits(
         .join("+");
 
     let mock_impl_item =
-        generate_mock_impl(&mock_ident, &mocked_class_name, &assoc_types, &quote! {});
+        generate_mock_impl(&mock_ident, &handle_ident, &mocked_class_name, &assoc_types, &quote! {});
     generated_items.push(mock_impl_item);
 
     let assoc_types_ref = &assoc_types;
@@ -566,6 +577,7 @@ fn generate_mock_struct(mock_ident: &Ident, associated_type_idents: &[Ident]) ->
 
 fn generate_mock_impl(
     mock_ident: &Ident,
+    handle_ident: &Ident,
     mocked_class_name: &str,
     associated_type_idents: &[Ident],
     custom_init_code: &TokenStream,
@@ -578,6 +590,8 @@ fn generate_mock_impl(
         .collect();
     quote! {
         impl<#(#associated_type_idents),*> ::mockers::Mock for #mock_ident<#(#associated_type_idents),*> {
+            type Handle = #handle_ident<#(#associated_type_idents),*>;
+
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
                 #custom_init_code
                 #mock_ident {
@@ -980,6 +994,7 @@ fn generate_impl_method(
 fn generate_extern_mock(
     foreign_mod: &syn::ItemForeignMod,
     mock_ident: &Ident,
+    handle_ident: &Ident,
 ) -> Result<TokenStream, String> {
     let mock_type_id = unsafe {
         let id = NEXT_MOCK_TYPE_ID;
@@ -1045,6 +1060,8 @@ fn generate_extern_mock(
     };
     let mock_impl = quote! {
         impl ::mockers::Mock for #mock_ident {
+            type Handle = #handle_ident;
+
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
                 ::mockers::EXTERN_MOCKS.with(|mocks| {
                     let mut mocks = mocks.borrow_mut();
@@ -1270,7 +1287,7 @@ fn set_self(ty: &Type, mock_struct_path: &Path) -> Type {
 
 pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let args = parse_macro_args(input).map_err(|_| "can't parse macro input".to_string())?;
-    let tokens = generate_mock_for_traits(args.ident, &args.traits, false)?;
+    let tokens = generate_mock_for_traits(args.mock_ident, args.handle_ident, &args.traits, false)?;
 
     if cfg!(feature = "debug") {
         eprintln!("{}", tokens.to_string());

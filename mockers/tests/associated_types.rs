@@ -16,7 +16,7 @@ pub trait B {
 
 /// Tests that mock may be created for trait with associated types.
 #[test]
-fn test_assocated_type() {
+fn test_associated_type() {
     let scenario = Scenario::new();
     let mock = scenario.create_mock_for::<A<Item = i32>>();
     scenario.expect(mock.create_call().and_return(2));

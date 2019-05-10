@@ -136,7 +136,8 @@ impl syn::parse::Parse for TraitDesc {
 }
 
 pub struct MockMacroArgs {
-    pub ident: Ident,
+    pub mock_ident: Ident,
+    pub handle_ident: Ident,
     pub traits: Vec<TraitDesc>,
 }
 
@@ -146,7 +147,8 @@ impl syn::parse::Parse for MockMacroArgs {
         input.parse::<Token![,]>()?;
         let traits: Punctuated<TraitDesc, Token![,]> = input.parse_terminated(TraitDesc::parse)?;
         Ok(MockMacroArgs {
-            ident: ident,
+            handle_ident: Ident::new(&format!("{}Handle", ident), Span::call_site()),
+            mock_ident: ident,
             traits: traits.into_iter().collect(),
         })
     }

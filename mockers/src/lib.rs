@@ -450,6 +450,8 @@ impl Expectation for Sequence {
 }
 
 pub trait Mock {
+    type Handle;
+
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
     fn mocked_class_name() -> &'static str;
 }
