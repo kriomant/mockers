@@ -12,7 +12,7 @@ pub trait A {
 #[test]
 fn test_extern() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<MockForA>();
+    let (mock, _) = scenario.create_mock::<MockForA>();
     scenario.expect(mock.foo_call(ANY).and_return(()));
     mock.foo(3);
 }

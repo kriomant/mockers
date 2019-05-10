@@ -21,7 +21,7 @@ mock! {
 #[test]
 fn test_a() {
     let scenario = mockers::Scenario::new();
-    let a = scenario.create_mock_for::<A>();
+    let (a, _) = scenario.create_mock_for::<A>();
     scenario.expect(a.foo_call().and_return(()));
     a.foo();
 }
@@ -29,7 +29,7 @@ fn test_a() {
 #[test]
 fn test_b() {
     let scenario = mockers::Scenario::new();
-    let b = scenario.create_mock::<BMock>();
+    let (b, _) = scenario.create_mock::<BMock>();
     scenario.expect(b.bar_call().and_return(()));
     b.bar();
 }

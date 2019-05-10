@@ -36,7 +36,7 @@ fn target<AC: A + Clone>(a: AC) {
 #[test]
 fn test_shared() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AShared>();
+    let (mock, _) = scenario.create_mock::<AShared>();
 
     scenario.expect(mock.foo_call(2).and_return_default().times(1));
 
@@ -46,8 +46,8 @@ fn test_shared() {
 #[test]
 fn test_clone_mock() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
-    let mock_clone = scenario.create_mock::<AMock>();
+    let (mock, _) = scenario.create_mock::<AMock>();
+    let (mock_clone, _) = scenario.create_mock::<AMock>();
 
     scenario.expect(mock_clone.foo_call(2).and_return_default().times(1));
     scenario.expect(mock.clone_call().and_return(mock_clone));
@@ -59,12 +59,12 @@ fn test_clone_mock() {
 #[test]
 fn test_clone_mock_dynamic() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, _) = scenario.create_mock::<AMock>();
 
     scenario.expect(mock.clone_call().and_call({
         let scenario = scenario.handle();
         move || {
-            let clone = scenario.create_mock::<AMock>();
+            let (clone, _) = scenario.create_mock::<AMock>();
             scenario.expect(clone.foo_call(2).and_return_default().times(1));
             clone
         }

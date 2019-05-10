@@ -12,7 +12,7 @@ pub trait A {
 #[test]
 fn test_any_works_for_refs() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, _) = scenario.create_mock::<AMock>();
 
     scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
 
@@ -22,7 +22,7 @@ fn test_any_works_for_refs() {
 #[test]
 fn test_refs_comparison() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, _) = scenario.create_mock::<AMock>();
 
     scenario.expect(mock.foo_call(&2).and_return_default().times(1));
 

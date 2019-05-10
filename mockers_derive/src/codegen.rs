@@ -120,10 +120,7 @@ fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOption
                                        extern { ... }
                                    ").to_string())
             })?;
-            let handle_name = opts
-                .mock_name
-                .clone()
-                .unwrap_or_else(|| Ident::new(&format!("{}Handle", mock_name), Span::call_site()));
+            let handle_name = Ident::new(&format!("{}Handle", mock_name), Span::call_site());
 
             Ok((generate_extern_mock(foreign_mod, mock_name, &handle_name)?, false))
         }
@@ -466,13 +463,17 @@ fn generate_mock_for_traits(
             let static_mock_ident = Ident::new(&static_mock_name.clone(), Span::call_site());
             let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
             let static_struct_type: Type = parse_quote! { #static_mock_ident<#(assoc_types),*> };
-
             // `impl<...> AMockStatic<...> { pub fn foo_call(...) { ... } }`
             let static_impl_item = quote! {
                 impl #generics #static_struct_type {
                     #(#static_impl_methods)*
                 }
             };
+
+            let static_handle_name = format!("{}StaticHandle", mock_ident);
+            let static_handle_ident = Ident::new(&static_handle_name.clone(), Span::call_site());
+            let static_handle_struct_item = generate_mock_struct(&static_handle_ident, &assoc_types);
+            let static_handle_impl = generate_handle_impl(&static_handle_ident, &assoc_types);
 
             let custom_init_code = quote! {
                 ::mockers::EXTERN_MOCKS.with(|mocks| {
@@ -487,7 +488,7 @@ fn generate_mock_for_traits(
             };
             let static_mock_impl = generate_mock_impl(
                 &static_mock_ident,
-                &static_mock_ident,
+                &static_handle_ident,
                 &static_mock_name,
                 &assoc_types,
                 &custom_init_code,
@@ -496,6 +497,9 @@ fn generate_mock_for_traits(
             generated_items.push(static_struct_item);
             generated_items.push(static_impl_item);
             generated_items.push(static_mock_impl);
+
+            generated_items.push(static_handle_struct_item);
+            generated_items.push(static_handle_impl);
         }
     }
 
@@ -511,6 +515,9 @@ fn generate_mock_for_traits(
     let mock_impl_item =
         generate_mock_impl(&mock_ident, &handle_ident, &mocked_class_name, &assoc_types, &quote! {});
     generated_items.push(mock_impl_item);
+
+    let handle_impl_item = generate_handle_impl(&handle_ident, &assoc_types);
+    generated_items.push(handle_impl_item);
 
     let assoc_types_ref = &assoc_types;
     let debug_impl_item = quote! {
@@ -607,6 +614,30 @@ fn generate_mock_impl(
         }
     }
 }
+
+fn generate_handle_impl(
+    handle_ident: &Ident,
+    associated_type_idents: &[Ident],
+) -> TokenStream {
+    let phantom_data_initializers: Vec<_> = associated_type_idents
+        .iter()
+        .map(|_| {
+            quote! { ::std::marker::PhantomData }
+        })
+        .collect();
+    quote! {
+        impl<#(#associated_type_idents),*> ::mockers::MockHandle for #handle_ident<#(#associated_type_idents),*> {
+            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
+                #handle_ident {
+                    scenario: scenario_int,
+                    mock_id: id,
+                    _phantom_data: (#(#phantom_data_initializers),*),
+                }
+            }
+        }
+    }
+}
+
 
 struct GeneratedMethods {
     trait_impl_method: TokenStream,
@@ -1081,9 +1112,26 @@ fn generate_extern_mock(
         }
     };
 
+    let handle_struct = quote! {
+        pub struct #handle_ident {
+            mock_id: usize,
+        }
+    };
+    let handle_impl = quote! {
+        impl ::mockers::MockHandle for #handle_ident {
+            fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
+                #handle_ident {
+                    mock_id: id,
+                }
+            }
+        }
+    };
+
     Ok(quote! {
         #mock_struct
         #mock_impl
+        #handle_struct
+        #handle_impl
         impl Drop for #mock_ident {
             fn drop(&mut self) {
                 ::mockers::EXTERN_MOCKS.with(|mocks| {

@@ -11,7 +11,7 @@ pub trait A {
 #[test]
 fn test_times_exactly_satisfied() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2));
 
@@ -25,7 +25,7 @@ fn test_times_exactly_satisfied() {
 ")]
 fn test_times_exactly_not_satisfied_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2));
 
@@ -38,7 +38,7 @@ fn test_times_exactly_not_satisfied_less() {
 )]
 fn test_times_exactly_not_satisfied_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2));
 
@@ -50,7 +50,7 @@ fn test_times_exactly_not_satisfied_more() {
 #[test]
 fn test_times_range_lower_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..4));
 
@@ -61,7 +61,7 @@ fn test_times_range_lower_bound() {
 #[test]
 fn test_times_range_upper_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..4));
 
@@ -74,7 +74,7 @@ fn test_times_range_upper_bound() {
 #[should_panic(expected = "A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
 fn test_times_range_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..4));
 
@@ -87,7 +87,7 @@ fn test_times_range_less() {
 )]
 fn test_times_range_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..4));
 
@@ -100,7 +100,7 @@ fn test_times_range_more() {
 #[test]
 fn test_times_range_inclusive_lower_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..=4));
 
@@ -111,7 +111,7 @@ fn test_times_range_inclusive_lower_bound() {
 #[test]
 fn test_times_range_inclusive_upper_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..=3));
 
@@ -124,7 +124,7 @@ fn test_times_range_inclusive_upper_bound() {
 #[should_panic(expected = "A#0.foo() must be called from 2 to 4 times, called 1 times")]
 fn test_times_range_inclusive_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..=4));
 
@@ -137,7 +137,7 @@ fn test_times_range_inclusive_less() {
 )]
 fn test_times_range_inclusive_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..=4));
 
@@ -151,7 +151,7 @@ fn test_times_range_inclusive_more() {
 #[test]
 fn test_times_range_from_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..));
 
@@ -162,7 +162,7 @@ fn test_times_range_from_bound() {
 #[test]
 fn test_times_range_from_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..));
 
@@ -175,7 +175,7 @@ fn test_times_range_from_more() {
 #[should_panic(expected = "A#0.foo() must be called from 2 and less than 4 times, called 1 times")]
 fn test_times_range_from_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(2..4));
 
@@ -185,7 +185,7 @@ fn test_times_range_from_less() {
 #[test]
 fn test_times_range_to_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..3));
 
@@ -196,7 +196,7 @@ fn test_times_range_to_bound() {
 #[test]
 fn test_times_range_to_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..3));
 
@@ -209,7 +209,7 @@ fn test_times_range_to_less() {
 )]
 fn test_times_range_to_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..3));
 
@@ -221,7 +221,7 @@ fn test_times_range_to_more() {
 #[test]
 fn test_times_range_to_inclusive_bound() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..=2));
 
@@ -232,7 +232,7 @@ fn test_times_range_to_inclusive_bound() {
 #[test]
 fn test_times_range_to_inclusive_less() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..=2));
 
@@ -245,7 +245,7 @@ fn test_times_range_to_inclusive_less() {
 )]
 fn test_times_range_to_inclusive_more() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..=2));
 
@@ -257,7 +257,7 @@ fn test_times_range_to_inclusive_more() {
 #[test]
 fn test_times_range_full_no_calls() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..));
 }
@@ -265,7 +265,7 @@ fn test_times_range_full_no_calls() {
 #[test]
 fn test_times_range_full_some_calls() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(..));
 
@@ -276,7 +276,7 @@ fn test_times_range_full_some_calls() {
 #[test]
 fn test_times_never_no_call() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(never()));
 }
@@ -285,7 +285,7 @@ fn test_times_never_no_call() {
 #[should_panic(expected = "A#0.foo is called for the 1st time, but expected to be never called")]
 fn test_times_never_call() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, _) = scenario.create_mock_for::<A>();
 
     scenario.expect(mock.foo_call().and_return_default().times(never()));
 

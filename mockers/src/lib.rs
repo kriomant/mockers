@@ -449,8 +449,12 @@ impl Expectation for Sequence {
     }
 }
 
+pub trait MockHandle {
+    fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
+}
+
 pub trait Mock {
-    type Handle;
+    type Handle: MockHandle;
 
     fn new(id: usize, scenario_int: Rc<RefCell<ScenarioInternals>>) -> Self;
     fn mocked_class_name() -> &'static str;
@@ -478,25 +482,26 @@ impl ScenarioInternals {
         id
     }
 
-    pub fn create_mock<T: Mock>(int: &Rc<RefCell<Self>>) -> T {
+    pub fn create_mock<T: Mock>(int: &Rc<RefCell<Self>>) -> (T, T::Handle) {
         let mut internals = int.borrow_mut();
         let mock_id = internals.get_next_mock_id();
         internals.generate_name_for_class(mock_id, T::mocked_class_name());
-        T::new(mock_id, int.clone())
+        (T::new(mock_id, int.clone()), T::Handle::new(mock_id, int.clone()))
     }
 
-    pub fn create_mock_with_id<T: Mock>(int: &Rc<RefCell<Self>>, mock_id: usize) -> T {
-        T::new(mock_id, int.clone())
+    pub fn create_mock_with_id<T: Mock>(int: &Rc<RefCell<Self>>, mock_id: usize) -> (T, T::Handle) {
+        (T::new(mock_id, int.clone()), T::Handle::new(mock_id, int.clone()))
     }
 
-    pub fn create_named_mock<T: Mock>(int: &Rc<RefCell<Self>>, name: String) -> T {
+    pub fn create_named_mock<T: Mock>(int: &Rc<RefCell<Self>>, name: String) -> (T, T::Handle) {
         let mut internals = int.borrow_mut();
         let mock_id = internals.get_next_mock_id();
         internals.register_name(mock_id, name);
-        T::new(mock_id, int.clone())
+        (T::new(mock_id, int.clone()), T::Handle::new(mock_id, int.clone()))
     }
 
-    pub fn create_mock_for<T: ?Sized>(int: &Rc<RefCell<Self>>) -> <&'static T as Mocked>::MockImpl
+    pub fn create_mock_for<T: ?Sized>(int: &Rc<RefCell<Self>>)
+        -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {
@@ -506,7 +511,7 @@ impl ScenarioInternals {
     pub fn create_named_mock_for<T: ?Sized>(
         int: &Rc<RefCell<Self>>,
         name: String,
-    ) -> <&'static T as Mocked>::MockImpl
+    ) -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {
@@ -552,22 +557,24 @@ impl Scenario {
         }
     }
 
-    pub fn create_mock<T: Mock>(&self) -> T {
+    pub fn create_mock<T: Mock>(&self) -> (T, T::Handle) {
         ScenarioInternals::create_mock::<T>(&self.internals)
     }
 
-    pub fn create_named_mock<T: Mock>(&self, name: String) -> T {
+    pub fn create_named_mock<T: Mock>(&self, name: String) -> (T, T::Handle) {
         ScenarioInternals::create_named_mock::<T>(&self.internals, name)
     }
 
-    pub fn create_mock_for<T: ?Sized>(&self) -> <&'static T as Mocked>::MockImpl
+    pub fn create_mock_for<T: ?Sized>(&self)
+        -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {
         ScenarioInternals::create_mock_for::<T>(&self.internals)
     }
 
-    pub fn create_named_mock_for<T: ?Sized>(&self, name: String) -> <&'static T as Mocked>::MockImpl
+    pub fn create_named_mock_for<T: ?Sized>(&self, name: String)
+        -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {
@@ -639,22 +646,24 @@ impl ScenarioHandle {
         }
     }
 
-    pub fn create_mock<T: Mock>(&self) -> T {
+    pub fn create_mock<T: Mock>(&self) -> (T, T::Handle) {
         ScenarioInternals::create_mock::<T>(&self.get_internals())
     }
 
-    pub fn create_named_mock<T: Mock>(&self, name: String) -> T {
+    pub fn create_named_mock<T: Mock>(&self, name: String) -> (T, T::Handle) {
         ScenarioInternals::create_named_mock::<T>(&self.get_internals(), name)
     }
 
-    pub fn create_mock_for<T: ?Sized>(&self) -> <&'static T as Mocked>::MockImpl
+    pub fn create_mock_for<T: ?Sized>(&self)
+        -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {
         ScenarioInternals::create_mock_for::<T>(&self.get_internals())
     }
 
-    pub fn create_named_mock_for<T: ?Sized>(&self, name: String) -> <&'static T as Mocked>::MockImpl
+    pub fn create_named_mock_for<T: ?Sized>(&self, name: String)
+        -> (<&'static T as Mocked>::MockImpl, <<&'static T as Mocked>::MockImpl as Mock>::Handle)
     where
         &'static T: Mocked,
     {

@@ -16,7 +16,7 @@ pub trait A {
 #[test]
 fn test_any_works_for_refs() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, _) = scenario.create_mock::<AMock>();
 
     scenario.expect(mock.foo_call(ANY).and_return(Ok(23)));
 

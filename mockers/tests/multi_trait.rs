@@ -22,7 +22,7 @@ mod derive_inherited_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let mock = scenario.create_mock::<BMock>();
+        let (mock, _) = scenario.create_mock::<BMock>();
 
         scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
         scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
@@ -60,7 +60,7 @@ mod derive_inherited_trait_different_modules {
         use self::b::B;
 
         let scenario = Scenario::new();
-        let mock = scenario.create_mock::<b::BMock>();
+        let (mock, _) = scenario.create_mock::<b::BMock>();
 
         scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
         scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
@@ -100,7 +100,7 @@ mod inherited_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let mock = scenario.create_mock::<BMock>();
+        let (mock, _) = scenario.create_mock::<BMock>();
 
         scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
         scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
@@ -145,7 +145,7 @@ mod multi_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let mock = scenario.create_mock::<ABMock>();
+        let (mock, _) = scenario.create_mock::<ABMock>();
 
         scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
         scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
