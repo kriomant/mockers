@@ -15,28 +15,28 @@ pub trait A {
 #[test]
 fn test_fn_mut() {
     let scenario = Scenario::new();
-    let (mock, _) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(mock.create0_call().and_call_clone(|| NonClonable).times(1));
+    scenario.expect(handle.create0_call().and_call_clone(|| NonClonable).times(1));
     scenario.expect(
-        mock.create1_call(())
-            .and_call_clone(|_| NonClonable)
-            .times(1),
+        handle.create1_call(())
+              .and_call_clone(|_| NonClonable)
+              .times(1),
     );
     scenario.expect(
-        mock.create2_call((), ())
-            .and_call_clone(|_, _| NonClonable)
-            .times(1),
+        handle.create2_call((), ())
+              .and_call_clone(|_, _| NonClonable)
+              .times(1),
     );
     scenario.expect(
-        mock.create3_call((), (), ())
-            .and_call_clone(|_, _, _| NonClonable)
-            .times(1),
+        handle.create3_call((), (), ())
+              .and_call_clone(|_, _, _| NonClonable)
+              .times(1),
     );
     scenario.expect(
-        mock.create4_call((), (), (), ())
-            .and_call_clone(|_, _, _, _| NonClonable)
-            .times(1),
+        handle.create4_call((), (), (), ())
+              .and_call_clone(|_, _, _, _| NonClonable)
+              .times(1),
     );
 
     let _ = mock.create0();

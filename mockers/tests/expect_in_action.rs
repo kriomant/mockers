@@ -17,12 +17,12 @@ pub trait B {
 #[test]
 fn test_expectation_from_action() {
     let scenario = Scenario::new();
-    let (a, _) = scenario.create_mock_for::<A<Item = BMock>>();
-    scenario.expect(a.create_call().and_call({
+    let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
+    scenario.expect(a_handle.create_call().and_call({
         let scenario = scenario.handle();
         move || {
-            let (b, _) = scenario.create_mock_for::<B>();
-            scenario.expect(b.foo_call().and_return(()));
+            let (b, b_handle) = scenario.create_mock_for::<B>();
+            scenario.expect(b_handle.foo_call().and_return(()));
             b
         }
     }));
@@ -36,12 +36,12 @@ fn test_expectation_from_action() {
 #[should_panic(expected = "not satisfied:\n`B#0.foo()`")]
 fn test_expectation_from_action_are_verified() {
     let scenario = Scenario::new();
-    let (a, _) = scenario.create_mock_for::<A<Item = BMock>>();
-    scenario.expect(a.create_call().and_call({
+    let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
+    scenario.expect(a_handle.create_call().and_call({
         let scenario = scenario.handle();
         move || {
-            let (b, _) = scenario.create_mock_for::<B>();
-            scenario.expect(b.foo_call().and_return(()));
+            let (b, b_handle) = scenario.create_mock_for::<B>();
+            scenario.expect(b_handle.foo_call().and_return(()));
             b
         }
     }));

@@ -21,16 +21,16 @@ mock! {
 #[test]
 fn test_a() {
     let scenario = mockers::Scenario::new();
-    let (a, _) = scenario.create_mock_for::<A>();
-    scenario.expect(a.foo_call().and_return(()));
+    let (a, a_handle) = scenario.create_mock_for::<A>();
+    scenario.expect(a_handle.foo_call().and_return(()));
     a.foo();
 }
 
 #[test]
 fn test_b() {
     let scenario = mockers::Scenario::new();
-    let (b, _) = scenario.create_mock::<BMock>();
-    scenario.expect(b.bar_call().and_return(()));
+    let (b, b_handle) = scenario.create_mock::<BMock>();
+    scenario.expect(b_handle.bar_call().and_return(()));
     b.bar();
 }
 

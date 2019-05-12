@@ -22,10 +22,10 @@ mod derive_inherited_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let (mock, _) = scenario.create_mock::<BMock>();
+        let (mock, handle) = scenario.create_mock::<BMock>();
 
-        scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -60,10 +60,10 @@ mod derive_inherited_trait_different_modules {
         use self::b::B;
 
         let scenario = Scenario::new();
-        let (mock, _) = scenario.create_mock::<b::BMock>();
+        let (mock, handle) = scenario.create_mock::<b::BMock>();
 
-        scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -100,10 +100,10 @@ mod inherited_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let (mock, _) = scenario.create_mock::<BMock>();
+        let (mock, handle) = scenario.create_mock::<BMock>();
 
-        scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -145,10 +145,10 @@ mod multi_trait {
     #[test]
     fn test() {
         let scenario = Scenario::new();
-        let (mock, _) = scenario.create_mock::<ABMock>();
+        let (mock, handle) = scenario.create_mock::<ABMock>();
 
-        scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(mock.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
 
         accept_cd(mock);
     }

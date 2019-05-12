@@ -25,12 +25,12 @@ fn use_foo<F: Foo>(f: F) {
 #[test]
 fn static_methods_can_be_mocked() {
     let scenario = Scenario::new();
-    let (mock, _) = scenario.create_mock::<FooMock>();
-    let (mock_static, _) = scenario.create_mock::<FooMockStatic>();
+    let (mock, handle) = scenario.create_mock::<FooMock>();
+    let (_mock_static, static_handle) = scenario.create_mock::<FooMockStatic>();
 
-    scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
-    scenario.expect(mock_static.bar_call(ANY).and_return(()));
-    scenario.expect(mock_static.baz_call().and_return(()));
+    scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+    scenario.expect(static_handle.bar_call(ANY).and_return(()));
+    scenario.expect(static_handle.baz_call().and_return(()));
 
     use_foo(mock);
 }
@@ -46,11 +46,11 @@ fn only_one_mock_instance_of_same_type_is_allowed() {
 #[test]
 fn mocks_of_different_types_can_be_used_simultaneously() {
     let scenario = Scenario::new();
-    let (foo_mock, _) = scenario.create_mock::<FooMockStatic>();
-    let (bar_mock, _) = scenario.create_mock::<BarMockStatic>();
+    let (_foo_mock, foo_handle) = scenario.create_mock::<FooMockStatic>();
+    let (_bar_mock, bar_handle) = scenario.create_mock::<BarMockStatic>();
 
-    scenario.expect(foo_mock.bar_call(ANY).and_return_default().times(1));
-    scenario.expect(bar_mock.bar_call().and_return_default().times(1));
+    scenario.expect(foo_handle.bar_call(ANY).and_return_default().times(1));
+    scenario.expect(bar_handle.bar_call().and_return_default().times(1));
 
     FooMock::bar(3);
     BarMock::bar();
@@ -70,13 +70,13 @@ fn create_and_use<T: WithCtor>() {
 #[test]
 fn mock_trait_with_ctor() {
     let scenario = Scenario::new();
-    let (static_mock, _) = scenario.create_mock::<WithCtorMockStatic>();
+    let (_static_mock, static_handle) = scenario.create_mock::<WithCtorMockStatic>();
 
-    scenario.expect(static_mock.new_call().and_call({
+    scenario.expect(static_handle.new_call().and_call({
         let scenario = scenario.handle();
         move || {
-            let (mock, _) = scenario.create_mock::<WithCtorMock>();
-            scenario.expect(mock.foo_call().and_return(()));
+            let (mock, handle) = scenario.create_mock::<WithCtorMock>();
+            scenario.expect(handle.foo_call().and_return(()));
             mock
         }
     }));

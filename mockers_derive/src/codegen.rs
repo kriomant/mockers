@@ -356,12 +356,18 @@ fn generate_mock_for_traits(
             .collect();
         gen
     };
-    // Type of mock struct with all type parameters specified.
+
+    // Types of mock and handle structs with all type parameters specified.
     let struct_path: Path = {
         let assoc_types = &assoc_types;
         parse_quote! { #mock_ident<#(#assoc_types),*> }
     };
+    let handle_path: Path = {
+        let assoc_types = &assoc_types;
+        parse_quote! { #handle_ident<#(#assoc_types),*> }
+    };
     let struct_type: Type = parse_quote! { #struct_path };
+    let handle_type: Type = parse_quote! { #handle_path };
 
     let mut generated_items = vec![struct_item, handle_struct_item];
     let mut has_static_methods = false;
@@ -428,9 +434,9 @@ fn generate_mock_for_traits(
             }
         }
 
-        // `impl<...> AMock<...> { pub fn foo_call(...) { ... } }`
+        // `impl<...> AMockHandle<...> { pub fn foo_call(...) { ... } }`
         let impl_item = quote! {
-            impl #generics #struct_type {
+            impl #generics #handle_type {
                 #(#impl_methods)*
             }
         };
@@ -463,17 +469,18 @@ fn generate_mock_for_traits(
             let static_mock_ident = Ident::new(&static_mock_name.clone(), Span::call_site());
             let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
             let static_struct_type: Type = parse_quote! { #static_mock_ident<#(assoc_types),*> };
-            // `impl<...> AMockStatic<...> { pub fn foo_call(...) { ... } }`
-            let static_impl_item = quote! {
-                impl #generics #static_struct_type {
-                    #(#static_impl_methods)*
-                }
-            };
 
             let static_handle_name = format!("{}StaticHandle", mock_ident);
             let static_handle_ident = Ident::new(&static_handle_name.clone(), Span::call_site());
             let static_handle_struct_item = generate_mock_struct(&static_handle_ident, &assoc_types);
             let static_handle_impl = generate_handle_impl(&static_handle_ident, &assoc_types);
+            let static_handle_struct_type: Type = parse_quote! { #static_handle_ident<#(assoc_types),*> };
+            // `impl<...> AMockStaticHandle<...> { pub fn foo_call(...) { ... } }`
+            let static_handle_impl_item = quote! {
+                impl #generics #static_handle_struct_type {
+                    #(#static_impl_methods)*
+                }
+            };
 
             let custom_init_code = quote! {
                 ::mockers::EXTERN_MOCKS.with(|mocks| {
@@ -495,11 +502,11 @@ fn generate_mock_for_traits(
             );
 
             generated_items.push(static_struct_item);
-            generated_items.push(static_impl_item);
             generated_items.push(static_mock_impl);
 
             generated_items.push(static_handle_struct_item);
             generated_items.push(static_handle_impl);
+            generated_items.push(static_handle_impl_item);
         }
     }
 
@@ -722,6 +729,7 @@ fn generate_trait_methods(
         &args,
         &return_type,
         trait_path,
+        mock_struct_path,
     )?;
 
     Ok(GeneratedMethods {
@@ -873,19 +881,20 @@ fn generate_impl_method_for_trait(
     args: &Punctuated<FnArg, Token![,]>,
     return_type: &Type,
     trait_path: &Path,
+    mock_path: &Path,
 ) -> Result<TokenStream, String> {
-    // Types of arguments and result may refer to `Self`, which is ambiguos in the
+    // Types of arguments and result may refer to `Self`, which is ambiguous in the
     // context of trait implementation. All references to `Self` must be replaced
-    // with `<Self as Trait>`
-    let fixed_return_type = qualify_self(return_type, trait_path);
+    // with `<Mock as Trait>`
+    let fixed_return_type = qualify_self(return_type, mock_path, &trait_path);
     let fixed_args = Punctuated::from_iter(args.iter().map(|arg| match arg {
         self_arg @ FnArg::SelfRef(..) => self_arg.clone(),
         self_arg @ FnArg::SelfValue(..) => self_arg.clone(),
         FnArg::Captured(ArgCaptured { pat, ty, .. }) => {
-            let qty = qualify_self(ty, trait_path);
+            let qty = qualify_self(ty, mock_path, &trait_path);
             parse_quote! { #pat: #qty }
         }
-        FnArg::Ignored(ty) => FnArg::Ignored(qualify_self(ty, trait_path)),
+        FnArg::Ignored(ty) => FnArg::Ignored(qualify_self(ty, mock_path, &trait_path)),
         FnArg::Inferred(pat) => FnArg::Inferred(pat.clone()),
     }));
 
@@ -1296,11 +1305,11 @@ where
 }
 
 /// Replace all unqualified references to `Self` with qualified ones.
-fn qualify_self(ty: &Type, trait_path: &Path) -> Type {
+fn qualify_self(ty: &Type, mock_path: &Path, trait_path: &Path) -> Type {
     replace_self(
         ty,
         |self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
-            let self_ty = parse_quote! { #self_seg };
+            let self_ty = parse_quote! { #mock_path };
             let new_qself = QSelf {
                 as_token: Some(Token![as](Span::call_site())),
                 gt_token: Token![>](Span::call_site()),

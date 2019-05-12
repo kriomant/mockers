@@ -4,6 +4,8 @@ extern crate mockers;
 use mockers::Scenario;
 use mockers_derive::mock;
 
+use mockers::CloneHandle as _;
+
 pub trait A {
     fn foo(&self, a: u32);
 }
@@ -16,7 +18,7 @@ mock! {
         fn foo(&self, a: u32);
     }
 }
-mock_clone!(AShared, share_expectations);
+mock_clone!(AShared, AMockHandle, share_expectations);
 
 // This mock mocks `clone` method.
 mock! {
@@ -26,7 +28,7 @@ mock! {
         fn foo(&self, a: u32);
     }
 }
-mock_clone!(AMock);
+mock_clone!(AMock, AMockHandle);
 
 fn target<AC: A + Clone>(a: AC) {
     let clone = a.clone();
@@ -36,9 +38,9 @@ fn target<AC: A + Clone>(a: AC) {
 #[test]
 fn test_shared() {
     let scenario = Scenario::new();
-    let (mock, _) = scenario.create_mock::<AShared>();
+    let (mock, handle) = scenario.create_mock::<AShared>();
 
-    scenario.expect(mock.foo_call(2).and_return_default().times(1));
+    scenario.expect(handle.foo_call(2).and_return_default().times(1));
 
     target(mock);
 }
@@ -46,11 +48,11 @@ fn test_shared() {
 #[test]
 fn test_clone_mock() {
     let scenario = Scenario::new();
-    let (mock, _) = scenario.create_mock::<AMock>();
-    let (mock_clone, _) = scenario.create_mock::<AMock>();
+    let (mock, mock_handle) = scenario.create_mock::<AMock>();
+    let (mock_clone, mock_clone_handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(mock_clone.foo_call(2).and_return_default().times(1));
-    scenario.expect(mock.clone_call().and_return(mock_clone));
+    scenario.expect(mock_clone_handle.foo_call(2).and_return_default().times(1));
+    scenario.expect(mock_handle.clone_call().and_return(mock_clone));
 
     target(mock);
 }
@@ -59,13 +61,13 @@ fn test_clone_mock() {
 #[test]
 fn test_clone_mock_dynamic() {
     let scenario = Scenario::new();
-    let (mock, _) = scenario.create_mock::<AMock>();
+    let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(mock.clone_call().and_call({
+    scenario.expect(handle.clone_call().and_call({
         let scenario = scenario.handle();
         move || {
-            let (clone, _) = scenario.create_mock::<AMock>();
-            scenario.expect(clone.foo_call(2).and_return_default().times(1));
+            let (clone, clone_handle) = scenario.create_mock::<AMock>();
+            scenario.expect(clone_handle.foo_call(2).and_return_default().times(1));
             clone
         }
     }));

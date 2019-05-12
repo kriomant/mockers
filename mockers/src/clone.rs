@@ -1,3 +1,9 @@
+use super::CallMatch0;
+
+pub trait CloneHandle<Mock>: Sized {
+    fn clone_call(&self) -> CallMatch0<Mock>;
+}
+
 /// Implements `Clone` for mock object.
 ///
 /// Sometimes it is needed for mock to be clonable. Say you have
@@ -60,7 +66,7 @@
 /// ```
 #[macro_export]
 macro_rules! mock_clone {
-    ($mock_name:ident) => {
+    ($mock_name:ident, $handle_name:ident) => {
         #[cfg(test)]
         impl Clone for $mock_name {
             fn clone(&self) -> Self {
@@ -75,15 +81,16 @@ macro_rules! mock_clone {
             }
         }
 
-        impl $mock_name {
+        #[cfg(test)]
+        impl $crate::CloneHandle<$mock_name> for $handle_name {
             #[allow(dead_code)]
-            pub fn clone_call(&self) -> ::mockers::CallMatch0<Self> {
+            fn clone_call(&self) -> ::mockers::CallMatch0<$mock_name> {
                 ::mockers::CallMatch0::new(self.mock_id, 0usize, "clone", vec![])
             }
         }
     };
 
-    ($mock_name:ident, share_expectations) => {
+    ($mock_name:ident, $handle_name:ident, share_expectations) => {
         #[cfg(test)]
         impl Clone for $mock_name {
             fn clone(&self) -> Self {
