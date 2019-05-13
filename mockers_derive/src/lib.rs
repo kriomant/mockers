@@ -70,7 +70,10 @@ pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
     let opts_span  = attr.span();
     let opts = match parse_attr_options(attr) {
         Ok(opts) => opts,
-        Err(err) => panic!("{}", err),
+        Err(err) => {
+            emit_error(err.into());
+            return proc_macro2::TokenStream::new().into();
+        }
     };
     match mocked_impl(input.into(), opts_span, &opts) {
         Ok(tokens) => tokens,

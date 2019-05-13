@@ -21,7 +21,7 @@ pub mod type_info;
 
 pub use crate::type_info::TypeInfo;
 pub use dbg::DebugOnStable;
-pub use clone::CloneHandle;
+pub use clone::CloneMock;
 
 use crate::cardinality::{Cardinality, CardinalityCheckResult};
 use crate::dbg::dbg;

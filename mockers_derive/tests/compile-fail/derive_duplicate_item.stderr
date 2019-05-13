@@ -1,0 +1,11 @@
+warning: duplicate derived trait name
+ --> $DIR/derive_duplicate_item.rs:3:24
+  |
+3 | #[mocked(derive(Clone, Clone))]
+  |                        ^^^^^
+
+error: Warnings verification
+ --> $DIR/derive_duplicate_item.rs:7:5
+  |
+7 |     compile_error!("Warnings verification");
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -577,20 +577,19 @@ fn target<AC: A + Clone>(a: AC) {
 }
 ```
 
-In this case you may use `mock_clone!` macro like this:
+In this case you may ask mockers to mock Clone trait for you:
 
 ```rust
-mock_clone!(AMock, AMockHandle);
+#[mock(derive(Clone))]
+trait A { .. }
 ```
 
-Note that it is assumed that mock object is already defined using either
-derive attribute or `mock!` macro - `mock_clone!` doesn't work alone.
-Also be attentive to use mock/handle names and not mocked trait name as argument.
-
-After this, you may set expectations for `clone` method as for any other
+Bring `mockers::CloneMock` into scope. After this, you may set expectations for `clone` method as for any other
 mocked one:
 
 ```rust
+use mockers::CloneMock as _;
+
 #[test]
 fn test_target() {
     let scenario = Scenario::new();

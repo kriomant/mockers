@@ -15,7 +15,7 @@ use syn::{
 };
 use indoc::indoc;
 
-use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc};
+use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits};
 
 use std::iter::FromIterator as _;
 use syn::spanned::Spanned as _;
@@ -28,6 +28,12 @@ pub enum Error {
 impl From<String> for Error {
     fn from(s: String) -> Error {
         Error::General(s)
+    }
+}
+
+impl From<syn::parse::Error> for Error {
+    fn from(err: syn::parse::Error) -> Error {
+        Error::Spanned(err.span(), format!("Parsing error: {}", err))
     }
 }
 
@@ -228,7 +234,7 @@ fn generate_trait_mock(
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
-    generate_mock_for_traits(mock_ident, handle_ident, &all_traits, true)
+    generate_mock_for_traits(mock_ident, handle_ident, &all_traits, true, &opts.derives)
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
@@ -240,6 +246,7 @@ fn generate_mock_for_traits(
     handle_ident: Ident,
     trait_items: &[TraitDesc],
     local: bool,
+    derives: &DerivedTraits,
 ) -> Result<TokenStream, Error> {
     let mock_ident_ref = &mock_ident;
     // Validate items, reject unsupported ones.
@@ -560,6 +567,30 @@ fn generate_mock_for_traits(
         };
 
         generated_items.push(mocked_impl_item)
+    }
+
+    if derives.clone {
+        generated_items.push(quote! {
+            impl Clone for #mock_ident {
+                fn clone(&self) -> Self {
+                    let method_data = ::mockers::MethodData {
+                        mock_id: self.mock_id,
+                        mock_type_id: 0usize,
+                        method_name: "Clone::clone",
+                        type_param_ids: vec![],
+                    };
+                    let action = self.scenario.borrow_mut().verify0(method_data);
+                    action.call()
+                }
+            }
+
+            impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
+                #[allow(dead_code)]
+                fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
+                    ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
+                }
+            }
+        });
     }
 
     Ok(quote! { #(#generated_items)* })
@@ -1341,7 +1372,8 @@ fn set_self(ty: &Type, mock_struct_path: &Path) -> Type {
 
 pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let args = parse_macro_args(input).map_err(|_| "can't parse macro input".to_string())?;
-    let tokens = generate_mock_for_traits(args.mock_ident, args.handle_ident, &args.traits, false)?;
+    let tokens = generate_mock_for_traits(args.mock_ident, args.handle_ident, &args.traits, false,
+                                          &DerivedTraits::default())?;
 
     if cfg!(feature = "debug") {
         eprintln!("{}", tokens.to_string());

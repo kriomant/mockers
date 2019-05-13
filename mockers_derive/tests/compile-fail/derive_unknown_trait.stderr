@@ -1,0 +1,5 @@
+error: Parsing error: don't know how to derive this trait, supported traits are: Copy
+ --> $DIR/derive_unknown_trait.rs:3:17
+  |
+3 | #[mocked(derive(Foo))]
+  |                 ^^^

@@ -1,6 +1,6 @@
 use super::CallMatch0;
 
-pub trait CloneHandle<Mock>: Sized {
+pub trait CloneMock<Mock>: Sized {
     fn clone(&self) -> CallMatch0<Mock>;
 }
 
@@ -82,7 +82,7 @@ macro_rules! mock_clone {
         }
 
         #[cfg(test)]
-        impl $crate::CloneHandle<$mock_name> for $handle_name {
+        impl $crate::CloneMock<$mock_name> for $handle_name {
             #[allow(dead_code)]
             fn clone(&self) -> ::mockers::CallMatch0<$mock_name> {
                 ::mockers::CallMatch0::new(self.mock_id, 0usize, "clone", vec![])

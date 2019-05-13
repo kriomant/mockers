@@ -39,4 +39,5 @@ fn test_b() {
 fn test_diagnostics() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/*.rs");
+    t.pass("tests/compile-warn/*.rs");
 }

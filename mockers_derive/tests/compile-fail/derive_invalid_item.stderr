@@ -1,0 +1,7 @@
+error: Parsing error: name of trait expected, for example:
+
+#[mocked(derive(Clone)]
+ --> $DIR/derive_invalid_item.rs:3:17
+  |
+3 | #[mocked(derive("Clone"))]
+  |                 ^^^^^^^
