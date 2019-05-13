@@ -130,10 +130,10 @@ mod test {
     #[test]
     fn test_set_temperature_20() {
         let scenario = Scenario::new();
-        let mut cond = scenario.create_mock_for::<AirConditioner>();
+        let (mut cond, cond_handle) = scenario.create_mock_for::<AirConditioner>();
 
-        scenario.expect(cond.get_temperature_call().and_return(16));
-        scenario.expect(cond.make_hotter_call(4).and_return(()));
+        scenario.expect(cond_handle.get_temperature().and_return(16));
+        scenario.expect(cond_handle.make_hotter(4).and_return(()));
 
         set_temperature_20(&mut cond);
     }
@@ -187,26 +187,22 @@ and expectations. When the scenario object is destroyed it checks
 that all expectations are satisfied and fails otherwise.
 
 ```rust
-let mut cond = scenario.create_mock_for::<AirConditioner>();
-scenario.expect(cond.get_temperature_call().and_return(16));
-scenario.expect(cond.make_hotter_call(4).and_return(()));
+let (mut cond, cond_handle) = scenario.create_mock_for::<AirConditioner>();
+scenario.expect(cond_handle.get_temperature().and_return(16));
+scenario.expect(cond_handle.make_hotter(4).and_return(()));
 ```
 
-Here we create a mock object which implements the `AirConditioner` trait and
-add expectations. Note that the concrete mock type is not specified. In fact the
-`#[mocked]` attribute will generate an `AirConditionerMock` struct, i.e.
-it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
-Don't rely on it. You can [set mock name explicitly](#specifying-mock-type-name-explicitly).
+Here we create a pair of objects:
+ * mock object implementing `AirConditioner` trait,
+ * handler object.
 
+For each method in the `AirConditioner` trait, the mock object has it's implementation
+and handle object has corresponding method which can be used to create expectations.
 
-In addition to methods from the `AirConditioner` trait, the mock object has a second
-set of methods which are named after trait methods, but with an additional
-`_call` suffix.
+In this case, for example, these are the `cond.get_temperature` method used by the tested code
+and the `cond_handle.get_temperature` method used by the testing code for creating expectations.
 
-In this case, for example, these are the `get_temperature` method used by the tested code
-and the `get_temperature_call` method used by the testing code for creating expectations.
-
-`*_call` methods return "call matcher" objects which are used by the scenario
+Handler object methods return "call matcher" objects which are used by the scenario
 to find expectations matching the performed call. But it isn't an expectation yet,
 because we didn't specify any reaction to this call.
 
@@ -219,33 +215,39 @@ Finally we run the function under test:
 set_temperature_20(&mut cond);
 ```
 
+Note that the concrete mock type is not specified. In fact the
+`#[mocked]` attribute will generate an `AirConditionerMock` struct, i.e.
+it just adds a `Mock` suffix to the trait name. But this is an implementation detail.
+Don't rely on it.
+If you want to use mock struct name (sometimes you have to) you can [set mock name explicitly](#specifying-mock-type-name-explicitly).
+
 ### Argument Matchers
 
 Consider the expectation from the previous example:
 
 ```rust
-cond.make_hotter_call(4).and_return(())
+cond_handle.make_hotter_call(4).and_return(())
 ```
 
-`*_call` methods have the same number of arguments as the original method.
+Handler methods have the same number of arguments as the original method.
 In this case we just use a fixed value to verify the call, but expectations are
 not limited to that.
 
-For every parameter `arg: T` of the original method, the corresponding `_call` method
+For every parameter `arg: T` of the original method, the corresponding handler method
 has an `arg: M where M: MatchArg<T>` parameter, i.e. it receives a matcher for an
 argument of type `T`.
 
 Any type `T` which implements `Eq` automatically implements `MatchArg<T>`.
 The arguments get matched by checking for equality with the specified value.
 
-This is why we can pass the value `4` to `make_hotter_call`.
+This is why we can pass the value `4` to `cond_handle.make_hotter`.
 
 The `matchers` module contains other matchers which may be useful:
 
   * `ANY` will match any value:
     ```rust
     use mockers::matchers::ANY;
-    cond.make_hotter_call(ANY).and_return(());
+    cond_handle.make_hotter(ANY).and_return(());
     ```
 
 	* `any` will match any value, just like `ANY`, but may be used for generic
@@ -256,7 +258,7 @@ The `matchers` module contains other matchers which may be useful:
 			fn foo<T>(t: T);
 		}
 
-		mock.foo_call(any::<u32>()).and_return(());
+		handle.foo(any::<u32>()).and_return(());
 		mock.foo(1u32);
 		```
 
@@ -264,26 +266,26 @@ The `matchers` module contains other matchers which may be useful:
     using `<`, `<=`, `==`, `!=`, `>=` and `>` respectively:
     ```rust
     use mockers::matchers::le;
-    cond.make_hotter_call(le(5)).and_return(());
+    cond_handle.make_hotter(le(5)).and_return(());
     ```
 
   * `in_range` will check whether the value is contained in range:
     ```rust
     use mockers::matchers::in_range;
-    cond.make_hotter_call(in_range(1..)).and_return(());
-    cond.make_hotter_call(in_range(10..20)).and_return(());
+    cond_handle.make_hotter(in_range(1..)).and_return(());
+    cond_handle.make_hotter(in_range(10..20)).and_return(());
     ```
 
   * `not`, `and`, `or` will combine other matchers:
     ```rust
     use mockers::matchers::{gt, lt};
-    cond.make_hotter_call(and(gt(3), lt(10))).and_return(());
+    cond_handle.make_hotter(and(gt(3), lt(10))).and_return(());
     ```
 
   * `none`, `some`, `ok`, `err` matchers for `Option` and `Result`
     ```rust
     use mockers::matchers::{some, lt};
-    cond.opt_call(some(gt(3))).and_return(());
+    cond_handle.opt(some(gt(3))).and_return(());
     ```
 
 	* `by_ref` allows matching values behind the reference:
@@ -295,7 +297,7 @@ You can also use a function returning `bool` to match an argument:
 
 ```rust
 use mockers::matchers::check;
-cond.make_hotter_call(check(|t: usize| t > 4)).and_return(());
+cond_handle.make_hotter(check(|t: usize| t > 4)).and_return(());
 ```
 
 While the provided named matchers will produce nice error messages in case
@@ -307,7 +309,7 @@ function:
 
 ```rust
 #[macro_use(check)] extern crate mockers;
-cond.make_hotter_call(check!(|t: usize| t > 4)).and_return(());
+cond_handle.make_hotter(check!(|t: usize| t > 4)).and_return(());
 ```
 
 In case of failure it produces: ```3 doesn't satisfy to |t: usize| t > 4```,
@@ -318,7 +320,7 @@ matches a specified pattern:
 
 ```rust
 #[macro_use(arg)] extern crate mockers;
-mock.method_receiving_option_call(arg!(Some(_))).and_return(())
+handle.method_receiving_option(arg!(Some(_))).and_return(())
 ```
 
 It will print something like ```None isn't matched by Some(_)``` in
@@ -363,23 +365,23 @@ yet, how many times a call must be matched. So you have to additionally call `ti
 on it:
 
 ```rust
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(2));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(2));
 ```
 
 It is also possible to specify ranges instead of single call count:
 ```rust
 // At most once
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(..2));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(..2));
 // 1 to 4 times
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(1..5));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(1..5));
 // 3 or more times
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(3..));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(3..));
 // Any number of times
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(..));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(..));
 // At most once
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(..=1));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(..=1));
 // 1 to 4 times
-scenario.expect(cond.get_temperature_call().and_return_clone(16).times(1..=4));
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(1..=4));
 ```
 
 ### Order of calls
@@ -388,8 +390,8 @@ The order in which calls are made is not important, expectations are not ordered
 Thus following will succeed:
 
 ```rust
-scenario.expect(cond.make_hotter_call(4).and_return(()));
-scenario.expect(cond.get_temperature_call().and_return(16));
+scenario.expect(cond_handle.make_hotter(4).and_return(()));
+scenario.expect(cond_handle.get_temperature().and_return(16));
 
 let _temp = cond.get_temperature();
 cond.make_hotter(2);
@@ -403,8 +405,8 @@ use mockers::Sequence;
 …
 
 let mut seq = Sequence::new();
-seq.expect(cond.get_temperature_call().and_return(16));
-seq.expect(cond.make_hotter_call(4).and_return(()));
+seq.expect(cond_handle.get_temperature().and_return(16));
+seq.expect(cond_handle.make_hotter(4).and_return(()));
 scenario.expect(seq);
 
 let _temp = cond.get_temperature();
@@ -416,8 +418,8 @@ cond.make_hotter(2);
 It is possible that one call matches several expectations:
 
 ```rust
-scenario.expect(cond.make_hotter_call(ANY).and_panic("boom"));
-scenario.expect(cond.make_hotter_call(4).and_return(()));
+scenario.expect(cond_handle.make_hotter(ANY).and_panic("boom"));
+scenario.expect(cond_handle.make_hotter(4).and_return(()));
 
 cond.make_hotter(4);
 ```
@@ -433,12 +435,12 @@ expectations are satisfied and only then specify new ones and continue
 testing. You may do this with `checkpoint`.
 
 ```rust
-scenario.expect(cond.make_hotter_call(4).and_return(()));
+scenario.expect(cond_handle.make_hotter(4).and_return(()));
 cond.make_hotter(4);
 
 scenario.checkpoint();
 
-scenario.expect(cond.make_hotter_call(5).and_return(()));
+scenario.expect(cond_handle.make_hotter(5).and_return(()));
 cond.make_hotter(5);
 ```
 
@@ -478,7 +480,7 @@ fn test() {
 
     // Use `create_mock` with mock type name instead of
     // `create_mock_for` with mocked trait name.
-    let mut cond = scenario.create_mock::<AirConditionerMock>();
+    let (mut cond, cond_handle) = scenario.create_mock::<AirConditionerMock>();
 
     // The rest is the same.
     …
@@ -507,8 +509,8 @@ This may be inconvenient when you have several mock objects
 of the same type. Just name them!
 
 ```rust
-let left = scenario.create_named_mock_for::<AirConditioner>("left".to_owned());
-let right = scenario.create_named_mock_for::<AirConditioner>("right".to_owned());
+let (left, left_handle) = scenario.create_named_mock_for::<AirConditioner>("left".to_owned());
+let (right, right_handle) = scenario.create_named_mock_for::<AirConditioner>("right".to_owned());
 ```
 
 There is also a corresponding `create_named_mock` method for external trait mocks.
@@ -554,8 +556,8 @@ Here is what `Scenario::handle()` method is for. It returns `ScenarioHandle` obj
 scenario.expect(factory.create_call().and_call({
     let scenario = scenario.handle();
     move || {
-        let item = scenario.create_mock_for::<Item>();
-        scenario.expect(item.foo_call().and_return(()));
+        let (item, item_handle) = scenario.create_mock_for::<Item>();
+        scenario.expect(item_handle.foo().and_return(()));
         item
     }
 }));
@@ -578,12 +580,12 @@ fn target<AC: A + Clone>(a: AC) {
 In this case you may use `mock_clone!` macro like this:
 
 ```rust
-mock_clone!(AMock);
+mock_clone!(AMock, AMockHandle);
 ```
 
 Note that it is assumed that mock object is already defined using either
 derive attribute or `mock!` macro - `mock_clone!` doesn't work alone.
-Also be attentive to use mock name and not mocked trait name as argument.
+Also be attentive to use mock/handle names and not mocked trait name as argument.
 
 After this, you may set expectations for `clone` method as for any other
 mocked one:
@@ -592,11 +594,11 @@ mocked one:
 #[test]
 fn test_target() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
-    let mock_clone = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<A>();
+    let (mock_clone, clone_handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(mock_clone.foo_call(2).and_return_default().times(1));
-    scenario.expect(mock.clone_call().and_return(mock_clone));  // <--
+    scenario.expect(clone_handle.foo(2).and_return_default().times(1));
+    scenario.expect(handle.clone().and_return(mock_clone));  // <--
 
     target(mock);
 }
@@ -606,7 +608,7 @@ If you don't need such precise control over how many clones are created
 and which calls are made on each of them, you may use second form:
 
 ```rust
-mock_clone!(AMock, share_expectations);
+mock_clone!(AMock, AMockHandle, share_expectations);
 ```
 
 Then all cloned mocks are indistinguishable and share same expectations,
@@ -616,9 +618,9 @@ so any expectation set on one of them will be satisfied by call on any other:
 #[test]
 fn test_target() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(mock.foo_call(2).and_return_default().times(1));
+    scenario.expect(handle.foo(2).and_return_default().times(1));
 
     target(mock);
 }
@@ -638,8 +640,8 @@ pub trait A {
 #[test]
 fn test_assocated_type() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock_for::<A<Item=i32>>();
-    scenario.expect(mock.create_call().and_return(2));
+    let (mock, handle) = scenario.create_mock_for::<A<Item=i32>>();
+    scenario.expect(handle.create().and_return(2));
     assert_eq!(mock.create(), 2);
 }
 ```
@@ -665,9 +667,9 @@ trait Bar {
 }
 
 let scenario = Scenario::new();
-let mock_static = scenario.create_mock::<BarMockStatic>();
+let (mock_static, handle_static) = scenario.create_mock::<BarMockStatic>();
 
-scenario.expect(mock_static.bar_call().and_return(()).times(1));
+scenario.expect(handle_static.bar().and_return(()).times(1));
 
 <BarMock as Bar>::bar();
 ```
@@ -693,13 +695,13 @@ fn create_and_use<T: WithCtor>() {
 #[test]
 fn mock_trait_with_ctor() {
     let scenario = Scenario::new();
-    let static_mock = scenario.create_mock::<WithCtorMockStatic>();
+    let (static_mock, static_handle) = scenario.create_mock::<WithCtorMockStatic>();
 
-    scenario.expect(static_mock.new_call().and_call({
+    scenario.expect(static_handle.new().and_call({
         let scenario = scenario.handle();
         move || {
-            let mock = scenario.create_mock::<WithCtorMock>();
-            scenario.expect(mock.foo_call().and_return(()));
+            let (mock, handle) = scenario.create_mock::<WithCtorMock>();
+            scenario.expect(handle.foo_call().and_return(()));
             mock
         }
     }));
@@ -708,7 +710,7 @@ fn mock_trait_with_ctor() {
 }
 ```
 
-Note: more convenient syntax like `scenario.expect(FooMock::new_call())` is
+Note: more convenient syntax like `scenario.expect(FooMockHandle::new())` is
 planned, but not ready yet.
 
 ### Generic methods
@@ -728,8 +730,8 @@ register_types!(u32, &str, String);
 After that, generic methods may be mocked almost as usual ones. There are two
 significant differences:
   * you may not use `Scenario::create_mock_for`, only `Scenario::create_mock`,
-	* and you must use `any::<type>()` instead of `ANY` when matching parameters
-	  with generic type.
+  * and you must use `any::<type>()` instead of `ANY` when matching parameters
+	with generic type.
 
 ```rust
 register_types!(u32);
@@ -742,9 +744,9 @@ pub trait A {
 #[test]
 fn test() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(mock.foo_call(any::<u32>()).and_return_default().times(1));
+    scenario.expect(handle.foo(any::<u32>()).and_return_default().times(1));
     mock.foo(3u32);
 }
 ```
@@ -764,9 +766,9 @@ extern "Rust" {
 #[test]
 fn test_extern_function() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<Foo>();
+    let (mock, handle) = scenario.create_mock::<Foo>();
 
-    scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
+    scenario.expect(handle.foo(ANY).and_return_default().times(1));
 
     unsafe { foo(3) };
 }
@@ -835,9 +837,9 @@ extern "C" {
 #[test]
 fn test() {
   let scenario = Scenario::new();
-  let mock = scenario.create_mock::<LibFooMock>();
+  let (mock, handle) = scenario.create_mock::<LibFooMock>();
 
-  scenario.expect(mock.foo_call().and_return(()));
+  scenario.expect(handle.foo().and_return(()));
   unsafe { foo() };
 }
 ```
@@ -932,7 +934,7 @@ mod tests {
     #[test]
     fn test_set_temperature_20() {
         let scenario = mockers::Scenario::new();
-        let mut ac = s.create_mock::<AirConditioner>();
+        let mut (ac, ac_handle) = s.create_mock::<AirConditioner>();
         …
         set_temperature_20(&mut ac);
         …
