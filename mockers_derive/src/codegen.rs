@@ -53,7 +53,7 @@ lazy_static! {
 
 pub fn mocked_impl(input: TokenStream, opts_span: Span, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
     let mut result = input.clone();
-    let source_item: Item = syn::parse2(input).map_err(|e| e.to_string())?;
+    let source_item: Item = syn::parse2(input)?;
     let (tokens, include_source) = generate_mock(result.span(), &source_item, opts_span, opts)?;
 
     if cfg!(feature = "debug") {
@@ -113,6 +113,8 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, Error> {
     })
 }
 
+/// Generate mock for given item, it may be either trait or extern block.
+/// Returns generated mock and flag telling whether original item must be preserved.
 fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOptions) -> Result<(TokenStream, bool), Error> {
     match item {
         Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
@@ -138,14 +140,22 @@ fn generate_trait_mock(
     item_trait: &ItemTrait,
     opts: &MockAttrOptions,
 ) -> Result<TokenStream, Error> {
+    // Choose names for mock and handle structs. Mock name may be specified by user, otherwise
+    // it's name generated automatically. Handle name can't be changed right now.
     let mock_ident = opts
         .mock_name
         .clone()
         .unwrap_or_else(|| Ident::new(&format!("{}Mock", item_trait.ident), Span::call_site()));
-
     let handle_ident = Ident::new(&format!("{}Handle", mock_ident), Span::call_site());
 
-    // Find definitions for referenced traits.
+    // Trait definition may refer to another traits:
+    // ```
+    // #[mocked(refs="B => ::some::B")]
+    // trait A : B { .. }
+    // ```
+    //
+    // Referenced traits must has `#[mocked(module="::some")]` attribute and thus registered
+    // in global mocked traits registry. Find there definitions for referenced traits.
     let referenced_items =
         item_trait
             .supertraits
@@ -213,7 +223,8 @@ fn generate_trait_mock(
             .collect::<Result<Vec<TraitDesc>, Error>>()?;
 
     // Remember full trait definition, so we can recall it when it is references by
-    // another trait.
+    // another trait. `module` parameter must be given for trait in order to be able
+    // to be referenced by another mocked trait.
     if let Some(ref module_path) = opts.module_path {
         let mut full_path = module_path.clone();
         full_path
@@ -254,76 +265,67 @@ fn generate_mock_for_traits(
     let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items
         .iter()
         .map(|desc| {
-            match desc.trait_item {
-                ItemTrait {
-                    unsafety,
-                    ref generics,
-                    ref supertraits,
-                    ref items,
-                    ..
-                } => {
-                    if let Some(unsafety) = unsafety {
-                        return Err(Error::Spanned(unsafety.span(), "Unsafe traits are not supported yet.\n".to_string()));
-                    }
+            let ItemTrait { unsafety, ref generics, ref supertraits, ref items, .. } = desc.trait_item;
+            if let Some(unsafety) = unsafety {
+                return Err(Error::Spanned(unsafety.span(), "Unsafe traits are not supported yet.\n".to_string()));
+            }
 
-                    if let Some(lt) = generics.lt_token {
-                        return Err(Error::Spanned(lt.spans[0], "Parametrized traits are not supported yet\n".to_string()));
-                    }
+            if let Some(lt) = generics.lt_token {
+                return Err(Error::Spanned(lt.spans[0], "Parametrized traits are not supported yet\n".to_string()));
+            }
 
-                    if let Some(ref where_clause) = generics.where_clause {
-                        return Err(Error::Spanned(where_clause.where_token.span(), "Where clauses are not supported yet.\n".to_string()));
-                    }
+            if let Some(ref where_clause) = generics.where_clause {
+                return Err(Error::Spanned(where_clause.where_token.span(), "Where clauses are not supported yet.\n".to_string()));
+            }
 
-                    for bound in supertraits {
-                        match *bound {
-                            TypeParamBound::Trait(TraitBound {
-                                ref path,
-                                ref modifier,
-                                ref lifetimes,
-                                ..
-                            }) => {
-                                match *modifier {
-                                    TraitBoundModifier::None => {
-                                        assert!(lifetimes.is_none());
+            for bound in supertraits {
+                match *bound {
+                    TypeParamBound::Trait(TraitBound {
+                        ref path,
+                        ref modifier,
+                        ref lifetimes,
+                        ..
+                    }) => {
+                        match *modifier {
+                            TraitBoundModifier::None => {
+                                assert!(lifetimes.is_none());
 
-                                        // Ok, this is plain base trait reference with no lifetimes
-                                        // and type bounds. Check whether base trait definition was
-                                        // provided by user.
-                                        if !trait_paths
-                                            .contains(&path.clone().into_token_stream().to_string())
-                                        {
-                                            return Err(Error::General("All base trait definitions must be \
-                                                        provided"
-                                                .to_string()));
-                                        }
-                                    }
-                                    _ => {
-                                        return Err(Error::General("Type bound modifiers are not supported yet"
-                                            .to_string()));
-                                    }
+                                // Ok, this is plain base trait reference with no lifetimes
+                                // and type bounds. Check whether base trait definition was
+                                // provided by user.
+                                if !trait_paths
+                                    .contains(&path.clone().into_token_stream().to_string())
+                                {
+                                    return Err(Error::General("All base trait definitions must be \
+                                                provided"
+                                        .to_string()));
                                 }
                             }
-                            TypeParamBound::Lifetime(..) => {
-                                return Err(Error::General(
-                                    "Lifetime parameter bounds are not supported yet".to_string()
-                                ));
+                            _ => {
+                                return Err(Error::General("Type bound modifiers are not supported yet"
+                                    .to_string()));
                             }
                         }
                     }
-
-                    let mut trait_path = desc.mod_path.clone();
-                    trait_path.segments.push(PathSegment {
-                        ident: desc.trait_item.ident.clone(),
-                        arguments: PathArguments::None,
-                    });
-
-                    trait_paths.insert(format!(
-                        "{}",
-                        trait_path.clone().into_token_stream().to_string()
-                    ));
-                    Ok((trait_path, items))
+                    TypeParamBound::Lifetime(..) => {
+                        return Err(Error::General(
+                            "Lifetime parameter bounds are not supported yet".to_string()
+                        ));
+                    }
                 }
             }
+
+            let mut trait_path = desc.mod_path.clone();
+            trait_path.segments.push(PathSegment {
+                ident: desc.trait_item.ident.clone(),
+                arguments: PathArguments::None,
+            });
+
+            trait_paths.insert(format!(
+                "{}",
+                trait_path.clone().into_token_stream().to_string()
+            ));
+            Ok((trait_path, items))
         })
         .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, Error>>()?;
 
@@ -387,11 +389,7 @@ fn generate_mock_for_traits(
         let mut static_impl_methods = Vec::new();
         let mut static_trait_impl_methods = Vec::new();
 
-        let mock_type_id = unsafe {
-            let id = NEXT_MOCK_TYPE_ID;
-            NEXT_MOCK_TYPE_ID += 1;
-            id
-        };
+        let mock_type_id = gen_type_id();
         mock_type_ids.push(mock_type_id);
 
         for member in members.iter() {
@@ -569,44 +567,7 @@ fn generate_mock_for_traits(
         generated_items.push(mocked_impl_item)
     }
 
-    match derives.clone {
-        DeriveClone::No => {}
-
-        DeriveClone::Normal => {
-            generated_items.push(quote! {
-                impl Clone for #mock_ident {
-                    fn clone(&self) -> Self {
-                        let method_data = ::mockers::MethodData {
-                            mock_id: self.mock_id,
-                            mock_type_id: 0usize,
-                            method_name: "Clone::clone",
-                            type_param_ids: vec![],
-                        };
-                        let action = self.scenario.borrow_mut().verify0(method_data);
-                        action.call()
-                    }
-                }
-
-                impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
-                    #[allow(dead_code)]
-                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
-                        ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
-                    }
-                }
-            });
-        }
-
-        DeriveClone::Shared => {
-            generated_items.push(quote! {
-                impl Clone for #mock_ident {
-                    fn clone(&self) -> Self {
-                        use ::mockers::Mock;
-                        #mock_ident::new(self.mock_id, self.scenario.clone())
-                    }
-                }
-            });
-        }
-    }
+    generated_items.extend(derive_standard_traits(derives, &mock_ident, &handle_ident));
 
     Ok(quote! { #(#generated_items)* })
 }
@@ -1079,11 +1040,7 @@ fn generate_extern_mock(
     mock_ident: &Ident,
     handle_ident: &Ident,
 ) -> Result<TokenStream, String> {
-    let mock_type_id = unsafe {
-        let id = NEXT_MOCK_TYPE_ID;
-        NEXT_MOCK_TYPE_ID += 1;
-        id
-    };
+    let mock_type_id = gen_type_id();
 
     let (mock_items, stub_items): (Vec<_>, Vec<_>) = foreign_mod
         .items
@@ -1395,6 +1352,61 @@ pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
     }
 
     Ok(tokens)
+}
+
+/// Generate implementation of supported standard traits for mock and handle structs.
+fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_ident: &Ident)
+        -> Vec<TokenStream> {
+    let mut items = Vec::new();
+
+    match derives.clone {
+        DeriveClone::No => {}
+
+        DeriveClone::Normal => {
+            items.push(quote! {
+                impl Clone for #mock_ident {
+                    fn clone(&self) -> Self {
+                        let method_data = ::mockers::MethodData {
+                            mock_id: self.mock_id,
+                            mock_type_id: 0usize,
+                            method_name: "Clone::clone",
+                            type_param_ids: vec![],
+                        };
+                        let action = self.scenario.borrow_mut().verify0(method_data);
+                        action.call()
+                    }
+                }
+
+                impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
+                    #[allow(dead_code)]
+                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
+                        ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
+                    }
+                }
+            });
+        }
+
+        DeriveClone::Shared => {
+            items.push(quote! {
+                impl Clone for #mock_ident {
+                    fn clone(&self) -> Self {
+                        use ::mockers::Mock;
+                        #mock_ident::new(self.mock_id, self.scenario.clone())
+                    }
+                }
+            });
+        }
+    }
+
+    items
+}
+
+fn gen_type_id() -> usize {
+    unsafe {
+        let id = NEXT_MOCK_TYPE_ID;
+        NEXT_MOCK_TYPE_ID += 1;
+        id
+    }
 }
 
 /// Given generic params, returns expression returning vector of type parameter IDs.
