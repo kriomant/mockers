@@ -15,7 +15,7 @@ use syn::{
 };
 use indoc::indoc;
 
-use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits};
+use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits, DeriveClone};
 
 use std::iter::FromIterator as _;
 use syn::spanned::Spanned as _;
@@ -569,28 +569,43 @@ fn generate_mock_for_traits(
         generated_items.push(mocked_impl_item)
     }
 
-    if derives.clone {
-        generated_items.push(quote! {
-            impl Clone for #mock_ident {
-                fn clone(&self) -> Self {
-                    let method_data = ::mockers::MethodData {
-                        mock_id: self.mock_id,
-                        mock_type_id: 0usize,
-                        method_name: "Clone::clone",
-                        type_param_ids: vec![],
-                    };
-                    let action = self.scenario.borrow_mut().verify0(method_data);
-                    action.call()
-                }
-            }
+    match derives.clone {
+        DeriveClone::No => {}
 
-            impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
-                #[allow(dead_code)]
-                fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
-                    ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
+        DeriveClone::Normal => {
+            generated_items.push(quote! {
+                impl Clone for #mock_ident {
+                    fn clone(&self) -> Self {
+                        let method_data = ::mockers::MethodData {
+                            mock_id: self.mock_id,
+                            mock_type_id: 0usize,
+                            method_name: "Clone::clone",
+                            type_param_ids: vec![],
+                        };
+                        let action = self.scenario.borrow_mut().verify0(method_data);
+                        action.call()
+                    }
                 }
-            }
-        });
+
+                impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
+                    #[allow(dead_code)]
+                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
+                        ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
+                    }
+                }
+            });
+        }
+
+        DeriveClone::Shared => {
+            generated_items.push(quote! {
+                impl Clone for #mock_ident {
+                    fn clone(&self) -> Self {
+                        use ::mockers::Mock;
+                        #mock_ident::new(self.mock_id, self.scenario.clone())
+                    }
+                }
+            });
+        }
     }
 
     Ok(quote! { #(#generated_items)* })

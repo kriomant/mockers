@@ -35,6 +35,11 @@ pub trait ADerive {
     fn foo(&self, a: u32);
 }
 
+#[mocked(derive(Clone(share_expectations)))]
+pub trait ADeriveShared {
+    fn foo(&self, a: u32);
+}
+
 fn target<AC: A + Clone>(a: AC) {
     let clone = a.clone();
     clone.foo(2);
@@ -45,6 +50,10 @@ fn target_derive<AC: ADerive + Clone>(a: AC) {
     clone.foo(2);
 }
 
+fn target_derive_shared<AC: ADeriveShared + Clone>(a: AC) {
+    let clone = a.clone();
+    clone.foo(2);
+}
 
 #[test]
 fn test_shared() {
@@ -78,6 +87,16 @@ fn test_derive() {
     scenario.expect(mock_handle.clone().and_return(mock_clone));
 
     target_derive(mock);
+}
+
+#[test]
+fn test_derive_shared() {
+    let scenario = Scenario::new();
+    let (mock, handle) = scenario.create_mock_for::<ADeriveShared>();
+
+    scenario.expect(handle.foo(2).and_return_default().times(1));
+
+    target_derive_shared(mock);
 }
 
 // Test that it is possible to create mock right from `clone` expectation reaction.

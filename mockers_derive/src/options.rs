@@ -14,12 +14,15 @@ pub fn parse_macro_args(tokens: TokenStream) -> syn::parse::Result<MockMacroArgs
     syn::parse2::<MockMacroArgs>(tokens)
 }
 
+#[derive(PartialEq, Eq)]
+pub enum DeriveClone { No, Normal, Shared }
+
 pub struct DerivedTraits {
-    pub clone: bool,
+    pub clone: DeriveClone,
 }
 impl Default for DerivedTraits {
     fn default() -> Self {
-        DerivedTraits { clone: false }
+        DerivedTraits { clone: DeriveClone::No }
     }
 }
 
@@ -106,10 +109,10 @@ impl syn::parse::Parse for MockAttrOptions {
                     })) if name == "derive" => {
                         use syn::spanned::Spanned;
 
-                        let idents: Vec<&Ident> = items.iter().map(|m| {
+                        let metas: Vec<&Meta> = items.iter().map(|m| {
                             match m {
-                                NestedMeta::Meta(Meta::Word(ident)) => Ok(ident),
-                                _ => Err(syn::Error::new(
+                                NestedMeta::Meta(meta) => Ok(meta),
+                                NestedMeta::Literal(_) => Err(syn::Error::new(
                                     m.span(),
                                     indoc!("name of trait expected, for example:
 
@@ -119,19 +122,47 @@ impl syn::parse::Parse for MockAttrOptions {
                             }
                         }).collect::<Result<Vec<_>, _>>()?;
 
-                        for ident in idents {
-                            match ident.to_string().as_ref() {
-                                "Clone" => {
-                                    if derives.clone {
+                        for meta in metas {
+                            match meta {
+                                Meta::Word(ident) if ident == "Clone" => {
+                                    if derives.clone != DeriveClone::No {
                                          Diagnostic::spanned(ident.span().unstable(),
                                                              proc_macro::Level::Warning,
                                                              "duplicate derived trait name").emit();
                                     }
-                                    derives.clone = true;
+                                    derives.clone = DeriveClone::Normal;
                                 }
 
-                                _ => return Err(syn::Error::new(
-                                        ident.span(),
+                                Meta::List(MetaList { ident, nested, .. }) if ident == "Clone" => {
+                                    if derives.clone != DeriveClone::No {
+                                        Diagnostic::spanned(ident.span().unstable(),
+                                                            proc_macro::Level::Warning,
+                                                            "duplicate derived trait name").emit();
+                                    }
+
+                                    if nested.len() > 1 {
+                                        return Err(syn::Error::new(nested[1].span(),
+                                                                   "only one option is allowed for Clone trait specification"));
+                                    }
+
+                                    match nested.iter().next() {
+                                        None => {
+                                            derives.clone = DeriveClone::Normal;
+                                        }
+                                        Some(NestedMeta::Meta(Meta::Word(w))) if w == "normal" => {
+                                            derives.clone = DeriveClone::Normal;
+                                        }
+                                        Some(NestedMeta::Meta(Meta::Word(w))) if w == "share_expectations" => {
+                                            derives.clone = DeriveClone::Shared;
+                                        }
+                                        m => return Err(syn::Error::new(
+                                            m.span(),
+                                            "unknown Clone derive trait option, only 'normal' and 'share_expectations' are supported".to_string()))
+                                    }
+                                }
+
+                                meta => return Err(syn::Error::new(
+                                        meta.span(),
                                         "don't know how to derive this trait, supported traits are: Copy".to_string()))
                             }
                         }
