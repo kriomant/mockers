@@ -39,7 +39,7 @@ mock! {
 fn test_unit() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.bar_call(2).and_return(()));
+    scenario.expect(handle.bar(2).and_return(()));
     mock.foo();
 }
 
@@ -47,7 +47,7 @@ fn test_unit() {
 fn test_return() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.baz_call().and_return(2));
+    scenario.expect(handle.baz().and_return(2));
     assert_eq!(2, mock.baz());
 }
 
@@ -56,7 +56,7 @@ fn test_return() {
 fn test_arg_match_failure() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.bar_call(lt(3)).and_return(()));
+    scenario.expect(handle.bar(lt(3)).and_return(()));
     mock.bar(4);
 }
 
@@ -64,7 +64,7 @@ fn test_arg_match_failure() {
 fn test_arg_match_success() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.bar_call(lt(3)).and_return(()));
+    scenario.expect(handle.bar(lt(3)).and_return(()));
     mock.bar(2);
 }
 
@@ -73,7 +73,7 @@ fn test_arg_match_success() {
 fn test_expected_call_not_performed() {
     let scenario = Scenario::new();
     let (_mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.bar_call(ANY).and_return(()));
+    scenario.expect(handle.bar(ANY).and_return(()));
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn test_expected_call_not_performed() {
 fn test_panic_result() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.foo_call().and_panic("boom!".to_owned()));
+    scenario.expect(handle.foo().and_panic("boom!".to_owned()));
     mock.foo();
 }
 
@@ -89,7 +89,7 @@ fn test_panic_result() {
 fn test_mut_self_method() {
     let scenario = Scenario::new();
     let (mut mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.modify_call().and_return(()));
+    scenario.expect(handle.modify().and_return(()));
     mock.modify();
 }
 
@@ -97,7 +97,7 @@ fn test_mut_self_method() {
 fn test_value_self_method() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.consume_call().and_return(()));
+    scenario.expect(handle.consume().and_return(()));
     mock.consume();
 }
 
@@ -106,7 +106,7 @@ fn test_value_self_method() {
 fn test_named_mock() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_named_mock_for::<A>("amock".to_owned());
-    scenario.expect(handle.bar_call(2).and_return(()));
+    scenario.expect(handle.bar(2).and_return(()));
     mock.foo();
 }
 
@@ -120,17 +120,17 @@ fn test_failed_with_remaining_expectations() {
     let (_mock, handle) = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
-    scenario.expect(handle.bar_call(2).and_return(()));
+    scenario.expect(handle.bar(2).and_return(()));
     panic!("caboom!");
 }
 
 #[test]
-fn test_expect_and_call() {
+fn test_expect_and() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     // This expectation will never be satisfied.
-    scenario.expect(handle.ask_call(2).and_call(|arg| arg + 1));
+    scenario.expect(handle.ask(2).and_call(|arg| arg + 1));
     assert_eq!(mock.ask(2), 3);
 }
 
@@ -139,8 +139,8 @@ fn test_expect_is_unordered() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call().and_return(()));
-    scenario.expect(handle.bar_call(2).and_return(()));
+    scenario.expect(handle.foo().and_return(()));
+    scenario.expect(handle.bar(2).and_return(()));
 
     mock.bar(2);
     mock.foo();
@@ -152,7 +152,7 @@ fn test_expect_consumes_one_call_only() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call().and_return(()));
+    scenario.expect(handle.foo().and_return(()));
 
     mock.foo();
     mock.foo();
@@ -163,7 +163,7 @@ fn test_never_satisfied() {
     let scenario = Scenario::new();
     let (_mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call().never());
+    scenario.expect(handle.foo().never());
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn test_never_on_call_with_args() {
     let scenario = Scenario::new();
     let (_mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.bar_call(ANY).never());
+    scenario.expect(handle.bar(ANY).never());
 }
 
 #[test]
@@ -180,7 +180,7 @@ fn test_never_not_satisfied() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call().never());
+    scenario.expect(handle.foo().never());
 
     mock.foo();
 }
@@ -191,7 +191,7 @@ fn test_consume_result() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
-    scenario.expect(handle.consume_result_call().and_return(result));
+    scenario.expect(handle.consume_result().and_return(result));
 
     assert_eq!(mock.consume_result(), "ho-ho");
 }
@@ -202,7 +202,7 @@ fn test_consume_call_result() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let result = "ho-ho".to_owned();
-    scenario.expect(handle.consume_result_call().and_call(move || result));
+    scenario.expect(handle.consume_result().and_call(move || result));
 
     assert_eq!(mock.consume_result(), "ho-ho");
 }
@@ -212,7 +212,7 @@ fn test_consume_argument() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.consume_arg_call(ANY).and_call(|arg| arg));
+    scenario.expect(handle.consume_arg(ANY).and_call(|arg| arg));
 
     let arg = "ho-ho".to_owned();
     assert_eq!(mock.consume_arg(arg), "ho-ho");
@@ -243,7 +243,7 @@ fn test_checkpoint() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call().and_return_clone(()).times(2));
+    scenario.expect(handle.foo().and_return_clone(()).times(2));
 
     mock.foo();
 
@@ -277,7 +277,7 @@ fn test_check_other_mock_object_expectations() {
     let (_mock0, handle0) = scenario.create_mock_for::<A>();
     let (mock1, _) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle0.bar_call(12).and_return(()));
+    scenario.expect(handle0.bar(12).and_return(()));
 
     mock1.bar(12);
 }
@@ -288,8 +288,8 @@ fn test_sequence() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
-    seq.expect(handle.foo_call().and_return(()));
-    seq.expect(handle.bar_call(4).and_return(()));
+    seq.expect(handle.foo().and_return(()));
+    seq.expect(handle.bar(4).and_return(()));
     scenario.expect(seq);
 
     mock.foo();
@@ -303,8 +303,8 @@ fn test_sequence_invalid_order() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
-    seq.expect(handle.foo_call().and_return(()));
-    seq.expect(handle.bar_call(4).and_return(()));
+    seq.expect(handle.foo().and_return(()));
+    seq.expect(handle.bar(4).and_return(()));
     scenario.expect(seq);
 
     mock.bar(4);
@@ -317,8 +317,8 @@ fn test_sequence_times() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
-    seq.expect(handle.foo_call().and_return_clone(()).times(2));
-    seq.expect(handle.bar_call(4).and_return(()));
+    seq.expect(handle.foo().and_return_clone(()).times(2));
+    seq.expect(handle.bar(4).and_return(()));
     scenario.expect(seq);
 
     mock.foo();
@@ -333,8 +333,8 @@ fn test_sequence_times_invalid() {
     let (mock, handle) = scenario.create_mock_for::<A>();
 
     let mut seq = Sequence::new();
-    seq.expect(handle.foo_call().and_return_clone(()).times(2));
-    seq.expect(handle.bar_call(4).and_return(()));
+    seq.expect(handle.foo().and_return_clone(()).times(2));
+    seq.expect(handle.bar(4).and_return(()));
     scenario.expect(seq);
 
     mock.foo();
@@ -346,7 +346,7 @@ fn test_return_default() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.baz_call().and_return_default().times(1));
+    scenario.expect(handle.baz().and_return_default().times(1));
 
     assert_eq!(mock.baz(), 0);
 }

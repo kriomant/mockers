@@ -17,7 +17,7 @@ pub trait A {
 fn test_any_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.bar_call(ANY).and_return(()));
+    scenario.expect(handle.bar(ANY).and_return(()));
     mock.bar(2);
 }
 
@@ -25,7 +25,7 @@ fn test_any_match() {
 fn test_eq_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(eq(2)).and_return(()));
+    scenario.expect(handle.num(eq(2)).and_return(()));
     mock.num(2);
 }
 
@@ -34,7 +34,7 @@ fn test_eq_matcher_match() {
 fn test_eq_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(eq(2)).and_return(()));
+    scenario.expect(handle.num(eq(2)).and_return(()));
     mock.num(3);
 }
 
@@ -42,7 +42,7 @@ fn test_eq_matcher_mismatch() {
 fn test_ne_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(ne(2)).and_return(()));
+    scenario.expect(handle.num(ne(2)).and_return(()));
     mock.num(3);
 }
 
@@ -51,7 +51,7 @@ fn test_ne_matcher_match() {
 fn test_ne_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(ne(2)).and_return(()));
+    scenario.expect(handle.num(ne(2)).and_return(()));
     mock.num(2);
 }
 
@@ -59,7 +59,7 @@ fn test_ne_matcher_mismatch() {
 fn test_lt_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(lt(2)).and_return(()));
+    scenario.expect(handle.num(lt(2)).and_return(()));
     mock.num(1);
 }
 
@@ -68,7 +68,7 @@ fn test_lt_matcher_match() {
 fn test_lt_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(lt(2)).and_return(()));
+    scenario.expect(handle.num(lt(2)).and_return(()));
     mock.num(2);
 }
 
@@ -76,12 +76,12 @@ fn test_lt_matcher_mismatch() {
 fn test_le_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(le(2)).and_return(()));
+    scenario.expect(handle.num(le(2)).and_return(()));
     mock.num(1);
 
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(le(2)).and_return(()));
+    scenario.expect(handle.num(le(2)).and_return(()));
     mock.num(2);
 }
 
@@ -90,7 +90,7 @@ fn test_le_matcher_match() {
 fn test_le_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(le(2)).and_return(()));
+    scenario.expect(handle.num(le(2)).and_return(()));
     mock.num(3);
 }
 
@@ -98,7 +98,7 @@ fn test_le_matcher_mismatch() {
 fn test_gt_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(gt(2)).and_return(()));
+    scenario.expect(handle.num(gt(2)).and_return(()));
     mock.num(3);
 }
 
@@ -107,7 +107,7 @@ fn test_gt_matcher_match() {
 fn test_gt_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(gt(2)).and_return(()));
+    scenario.expect(handle.num(gt(2)).and_return(()));
     mock.num(2);
 }
 
@@ -115,12 +115,12 @@ fn test_gt_matcher_mismatch() {
 fn test_ge_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(ge(2)).and_return(()));
+    scenario.expect(handle.num(ge(2)).and_return(()));
     mock.num(2);
 
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(ge(2)).and_return(()));
+    scenario.expect(handle.num(ge(2)).and_return(()));
     mock.num(3);
 }
 
@@ -129,7 +129,7 @@ fn test_ge_matcher_match() {
 fn test_ge_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(ge(2)).and_return(()));
+    scenario.expect(handle.num(ge(2)).and_return(()));
     mock.num(1);
 }
 
@@ -137,7 +137,7 @@ fn test_ge_matcher_mismatch() {
 fn test_not_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(not(ge(2))).and_return(()));
+    scenario.expect(handle.num(not(ge(2))).and_return(()));
     mock.num(1);
 }
 
@@ -146,7 +146,7 @@ fn test_not_matcher_match() {
 fn test_not_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(not(ge(2))).and_return(()));
+    scenario.expect(handle.num(not(ge(2))).and_return(()));
     mock.num(2);
 }
 
@@ -168,7 +168,7 @@ impl<T> mockers::MatchArg<T> for UnreachableMatcher {
 fn test_and_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(and(gt(2), lt(5))).and_return(()));
+    scenario.expect(handle.num(and(gt(2), lt(5))).and_return(()));
     mock.num(3);
 }
 
@@ -177,7 +177,7 @@ fn test_and_matcher_match() {
 fn test_and_matcher_short_circuit() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(and(gt(2), UnreachableMatcher)).and_return(()));
+    scenario.expect(handle.num(and(gt(2), UnreachableMatcher)).and_return(()));
     mock.num(1);
 }
 
@@ -186,7 +186,7 @@ fn test_and_matcher_short_circuit() {
 fn test_and_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(and(gt(2), lt(5))).and_return(()));
+    scenario.expect(handle.num(and(gt(2), lt(5))).and_return(()));
     mock.num(6);
 }
 
@@ -194,7 +194,7 @@ fn test_and_matcher_mismatch() {
 fn test_or_matcher_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(or(lt(2), gt(5))).and_return(()));
+    scenario.expect(handle.num(or(lt(2), gt(5))).and_return(()));
     mock.num(1);
 }
 
@@ -202,7 +202,7 @@ fn test_or_matcher_match() {
 fn test_or_matcher_short_circuit() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(or(lt(2), UnreachableMatcher)).and_return(()));
+    scenario.expect(handle.num(or(lt(2), UnreachableMatcher)).and_return(()));
     mock.num(1);
 }
 
@@ -211,7 +211,7 @@ fn test_or_matcher_short_circuit() {
 fn test_or_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.num_call(or(lt(2), gt(5))).and_return(()));
+    scenario.expect(handle.num(or(lt(2), gt(5))).and_return(()));
     mock.num(4);
 }
 
@@ -219,7 +219,7 @@ fn test_or_matcher_mismatch() {
 fn test_arg_macro_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.cmplx_call(arg!(Some(_))).and_return(()));
+    scenario.expect(handle.cmplx(arg!(Some(_))).and_return(()));
     mock.cmplx(Some(3));
 }
 
@@ -228,7 +228,7 @@ fn test_arg_macro_match() {
 fn test_arg_macro_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
-    scenario.expect(handle.cmplx_call(arg!(Some(_))).and_return(()));
+    scenario.expect(handle.cmplx(arg!(Some(_))).and_return(()));
     mock.cmplx(None);
 }
 
@@ -237,7 +237,7 @@ fn test_check_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
     scenario.expect(
-        handle.cmplx_call(check(|t: &Option<u32>| t.is_some()))
+        handle.cmplx(check(|t: &Option<u32>| t.is_some()))
               .and_return(()),
     );
     mock.cmplx(Some(3));
@@ -249,7 +249,7 @@ fn test_check_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
     scenario.expect(
-        handle.cmplx_call(check(|t: &Option<u32>| t.is_some()))
+        handle.cmplx(check(|t: &Option<u32>| t.is_some()))
               .and_return(()),
     );
     mock.cmplx(None);
@@ -260,7 +260,7 @@ fn test_check_macro_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
     scenario.expect(
-        handle.cmplx_call(check!(|t: &Option<u32>| t.is_some()))
+        handle.cmplx(check!(|t: &Option<u32>| t.is_some()))
               .and_return(()),
     );
     mock.cmplx(Some(3));
@@ -272,7 +272,7 @@ fn test_check_macro_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
     scenario.expect(
-        handle.cmplx_call(check!(|t: &Option<u32>| t.is_some()))
+        handle.cmplx(check!(|t: &Option<u32>| t.is_some()))
               .and_return(()),
     );
     mock.cmplx(None);
@@ -283,7 +283,7 @@ fn test_range_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.bar_call(in_range(1..4)).and_return(()));
+    scenario.expect(handle.bar(in_range(1..4)).and_return(()));
 
     mock.bar(2);
 }
@@ -294,7 +294,7 @@ fn test_range_edge_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.bar_call(in_range(1..4)).and_return(()));
+    scenario.expect(handle.bar(in_range(1..4)).and_return(()));
 
     mock.bar(4);
 }
@@ -305,7 +305,7 @@ fn test_range_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.bar_call(in_range(1..4)).and_return(()));
+    scenario.expect(handle.bar(in_range(1..4)).and_return(()));
 
     mock.bar(5);
 }
@@ -315,7 +315,7 @@ fn test_none_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.cmplx_call(none()).and_return(()));
+    scenario.expect(handle.cmplx(none()).and_return(()));
 
     mock.cmplx(None);
 }
@@ -326,7 +326,7 @@ fn test_none_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.cmplx_call(none()).and_return(()));
+    scenario.expect(handle.cmplx(none()).and_return(()));
 
     mock.cmplx(Some(2));
 }
@@ -336,7 +336,7 @@ fn test_some_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.cmplx_call(some(gt(3))).and_return(()));
+    scenario.expect(handle.cmplx(some(gt(3))).and_return(()));
 
     mock.cmplx(Some(4));
 }
@@ -347,7 +347,7 @@ fn test_some_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.cmplx_call(some(gt(3))).and_return(()));
+    scenario.expect(handle.cmplx(some(gt(3))).and_return(()));
 
     mock.cmplx(None);
 }
@@ -358,7 +358,7 @@ fn test_some_inner_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.cmplx_call(some(gt(3))).and_return(()));
+    scenario.expect(handle.cmplx(some(gt(3))).and_return(()));
 
     mock.cmplx(Some(2));
 }
@@ -373,7 +373,7 @@ fn test_err_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(err("Boom")).and_return(()));
+    scenario.expect(handle.func(err("Boom")).and_return(()));
 
     mock.func(Err("Boom"));
 }
@@ -384,7 +384,7 @@ fn test_err_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(err(ANY)).and_return(()));
+    scenario.expect(handle.func(err(ANY)).and_return(()));
 
     mock.func(Ok(2));
 }
@@ -395,7 +395,7 @@ fn test_err_inner_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(err("Oops")).and_return(()));
+    scenario.expect(handle.func(err("Oops")).and_return(()));
 
     mock.func(Err("Boom"));
 }
@@ -405,7 +405,7 @@ fn test_ok_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(ok(gt(3))).and_return(()));
+    scenario.expect(handle.func(ok(gt(3))).and_return(()));
 
     mock.func(Ok(4));
 }
@@ -416,7 +416,7 @@ fn test_ok_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(ok(gt(3))).and_return(()));
+    scenario.expect(handle.func(ok(gt(3))).and_return(()));
 
     mock.func(Err("Boom"));
 }
@@ -427,7 +427,7 @@ fn test_ok_inner_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<ResultTest>();
 
-    scenario.expect(handle.func_call(ok(gt(3))).and_return(()));
+    scenario.expect(handle.func(ok(gt(3))).and_return(()));
 
     mock.func(Ok(2));
 }

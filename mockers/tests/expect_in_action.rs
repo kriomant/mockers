@@ -18,11 +18,11 @@ pub trait B {
 fn test_expectation_from_action() {
     let scenario = Scenario::new();
     let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
-    scenario.expect(a_handle.create_call().and_call({
+    scenario.expect(a_handle.create().and_call({
         let scenario = scenario.handle();
         move || {
             let (b, b_handle) = scenario.create_mock_for::<B>();
-            scenario.expect(b_handle.foo_call().and_return(()));
+            scenario.expect(b_handle.foo().and_return(()));
             b
         }
     }));
@@ -37,11 +37,11 @@ fn test_expectation_from_action() {
 fn test_expectation_from_action_are_verified() {
     let scenario = Scenario::new();
     let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
-    scenario.expect(a_handle.create_call().and_call({
+    scenario.expect(a_handle.create().and_call({
         let scenario = scenario.handle();
         move || {
             let (b, b_handle) = scenario.create_mock_for::<B>();
-            scenario.expect(b_handle.foo_call().and_return(()));
+            scenario.expect(b_handle.foo().and_return(()));
             b
         }
     }));

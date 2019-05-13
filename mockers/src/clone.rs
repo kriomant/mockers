@@ -1,7 +1,7 @@
 use super::CallMatch0;
 
 pub trait CloneHandle<Mock>: Sized {
-    fn clone_call(&self) -> CallMatch0<Mock>;
+    fn clone(&self) -> CallMatch0<Mock>;
 }
 
 /// Implements `Clone` for mock object.
@@ -34,8 +34,8 @@ pub trait CloneHandle<Mock>: Sized {
 ///     let mock = scenario.create_mock_for::<A>();
 ///     let mock_clone = scenario.create_mock_for::<A>();
 ///
-///     scenario.expect(mock_clone.foo_call(2).and_return_default().times(1));
-///     scenario.expect(mock.clone_call().and_return(mock_clone));
+///     scenario.expect(mock_clone.foo(2).and_return_default().times(1));
+///     scenario.expect(mock.clone().and_return(mock_clone));
 ///
 ///     target(mock);
 /// }
@@ -59,7 +59,7 @@ pub trait CloneHandle<Mock>: Sized {
 ///     let scenario = Scenario::new();
 ///     let mock = scenario.create_mock_for::<A>();
 ///
-///     scenario.expect(mock.foo_call(2).and_return_default().times(1));
+///     scenario.expect(mock.foo(2).and_return_default().times(1));
 ///
 ///     target(mock);
 /// }
@@ -84,7 +84,7 @@ macro_rules! mock_clone {
         #[cfg(test)]
         impl $crate::CloneHandle<$mock_name> for $handle_name {
             #[allow(dead_code)]
-            fn clone_call(&self) -> ::mockers::CallMatch0<$mock_name> {
+            fn clone(&self) -> ::mockers::CallMatch0<$mock_name> {
                 ::mockers::CallMatch0::new(self.mock_id, 0usize, "clone", vec![])
             }
         }

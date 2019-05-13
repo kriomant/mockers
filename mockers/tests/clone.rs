@@ -40,7 +40,7 @@ fn test_shared() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AShared>();
 
-    scenario.expect(handle.foo_call(2).and_return_default().times(1));
+    scenario.expect(handle.foo(2).and_return_default().times(1));
 
     target(mock);
 }
@@ -51,8 +51,8 @@ fn test_clone_mock() {
     let (mock, mock_handle) = scenario.create_mock::<AMock>();
     let (mock_clone, mock_clone_handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(mock_clone_handle.foo_call(2).and_return_default().times(1));
-    scenario.expect(mock_handle.clone_call().and_return(mock_clone));
+    scenario.expect(mock_clone_handle.foo(2).and_return_default().times(1));
+    scenario.expect(mock_handle.clone().and_return(mock_clone));
 
     target(mock);
 }
@@ -63,11 +63,11 @@ fn test_clone_mock_dynamic() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.clone_call().and_call({
+    scenario.expect(handle.clone().and_call({
         let scenario = scenario.handle();
         move || {
             let (clone, clone_handle) = scenario.create_mock::<AMock>();
-            scenario.expect(clone_handle.foo_call(2).and_return_default().times(1));
+            scenario.expect(clone_handle.foo(2).and_return_default().times(1));
             clone
         }
     }));

@@ -19,7 +19,7 @@ fn extern_function_can_be_mocked() {
     let scenario = Scenario::new();
     let (mock, _) = scenario.create_mock::<Foo>();
 
-    scenario.expect(mock.foo_call(ANY).and_return_default().times(1));
+    scenario.expect(mock.foo(ANY).and_return_default().times(1));
 
     unsafe { foo(3) };
 }
@@ -38,8 +38,8 @@ fn mocks_of_different_types_can_be_used_simultaneously() {
     let (foo_mock, _) = scenario.create_mock::<Foo>();
     let (bar_mock, _) = scenario.create_mock::<Bar>();
 
-    scenario.expect(foo_mock.foo_call(ANY).and_return_default().times(1));
-    scenario.expect(bar_mock.bar_call().and_return_default().times(1));
+    scenario.expect(foo_mock.foo(ANY).and_return_default().times(1));
+    scenario.expect(bar_mock.bar().and_return_default().times(1));
 
     unsafe { foo(3) };
     unsafe { bar() };

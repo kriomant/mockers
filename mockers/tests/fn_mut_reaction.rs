@@ -17,24 +17,24 @@ fn test_fn_mut() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.create0_call().and_call_clone(|| NonClonable).times(1));
+    scenario.expect(handle.create0().and_call_clone(|| NonClonable).times(1));
     scenario.expect(
-        handle.create1_call(())
+        handle.create1(())
               .and_call_clone(|_| NonClonable)
               .times(1),
     );
     scenario.expect(
-        handle.create2_call((), ())
+        handle.create2((), ())
               .and_call_clone(|_, _| NonClonable)
               .times(1),
     );
     scenario.expect(
-        handle.create3_call((), (), ())
+        handle.create3((), (), ())
               .and_call_clone(|_, _, _| NonClonable)
               .times(1),
     );
     scenario.expect(
-        handle.create4_call((), (), (), ())
+        handle.create4((), (), (), ())
               .and_call_clone(|_, _, _, _| NonClonable)
               .times(1),
     );

@@ -22,7 +22,7 @@ fn test_generic_method_with_type_param() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call(any::<u32>()).and_return_default().times(1));
+    scenario.expect(handle.foo(any::<u32>()).and_return_default().times(1));
     mock.foo(3u32);
 }
 
@@ -32,7 +32,7 @@ fn test_generic_method_with_lifetime() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
+    scenario.expect(handle.bar(ANY).and_return_default().times(1));
     mock.bar(&3);
 }
 
@@ -42,7 +42,7 @@ fn test_generic_method_with_type_param_and_lifetime() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.baz_call(any::<&u32>()).and_return_default().times(1));
+    scenario.expect(handle.baz(any::<&u32>()).and_return_default().times(1));
     mock.baz(&3);
 }
 
@@ -51,7 +51,7 @@ fn test_generic_method_with_type_param_bounds() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.qux_call(any::<u32>()).and_return_default().times(1));
+    scenario.expect(handle.qux(any::<u32>()).and_return_default().times(1));
     mock.qux(3u32);
 }
 
@@ -60,7 +60,7 @@ fn test_generic_method_with_parametrized_return_type() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.ret_call().and_return(2u32));
+    scenario.expect(handle.ret().and_return(2u32));
     assert_eq!(mock.ret::<u32>(), 2);
 }
 
@@ -72,7 +72,7 @@ fn test_usage_of_unregistered_parameter_type() {
     let scenario = Scenario::new();
     let (_mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call(1u8).and_return(()));
+    scenario.expect(handle.foo(1u8).and_return(()));
 }
 
 /// Test that when call of generic method with some type parameters is expected
@@ -83,6 +83,6 @@ fn test_two_instantiations_of_generic_method_dont_match() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call("foofoo").and_return(()));
+    scenario.expect(handle.foo("foofoo").and_return(()));
     mock.foo::<u32>(2);
 }

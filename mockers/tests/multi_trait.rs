@@ -24,8 +24,8 @@ mod derive_inherited_trait {
         let scenario = Scenario::new();
         let (mock, handle) = scenario.create_mock::<BMock>();
 
-        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -62,8 +62,8 @@ mod derive_inherited_trait_different_modules {
         let scenario = Scenario::new();
         let (mock, handle) = scenario.create_mock::<b::BMock>();
 
-        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -102,8 +102,8 @@ mod inherited_trait {
         let scenario = Scenario::new();
         let (mock, handle) = scenario.create_mock::<BMock>();
 
-        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar(ANY).and_return_default().times(1));
 
         mock.foo(3);
         mock.bar(4);
@@ -147,8 +147,8 @@ mod multi_trait {
         let scenario = Scenario::new();
         let (mock, handle) = scenario.create_mock::<ABMock>();
 
-        scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
-        scenario.expect(handle.bar_call(ANY).and_return_default().times(1));
+        scenario.expect(handle.foo(ANY).and_return_default().times(1));
+        scenario.expect(handle.bar(ANY).and_return_default().times(1));
 
         accept_cd(mock);
     }

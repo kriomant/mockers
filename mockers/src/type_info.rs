@@ -34,7 +34,7 @@ pub fn fail_type_info_not_found() -> ! {
         "        let scenario = Scenario::new();\n",
         "        let mock = scenario.create_mock::<AMock>();\n",
         "\n",
-        "        scenario.expect(mock.generic_method_call(\"foo\").and_return(()));\n",
+        "        scenario.expect(mock.generic_method(\"foo\").and_return(()));\n",
         "        mock.generic_method(2u32);\n",
         "    }\n",
         "\n"

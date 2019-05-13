@@ -28,9 +28,9 @@ fn static_methods_can_be_mocked() {
     let (mock, handle) = scenario.create_mock::<FooMock>();
     let (_mock_static, static_handle) = scenario.create_mock::<FooMockStatic>();
 
-    scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
-    scenario.expect(static_handle.bar_call(ANY).and_return(()));
-    scenario.expect(static_handle.baz_call().and_return(()));
+    scenario.expect(handle.foo(ANY).and_return_default().times(1));
+    scenario.expect(static_handle.bar(ANY).and_return(()));
+    scenario.expect(static_handle.baz().and_return(()));
 
     use_foo(mock);
 }
@@ -49,8 +49,8 @@ fn mocks_of_different_types_can_be_used_simultaneously() {
     let (_foo_mock, foo_handle) = scenario.create_mock::<FooMockStatic>();
     let (_bar_mock, bar_handle) = scenario.create_mock::<BarMockStatic>();
 
-    scenario.expect(foo_handle.bar_call(ANY).and_return_default().times(1));
-    scenario.expect(bar_handle.bar_call().and_return_default().times(1));
+    scenario.expect(foo_handle.bar(ANY).and_return_default().times(1));
+    scenario.expect(bar_handle.bar().and_return_default().times(1));
 
     FooMock::bar(3);
     BarMock::bar();
@@ -72,11 +72,11 @@ fn mock_trait_with_ctor() {
     let scenario = Scenario::new();
     let (_static_mock, static_handle) = scenario.create_mock::<WithCtorMockStatic>();
 
-    scenario.expect(static_handle.new_call().and_call({
+    scenario.expect(static_handle.new().and_call({
         let scenario = scenario.handle();
         move || {
             let (mock, handle) = scenario.create_mock::<WithCtorMock>();
-            scenario.expect(handle.foo_call().and_return(()));
+            scenario.expect(handle.foo().and_return(()));
             mock
         }
     }));

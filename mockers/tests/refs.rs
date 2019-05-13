@@ -14,7 +14,7 @@ fn test_any_works_for_refs() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call(ANY).and_return_default().times(1));
+    scenario.expect(handle.foo(ANY).and_return_default().times(1));
 
     mock.foo(&3);
 }
@@ -24,7 +24,7 @@ fn test_refs_comparison() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call(&2).and_return_default().times(1));
+    scenario.expect(handle.foo(&2).and_return_default().times(1));
 
     mock.foo(&2);
 }

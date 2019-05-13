@@ -18,7 +18,7 @@ fn test_any_works_for_refs() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo_call(ANY).and_return(Ok(23)));
+    scenario.expect(handle.foo(ANY).and_return(Ok(23)));
 
     assert_eq!(Ok(23), mock.foo(&3));
 }

@@ -14,7 +14,7 @@ fn test() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo_call(ANY).and_return(()));
+    scenario.expect(handle.foo(ANY).and_return(()));
 
     mock.foo(&32);
 }

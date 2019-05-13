@@ -19,7 +19,7 @@ pub trait B {
 fn test_associated_type() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A<Item = i32>>();
-    scenario.expect(handle.create_call().and_return(2));
+    scenario.expect(handle.create().and_return(2));
     assert_eq!(mock.create(), 2);
 }
 
@@ -29,6 +29,6 @@ fn test_associated_type() {
 fn test_self_type_qualification() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<B<Item = i32>>();
-    scenario.expect(handle.create_call(1).and_return(vec![(true, 2)]));
+    scenario.expect(handle.create(1).and_return(vec![(true, 2)]));
     assert_eq!(mock.create(1), vec![(true, 2)]);
 }

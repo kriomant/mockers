@@ -33,7 +33,7 @@ impl From<String> for Error {
 
 /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
 /// unique type ID. It is added to both call matchers produced by
-/// `*_call` methods and to `Call` structure created by mocked method.
+/// handler methods and to `Call` structure created by mocked method.
 /// It is same to use call matcher for inspecting call object only when
 /// both mock type ID and method name match.
 static mut NEXT_MOCK_TYPE_ID: usize = 0;
@@ -434,7 +434,7 @@ fn generate_mock_for_traits(
             }
         }
 
-        // `impl<...> AMockHandle<...> { pub fn foo_call(...) { ... } }`
+        // `impl<...> AMockHandle<...> { pub fn foo(...) { ... } }`
         let impl_item = quote! {
             impl #generics #handle_type {
                 #(#impl_methods)*
@@ -468,14 +468,13 @@ fn generate_mock_for_traits(
             let static_mock_name = format!("{}Static", mock_ident);
             let static_mock_ident = Ident::new(&static_mock_name.clone(), Span::call_site());
             let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
-            let static_struct_type: Type = parse_quote! { #static_mock_ident<#(assoc_types),*> };
 
             let static_handle_name = format!("{}StaticHandle", mock_ident);
             let static_handle_ident = Ident::new(&static_handle_name.clone(), Span::call_site());
             let static_handle_struct_item = generate_mock_struct(&static_handle_ident, &assoc_types);
             let static_handle_impl = generate_handle_impl(&static_handle_ident, &assoc_types);
             let static_handle_struct_type: Type = parse_quote! { #static_handle_ident<#(assoc_types),*> };
-            // `impl<...> AMockStaticHandle<...> { pub fn foo_call(...) { ... } }`
+            // `impl<...> AMockStaticHandle<...> { pub fn foo(...) { ... } }`
             let static_handle_impl_item = quote! {
                 impl #generics #static_handle_struct_type {
                     #(#static_impl_methods)*
@@ -867,8 +866,7 @@ fn generate_stub_code(
 /// Example of method generated for trait method `fn bar(a: u32)`:
 /// ```ignore
 /// #[allow(dead_code)]
-/// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
-///                                                      arg0: Arg0Match)
+/// pub fn bar<Arg0Match: ::mockers::MatchArg<u32>>(&self, arg0: Arg0Match)
 ///  -> ::mockers::CallMatch1<u32, ()> {
 ///     ::mockers::CallMatch1::new(self.mock_id, 1usize /* mock_id */,
 ///                                Box::new(arg0))
@@ -915,8 +913,7 @@ fn generate_impl_method_for_trait(
 /// Example of method generated for trait method `fn bar(a: u32)`:
 /// ```ignore
 /// #[allow(dead_code)]
-/// pub fn bar_call<Arg0Match: ::mockers::MatchArg<u32>>(&self,
-///                                                      arg0: Arg0Match)
+/// pub fn bar<Arg0Match: ::mockers::MatchArg<u32>>(&self, arg0: Arg0Match)
 ///  -> ::mockers::CallMatch1<u32, ()> {
 ///     ::mockers::CallMatch1::new(self.mock_id, 1usize /* mock_id */,
 ///                                Box::new(arg0))
@@ -962,8 +959,8 @@ fn generate_impl_method(
         // Generated method signature for reference parameter looks like this:
         //
         // ```ignore
-        // pub fn foo_call<'a0, Arg0Match: ::mockers::MatchArg<&'a0 u32> + 'static>
-        //                (&self, arg0: Arg0Match)
+        // pub fn foo<'a0, Arg0Match: ::mockers::MatchArg<&'a0 u32> + 'static>
+        //           (&self, arg0: Arg0Match)
         //  -> ::mockers::CallMatch1<&'a0 u32, ()>;
         // ```
         let new_arg_type = match &arg_type {
@@ -1000,7 +997,7 @@ fn generate_impl_method(
     let ret_type = quote! { ::mockers::#call_match_ident<#(#call_match_args),*> };
 
     let output = ret_type.clone();
-    let expect_method_name = Ident::new(&format!("{}_call", method_ident), Span::call_site());
+    let expect_method_name = method_ident.clone();
 
     let debug_param_bound: TypeParamBound = syn::parse_str("::std::fmt::Debug").unwrap();
     let generic_params = [
@@ -1308,7 +1305,7 @@ where
 fn qualify_self(ty: &Type, mock_path: &Path, trait_path: &Path) -> Type {
     replace_self(
         ty,
-        |self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
+        |_self_seg: &syn::PathSegment, rest: &[syn::PathSegment]| {
             let self_ty = parse_quote! { #mock_path };
             let new_qself = QSelf {
                 as_token: Some(Token![as](Span::call_site())),
