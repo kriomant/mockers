@@ -16,6 +16,8 @@ lazy_static = "0.2.9"
 proc-macro2 = { version = "0.4.24", features = ["nightly"] }
 indoc = "0.3.3"
 
+rustfmt-nightly = { version = "1.2.2", optional = true }
+
 [build-dependencies]
 
 [dev-dependencies]
@@ -28,4 +30,5 @@ proc-macro = true
 
 [features]
 debug = []
+debug-rustfmt = ["rustfmt-nightly"]
 nightly = []

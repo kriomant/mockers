@@ -51,13 +51,34 @@ lazy_static! {
     static ref KNOWN_TRAITS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
 }
 
+#[cfg(all(feature="debug", feature="debug-rustfmt"))]
+fn format_code(tokens: &TokenStream) -> String {
+    let output = tokens.to_string();
+    let mut config = rustfmt_nightly::Config::default();
+    config.set().emit_mode(rustfmt_nightly::EmitMode::Stdout);
+    config.set().verbose(rustfmt_nightly::Verbosity::Quiet);
+    config.set().hide_parse_errors(true);
+    let mut buf = Vec::<u8>::new();
+    let mut session = rustfmt_nightly::Session::new(config, Some(&mut buf));
+    let result = session.format(rustfmt_nightly::Input::Text(output));
+    drop(session);
+    result
+        .ok().and_then(|_| { String::from_utf8(buf).ok() })
+        .unwrap_or_else(|| tokens.to_string())
+}
+
+#[cfg(all(feature="debug", not(feature="debug-rustfmt")))]
+fn format_code(tokens: &TokenStream) -> String {
+    tokens.to_string()
+}
+
 pub fn mocked_impl(input: TokenStream, opts_span: Span, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
     let mut result = input.clone();
     let source_item: Item = syn::parse2(input)?;
     let (tokens, include_source) = generate_mock(result.span(), &source_item, opts_span, opts)?;
 
-    if cfg!(feature = "debug") {
-        eprintln!("{}", tokens.to_string());
+    #[cfg(feature="debug")] {
+        eprintln!("{}", format_code(&tokens));
     }
 
     if !include_source {
@@ -1347,8 +1368,8 @@ pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let tokens = generate_mock_for_traits(args.mock_ident, args.handle_ident, &args.traits, false,
                                           &DerivedTraits::default())?;
 
-    if cfg!(feature = "debug") {
-        eprintln!("{}", tokens.to_string());
+    #[cfg(feature="debug")] {
+        eprintln!("{}", format_code(&tokens));
     }
 
     Ok(tokens)
