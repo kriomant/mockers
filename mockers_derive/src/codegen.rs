@@ -78,7 +78,9 @@ pub fn mocked_impl(input: TokenStream, opts_span: Span, opts: &MockAttrOptions) 
     let (tokens, include_source) = generate_mock(result.span(), &source_item, opts_span, opts)?;
 
     #[cfg(feature="debug")] {
-        eprintln!("{}", format_code(&tokens));
+        if opts.debug {
+            eprintln!("{}", format_code(&tokens));
+        }
     }
 
     if !include_source {

@@ -31,6 +31,7 @@ pub struct MockAttrOptions {
     pub module_path: Option<Path>,
     pub refs: HashMap<Path, Path>,
     pub derives: DerivedTraits,
+    pub debug: bool,
 }
 
 impl syn::parse::Parse for MockAttrOptions {
@@ -39,6 +40,7 @@ impl syn::parse::Parse for MockAttrOptions {
         let mut module_path: Option<Path> = None;
         let mut refs: HashMap<Path, Path> = HashMap::new();
         let mut derives: DerivedTraits = DerivedTraits::default();
+        let mut debug: bool = false;
 
         let metas = input.parse_terminated::<NestedMeta, Token![,]>(NestedMeta::parse)?;
         if metas.is_empty() {
@@ -168,6 +170,10 @@ impl syn::parse::Parse for MockAttrOptions {
                         }
                     }
 
+                    NestedMeta::Meta(Meta::Word(ref ident)) if ident == "debug" => {
+                        debug = true;
+                    }
+
                     NestedMeta::Meta(Meta::Word(ref ident)) => {
                         mock_name = Some(ident.clone());
                     }
@@ -186,6 +192,7 @@ impl syn::parse::Parse for MockAttrOptions {
             module_path,
             refs,
             derives,
+            debug,
         })
     }
 }
