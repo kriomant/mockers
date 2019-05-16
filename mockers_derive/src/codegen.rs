@@ -625,7 +625,7 @@ fn generate_mock_for_traits(
         generated_items.push(mocked_impl_item)
     }
 
-    generated_items.extend(derive_standard_traits(derives, &mock_ident, &handle_ident));
+    generated_items.extend(derive_standard_traits(derives, &mock_ident, &handle_ident, &type_params));
 
     Ok(quote! { #(#generated_items)* })
 }
@@ -1413,7 +1413,8 @@ pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 /// Generate implementation of supported standard traits for mock and handle structs.
-fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_ident: &Ident)
+fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_ident: &Ident,
+                          type_params: &[Ident])
         -> Vec<TokenStream> {
     let mut items = Vec::new();
 
@@ -1422,7 +1423,7 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
 
         DeriveClone::Normal => {
             items.push(quote! {
-                impl Clone for #mock_ident {
+                impl<#(#type_params),*> Clone for #mock_ident<#(#type_params),*> {
                     fn clone(&self) -> Self {
                         let method_data = ::mockers::MethodData {
                             mock_id: self.mock_id,
@@ -1435,9 +1436,9 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
                     }
                 }
 
-                impl ::mockers::CloneMock<#mock_ident> for #handle_ident {
+                impl<#(#type_params),*> ::mockers::CloneMock<#mock_ident<#(#type_params),*>> for #handle_ident<#(#type_params),*> {
                     #[allow(dead_code)]
-                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident> {
+                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident<#(#type_params),*>> {
                         ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
                     }
                 }
@@ -1446,7 +1447,7 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
 
         DeriveClone::Shared => {
             items.push(quote! {
-                impl Clone for #mock_ident {
+                impl<#(#type_params),*> Clone for #mock_ident<#(#type_params),*> {
                     fn clone(&self) -> Self {
                         use ::mockers::Mock;
                         #mock_ident::new(self.mock_id, self.scenario.clone())

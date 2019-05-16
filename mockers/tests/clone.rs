@@ -40,6 +40,9 @@ pub trait ADeriveShared {
     fn foo(&self, a: u32);
 }
 
+#[mocked(derive(Clone))]
+pub trait AGeneric<T> {}
+
 fn target<AC: A + Clone>(a: AC) {
     let clone = a.clone();
     clone.foo(2);
