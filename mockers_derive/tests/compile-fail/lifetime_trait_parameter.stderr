@@ -1,0 +1,6 @@
+error: Lifetime parameters are not supported yet
+
+ --> $DIR/lifetime_trait_parameter.rs:4:9
+  |
+4 | trait A<'a> {}
+  |         ^^

@@ -1,6 +1,0 @@
-error: Parametrized traits are not supported yet
-
- --> $DIR/parametrized_trait.rs:4:8
-  |
-4 | trait A<'a> {}
-  |        ^

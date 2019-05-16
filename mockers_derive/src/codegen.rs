@@ -293,8 +293,12 @@ fn generate_mock_for_traits(
                 return Err(Error::Spanned(unsafety.span(), "Unsafe traits are not supported yet.\n".to_string()));
             }
 
-            if let Some(lt) = generics.lt_token {
-                return Err(Error::Spanned(lt.spans[0], "Parametrized traits are not supported yet\n".to_string()));
+            if let Some(lt) = generics.lifetimes().next() {
+                return Err(Error::Spanned(lt.span(), "Lifetime parameters are not supported yet\n".to_string()));
+            }
+
+            if let Some(cp) = generics.const_params().next() {
+                return Err(Error::Spanned(cp.span(), "Const parameters are not supported yet\n".to_string()));
             }
 
             if let Some(ref where_clause) = generics.where_clause {
@@ -352,6 +356,23 @@ fn generate_mock_for_traits(
         })
         .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, Error>>()?;
 
+    // Extract type parameters from root trait only (which is last)
+    // TODO: specify root trait explicitly
+    let mut type_params: Vec<Ident> = Vec::new();
+    for gen in &trait_items.last().as_ref().unwrap().trait_item.generics.params {
+        match gen {
+            GenericParam::Const(c) => {
+                return Err(Error::Spanned(c.span(), "Const parameters are not supported yet\n".to_string()));
+            }
+            GenericParam::Lifetime(l) => {
+                return Err(Error::Spanned(l.span(), "Lifetime parameters are not supported yet\n".to_string()));
+            }
+            GenericParam::Type(t) => {
+                type_params.push(t.ident.clone());
+            }
+        }
+    }
+
     // Gather associated types from all traits, because they are used in mock
     // struct definition.
     let mut assoc_types = Vec::new();
@@ -371,15 +392,18 @@ fn generate_mock_for_traits(
         }
     }
 
+    let mut mock_type_params = type_params.clone();
+    mock_type_params.extend(assoc_types.iter().cloned());
+
     assert_ne!(mock_ident, handle_ident);
-    let struct_item = generate_mock_struct(&mock_ident, &assoc_types);
-    let handle_struct_item = generate_mock_struct(&handle_ident, &assoc_types);
+    let struct_item = generate_mock_struct(&mock_ident, &mock_type_params);
+    let handle_struct_item = generate_mock_struct(&handle_ident, &mock_type_params);
 
     // Generic parameters used for impls. It is part inside angles in
     // `impl<A: ::std::fmt::Debug, B: ::std::fmt::Debug, ...> ...`.
     let generics = {
         let mut gen = Generics::default();
-        gen.params = assoc_types
+        gen.params = mock_type_params
             .iter()
             .cloned()
             .map(|param| -> GenericParam {
@@ -391,11 +415,11 @@ fn generate_mock_for_traits(
 
     // Types of mock and handle structs with all type parameters specified.
     let struct_path: Path = {
-        let assoc_types = &assoc_types;
+        let assoc_types = &mock_type_params;
         parse_quote! { #mock_ident<#(#assoc_types),*> }
     };
     let handle_path: Path = {
-        let assoc_types = &assoc_types;
+        let assoc_types = &mock_type_params;
         parse_quote! { #handle_ident<#(#assoc_types),*> }
     };
     let struct_type: Type = parse_quote! { #struct_path };
@@ -429,11 +453,18 @@ fn generate_mock_for_traits(
                         return Err(Error::Spanned(abi.span(), "Extern specification for trait methods is not supported.\n".to_string()));
                     }
 
+                    let trait_path_with_params = {
+                        let type_params_ref = &type_params;
+                        let trait_path_ref = &trait_path;
+                        parse_quote! {
+                            #trait_path_ref<#(#type_params_ref),*>
+                        }
+                    };
                     let methods = generate_trait_methods(
                         sig.ident.clone(),
                         &sig.decl,
                         &sig.decl.generics,
-                        &trait_path,
+                        &trait_path_with_params,
                         mock_type_id,
                         &struct_path,
                     )?;
@@ -474,13 +505,14 @@ fn generate_mock_for_traits(
         let trait_type_items = assoc_types
             .iter()
             .cloned()
-            .zip(assoc_types.iter().cloned())
+            .zip(mock_type_params.iter().cloned())
             .map(|(assoc, param)| -> ImplItemType {
                 let path: Path = parse_quote! { #param };
                 parse_quote! { type #assoc = #path; }
             });
+        let type_params_ref = &type_params;
         let trait_impl_item = quote! {
-            impl #generics #trait_path for #struct_type {
+            impl #generics #trait_path<#(#type_params_ref),*> for #struct_type {
                 #(#trait_type_items)*
                 #(#trait_impl_items)*
                 #(#static_trait_impl_methods)*
@@ -495,12 +527,12 @@ fn generate_mock_for_traits(
 
             let static_mock_name = format!("{}Static", mock_ident);
             let static_mock_ident = Ident::new(&static_mock_name.clone(), Span::call_site());
-            let static_struct_item = generate_mock_struct(&static_mock_ident, &assoc_types);
+            let static_struct_item = generate_mock_struct(&static_mock_ident, &mock_type_params);
 
             let static_handle_name = format!("{}StaticHandle", mock_ident);
             let static_handle_ident = Ident::new(&static_handle_name.clone(), Span::call_site());
-            let static_handle_struct_item = generate_mock_struct(&static_handle_ident, &assoc_types);
-            let static_handle_impl = generate_handle_impl(&static_handle_ident, &assoc_types);
+            let static_handle_struct_item = generate_mock_struct(&static_handle_ident, &mock_type_params);
+            let static_handle_impl = generate_handle_impl(&static_handle_ident, &mock_type_params);
             let static_handle_struct_type: Type = parse_quote! { #static_handle_ident<#(assoc_types),*> };
             // `impl<...> AMockStaticHandle<...> { pub fn foo(...) { ... } }`
             let static_handle_impl_item = quote! {
@@ -524,7 +556,7 @@ fn generate_mock_for_traits(
                 &static_mock_ident,
                 &static_handle_ident,
                 &static_mock_name,
-                &assoc_types,
+                &mock_type_params,
                 &custom_init_code,
             );
 
@@ -547,15 +579,15 @@ fn generate_mock_for_traits(
         .join("+");
 
     let mock_impl_item =
-        generate_mock_impl(&mock_ident, &handle_ident, &mocked_class_name, &assoc_types, &quote! {});
+        generate_mock_impl(&mock_ident, &handle_ident, &mocked_class_name, &mock_type_params, &quote! {});
     generated_items.push(mock_impl_item);
 
-    let handle_impl_item = generate_handle_impl(&handle_ident, &assoc_types);
+    let handle_impl_item = generate_handle_impl(&handle_ident, &mock_type_params);
     generated_items.push(handle_impl_item);
 
-    let assoc_types_ref = &assoc_types;
+    let mock_type_params_ref = &mock_type_params;
     let debug_impl_item = quote! {
-        impl<#(#assoc_types_ref),*> ::std::fmt::Debug for #mock_ident_ref<#(#assoc_types_ref),*> {
+        impl<#(#mock_type_params_ref),*> ::std::fmt::Debug for #mock_ident_ref<#(#mock_type_params_ref),*> {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
             }
@@ -579,11 +611,14 @@ fn generate_mock_for_traits(
         //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
         //         type MockImpl = AMock<Item>;
         //     }
-        let assoc_types_ref2 = assoc_types_ref;
+        let mock_type_params_ref = &mock_type_params;
+        let type_params_ref = &type_params;
+        let assoc_types_ref = &assoc_types;
+        let assoc_types_ref2 = &assoc_types;
         let mocked_impl_item = quote! {
-            impl<#(#assoc_types_ref),*> ::mockers::Mocked
-                for &'static #trait_path<#(#assoc_types_ref=#assoc_types_ref2),*> {
-                type MockImpl = #mock_ident_ref<#(#assoc_types_ref),*>;
+            impl<#(#mock_type_params_ref),*> ::mockers::Mocked
+                for &'static #trait_path<#(#type_params_ref, )* #(#assoc_types_ref=#assoc_types_ref2),*> {
+                type MockImpl = #mock_ident_ref<#(#mock_type_params_ref),*>;
             }
         };
 
@@ -913,7 +948,7 @@ fn generate_impl_method_for_trait(
 ) -> Result<TokenStream, String> {
     // Types of arguments and result may refer to `Self`, which is ambiguous in the
     // context of trait implementation. All references to `Self` must be replaced
-    // with `<Mock as Trait>`
+    // with `<Mock<T> as Trait<T>>`
     let fixed_return_type = qualify_self(return_type, mock_path, &trait_path);
     let fixed_args = Punctuated::from_iter(args.iter().map(|arg| match arg {
         self_arg @ FnArg::SelfRef(..) => self_arg.clone(),
