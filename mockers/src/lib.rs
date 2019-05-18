@@ -12,7 +12,6 @@ use itertools::Itertools;
 
 #[macro_use]
 mod colors;
-mod box_fn;
 pub mod cardinality;
 mod dbg;
 pub mod matchers;
@@ -71,7 +70,7 @@ pub trait CallMatch {
 pub trait Expectation {
     fn call_match(&self) -> &dyn CallMatch;
     fn is_satisfied(&self) -> bool;
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8>;
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy>;
     fn describe(&self) -> String;
 }
 
@@ -85,7 +84,7 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     fn is_satisfied(&self) -> bool {
         true
     }
-    fn satisfy(&mut self, _call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
+    fn satisfy(&mut self, _call: Call, mock_name: &str) -> Box<Satisfy> {
         panic!(
             "{}.{} should never be called",
             mock_name,
@@ -97,13 +96,42 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     }
 }
 
+pub trait Satisfy {
+    fn satisfy(self: Box<Self>) -> *mut u8;
+}
+
 macro_rules! define_all {
     (
         $reaction:ident(
             $callmatch:ident, $actionclone:ident,
+            $satisfy:ident, $satisfyclone:ident,
             $expectation:ident, $expectationtimes:ident
         ) { $($arg:ident => $n:tt, $Arg:ident),* }
     ) => {
+        struct $satisfy<$($Arg,)* Res, F: FnOnce($($Arg,)*) -> Res> {
+            action: F,
+            $($arg: $Arg,)*
+        }
+
+        impl<$($Arg,)* Res, F: FnOnce($($Arg,)*) -> Res> Satisfy for $satisfy<$($Arg,)* Res, F> {
+            fn satisfy(self: Box<Self>) -> *mut u8 {
+                let result = (self.action)($(self.$arg,)*);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        }
+
+        struct $satisfyclone<$($Arg,)* Res> {
+            action: $actionclone<$($Arg,)* Res>,
+            $($arg: $Arg,)*
+        }
+
+        impl<$($Arg,)* Res> Satisfy for $satisfyclone<$($Arg,)* Res> {
+            fn satisfy(self: Box<Self>) -> *mut u8 {
+                let result = self.action.borrow_mut().deref_mut()($(self.$arg,)*);
+                Box::into_raw(Box::new(result)) as *mut u8
+            }
+        }
+
         #[must_use]
         pub struct $callmatch<$($Arg,)* Res> {
             mock_id: usize,
@@ -182,7 +210,7 @@ macro_rules! define_all {
             fn is_satisfied(&self) -> bool {
                 self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
             }
-            fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
                 self.count += 1;
                 if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
                     panic!(
@@ -194,13 +222,13 @@ macro_rules! define_all {
                     );
                 }
                 let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
-                box_fn::BoxFn0::new({
-                    let action = self.action.clone();
-                    move || {
-                        let result = action.borrow_mut().deref_mut()($($arg,)*);
-                        Box::into_raw(Box::new(result)) as *mut u8
+                let action = self.action.clone();
+                Box::new(
+                    $satisfyclone {
+                        action,
+                        $($arg,)*
                     }
-                })
+                )
             }
             fn describe(&self) -> String {
                 format!(
@@ -226,14 +254,16 @@ macro_rules! define_all {
             fn is_satisfied(&self) -> bool {
                 self.action.is_none()
             }
-            fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
                 match self.action.take() {
                     Some(action) => {
                         let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
-                        box_fn::BoxFn0::<*mut u8>::new(move || {
-                            let result = action($($arg,)*);
-                            Box::into_raw(Box::new(result)) as *mut u8
-                        })
+                        Box::new(
+                            $satisfy {
+                                action,
+                                $($arg,)*
+                            }
+                        )
                     }
                     None => {
                         panic!(
@@ -352,18 +382,18 @@ macro_rules! define_all {
     }
 }
 
-define_all!(Reaction0(CallMatch0, ActionClone0, Expectation0, ExpectationTimes0) {
+define_all!(Reaction0(CallMatch0, ActionClone0, Satisfy0, SatisfyClone0, Expectation0, ExpectationTimes0) {
 });
-define_all!(Reaction1(CallMatch1, ActionClone1, Expectation1, ExpectationTimes1) {
+define_all!(Reaction1(CallMatch1, ActionClone1, Satisfy1, SatisfyClone1, Expectation1, ExpectationTimes1) {
     arg0 => 0, Arg0
 });
-define_all!(Reaction2(CallMatch2, ActionClone2, Expectation2, ExpectationTimes2) {
+define_all!(Reaction2(CallMatch2, ActionClone2, Satisfy2, SatisfyClone2, Expectation2, ExpectationTimes2) {
     arg0 => 0, Arg0, arg1 => 1, Arg1
 });
-define_all!(Reaction3(CallMatch3, ActionClone3, Expectation3, ExpectationTimes3) {
+define_all!(Reaction3(CallMatch3, ActionClone3, Satisfy3, SatisfyClone3, Expectation3, ExpectationTimes3) {
     arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2
 });
-define_all!(Reaction4(CallMatch4, ActionClone4, Expectation4, ExpectationTimes4) {
+define_all!(Reaction4(CallMatch4, ActionClone4, Satisfy4, SatisfyClone4, Expectation4, ExpectationTimes4) {
     arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3
 });
 
@@ -415,7 +445,7 @@ impl Expectation for Sequence {
     fn is_satisfied(&self) -> bool {
         self.expectations.is_empty()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
         let (res, remove) = {
             let exp = &mut self.expectations[0];
             let res = exp.satisfy(call, mock_name);
@@ -709,7 +739,7 @@ macro_rules! define_verify {
             };
             let action = self.verify(call);
             move || {
-                let result_ptr: *mut u8 = action.call();
+                let result_ptr: *mut u8 = action.satisfy();
                 let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
                 *result
             }
@@ -730,7 +760,7 @@ impl ScenarioInternals {
     /// use user-provided closure as action, and that closure may want to
     /// use scenario object to create mocks or establish expectations, so
     /// we need to release scenario borrow before calling expectation action.
-    fn verify(&mut self, call: Call) -> box_fn::BoxFn0<*mut u8> {
+    fn verify(&mut self, call: Call) -> Box<Satisfy> {
         for expectation in self.expectations.iter_mut().rev() {
             if expectation.call_match().matches(&call) {
                 let mock_name = self
