@@ -706,7 +706,7 @@ fn generate_trait_methods(
 ///                               method_name: "method",
 ///                               type_param_ids: vec![] };
 ///     let action = self.scenario.borrow_mut().verify2(method_data, foo, bar);
-///     action.call()
+///     action()
 /// }
 /// ```
 /// where constant marked with `mock_id` is unique trait method ID.
@@ -798,7 +798,7 @@ fn generate_stub_code(
                                                       method_name: #method_name,
                                                       type_param_ids: #type_ids_expr };
             let action = scenario.borrow_mut().#verify_fn(method_data, #(#arg_values),*);
-            action.call()
+            action()
         }
     })
 }
