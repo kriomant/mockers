@@ -32,17 +32,16 @@ thread_local! {
 }
 
 macro_rules! define_actions {
-    ($action:ident $action_clone:ident ($boxfn:ident) { $($Arg:ident),* }) => {
-        type $action<$($Arg,)* T> = box_fn::$boxfn<$($Arg,)* T>;
+    ($action_clone:ident ($boxfn:ident) { $($Arg:ident),* }) => {
         type $action_clone<$($Arg,)* T> = Rc<RefCell<dyn FnMut($($Arg,)*) -> T>>;
     }
 }
 
-define_actions!(Action0 ActionClone0 (BoxFn0) { });
-define_actions!(Action1 ActionClone1 (BoxFn1) { Arg0 });
-define_actions!(Action2 ActionClone2 (BoxFn2) { Arg0, Arg1 });
-define_actions!(Action3 ActionClone3 (BoxFn3) { Arg0, Arg1, Arg2 });
-define_actions!(Action4 ActionClone4 (BoxFn4) { Arg0, Arg1, Arg2, Arg3 });
+define_actions!(ActionClone0 (BoxFn0) { });
+define_actions!(ActionClone1 (BoxFn1) { Arg0 });
+define_actions!(ActionClone2 (BoxFn2) { Arg0, Arg1 });
+define_actions!(ActionClone3 (BoxFn3) { Arg0, Arg1, Arg2 });
+define_actions!(ActionClone4 (BoxFn4) { Arg0, Arg1, Arg2, Arg3 });
 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
@@ -101,8 +100,7 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
 macro_rules! define_all {
     (
         $reaction:ident(
-            $callmatch:ident,
-            $action:ident, $actionclone:ident,
+            $callmatch:ident, $actionclone:ident,
             $expectation:ident, $expectationtimes:ident
         ) { $($arg:ident => $n:tt, $Arg:ident),* }
     ) => {
@@ -184,7 +182,7 @@ macro_rules! define_all {
             fn is_satisfied(&self) -> bool {
                 self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
             }
-            fn satisfy(&mut self, call: Call, mock_name: &str) -> Action0<*mut u8> {
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
                 self.count += 1;
                 if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
                     panic!(
@@ -196,7 +194,7 @@ macro_rules! define_all {
                     );
                 }
                 let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
-                Action0::new({
+                box_fn::BoxFn0::new({
                     let action = self.action.clone();
                     move || {
                         let result = action.borrow_mut().deref_mut()($($arg,)*);
@@ -215,12 +213,13 @@ macro_rules! define_all {
         }
 
         #[must_use]
-        pub struct $expectation<$($Arg,)* Res> {
+        pub struct $expectation<$($Arg,)* Res, F: FnOnce($($Arg,)*) -> Res> {
             call_match: $callmatch<$($Arg,)* Res>,
-            action: Option<$action<$($Arg,)* Res>>,
+            action: Option<F>,
         }
 
-        impl<$($Arg: 'static,)* Res: 'static> Expectation for $expectation<$($Arg,)* Res> {
+        impl<$($Arg: 'static,)* Res: 'static, F: FnOnce($($Arg,)*) -> Res + 'static> Expectation
+        for $expectation<$($Arg,)* Res, F> {
             fn call_match(&self) -> &dyn CallMatch {
                 &self.call_match
             }
@@ -232,7 +231,7 @@ macro_rules! define_all {
                     Some(action) => {
                         let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
                         box_fn::BoxFn0::<*mut u8>::new(move || {
-                            let result = action.call($($arg,)*);
+                            let result = action($($arg,)*);
                             Box::into_raw(Box::new(result)) as *mut u8
                         })
                     }
@@ -251,29 +250,32 @@ macro_rules! define_all {
         }
 
         impl<$($Arg: 'static,)* Res: 'static> $callmatch<$($Arg,)* Res> {
-            pub fn and_return(self, result: Res) -> $expectation<$($Arg,)* Res> {
+            pub fn and_return(self, result: Res)
+            -> $expectation<$($Arg,)* Res, impl FnOnce($($Arg,)*) -> Res> {
                 #[allow(unused_variables)]
                 $expectation {
                     call_match: self,
-                    action: Some($action::new(move |$($arg,)*| result)),
+                    action: Some(move |$($arg,)*| result),
                 }
             }
 
-            pub fn and_panic(self, msg: String) -> $expectation<$($Arg,)* Res> {
+            pub fn and_panic(self, msg: String)
+            -> $expectation<$($Arg,)* Res, impl FnOnce($($Arg,)*) -> Res> {
                 #[allow(unused_variables)]
                 $expectation {
                     call_match: self,
-                    action: Some($action::new(move |$($arg,)*| panic!(msg))),
+                    action: Some(move |$($arg,)*| panic!(msg)),
                 }
             }
 
-            pub fn and_call<F>(self, func: F) -> $expectation<$($Arg,)* Res>
+            pub fn and_call<F>(self, func: F)
+            -> $expectation<$($Arg,)* Res, impl FnOnce($($Arg,)*) -> Res>
             where
                 F: FnOnce($($Arg,)*) -> Res + 'static,
             {
                 $expectation {
                     call_match: self,
-                    action: Some($action::new(func)),
+                    action: Some(func),
                 }
             }
 
@@ -350,18 +352,18 @@ macro_rules! define_all {
     }
 }
 
-define_all!(Reaction0(CallMatch0, Action0, ActionClone0, Expectation0, ExpectationTimes0) {
+define_all!(Reaction0(CallMatch0, ActionClone0, Expectation0, ExpectationTimes0) {
 });
-define_all!(Reaction1(CallMatch1, Action1, ActionClone1, Expectation1, ExpectationTimes1) {
+define_all!(Reaction1(CallMatch1, ActionClone1, Expectation1, ExpectationTimes1) {
     arg0 => 0, Arg0
 });
-define_all!(Reaction2(CallMatch2, Action2, ActionClone2, Expectation2, ExpectationTimes2) {
+define_all!(Reaction2(CallMatch2, ActionClone2, Expectation2, ExpectationTimes2) {
     arg0 => 0, Arg0, arg1 => 1, Arg1
 });
-define_all!(Reaction3(CallMatch3, Action3, ActionClone3, Expectation3, ExpectationTimes3) {
+define_all!(Reaction3(CallMatch3, ActionClone3, Expectation3, ExpectationTimes3) {
     arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2
 });
-define_all!(Reaction4(CallMatch4, Action4, ActionClone4, Expectation4, ExpectationTimes4) {
+define_all!(Reaction4(CallMatch4, ActionClone4, Expectation4, ExpectationTimes4) {
     arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3
 });
 
