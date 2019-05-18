@@ -32,16 +32,16 @@ thread_local! {
 }
 
 macro_rules! define_actions {
-    ($action_clone:ident ($boxfn:ident) { $($Arg:ident),* }) => {
+    ($action_clone:ident { $($Arg:ident),* }) => {
         type $action_clone<$($Arg,)* T> = Rc<RefCell<dyn FnMut($($Arg,)*) -> T>>;
     }
 }
 
-define_actions!(ActionClone0 (BoxFn0) { });
-define_actions!(ActionClone1 (BoxFn1) { Arg0 });
-define_actions!(ActionClone2 (BoxFn2) { Arg0, Arg1 });
-define_actions!(ActionClone3 (BoxFn3) { Arg0, Arg1, Arg2 });
-define_actions!(ActionClone4 (BoxFn4) { Arg0, Arg1, Arg2, Arg3 });
+define_actions!(ActionClone0 { });
+define_actions!(ActionClone1 { Arg0 });
+define_actions!(ActionClone2 { Arg0, Arg1 });
+define_actions!(ActionClone3 { Arg0, Arg1, Arg2 });
+define_actions!(ActionClone4 { Arg0, Arg1, Arg2, Arg3 });
 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
@@ -690,7 +690,7 @@ macro_rules! define_verify {
     (
         $verify:ident { $($arg:ident => $n:tt, $Arg:ident),* }
     ) => {
-        pub fn $verify<$($Arg,)* Res>(&mut self, method_data: MethodData$(, $arg: $Arg)*) -> box_fn::BoxFn0<Res> {
+        pub fn $verify<$($Arg,)* Res>(&mut self, method_data: MethodData$(, $arg: $Arg)*) -> impl FnOnce() -> Res {
             let args = Box::new(($($arg,)*));
             let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
             fn destroy<$($Arg,)*>(args_to_destroy: *const u8) {
@@ -708,11 +708,11 @@ macro_rules! define_verify {
                 format_args: format_args::<$($Arg,)*>,
             };
             let action = self.verify(call);
-            box_fn::BoxFn0::new(move || {
+            move || {
                 let result_ptr: *mut u8 = action.call();
                 let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
                 *result
-            })
+            }
         }
     }
 }

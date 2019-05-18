@@ -71,7 +71,7 @@ macro_rules! mock_clone {
                     type_param_ids: vec![],
                 };
                 let action = self.scenario.borrow_mut().verify0(method_data);
-                action.call()
+                action()
             }
         }
 
