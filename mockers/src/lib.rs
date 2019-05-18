@@ -1,4 +1,4 @@
-#![feature(fnbox, specialization)]
+#![feature(specialization)]
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
