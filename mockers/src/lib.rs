@@ -8,6 +8,8 @@ use std::rc::{Rc, Weak};
 use std::fmt::Write;
 use std::ops::DerefMut;
 
+use itertools::Itertools;
+
 #[macro_use]
 mod colors;
 mod box_fn;
@@ -29,20 +31,18 @@ thread_local! {
     pub static EXTERN_MOCKS: RefCell<HashMap<usize, (usize, Rc<RefCell<ScenarioInternals>>)>> = RefCell::new(HashMap::new());
 }
 
-type Action0<T> = box_fn::BoxFn0<T>;
-type ActionClone0<T> = Rc<RefCell<dyn FnMut() -> T>>;
+macro_rules! define_actions {
+    ($action:ident $action_clone:ident ($boxfn:ident) { $($Arg:ident),* }) => {
+        type $action<$($Arg,)* T> = box_fn::$boxfn<$($Arg,)* T>;
+        type $action_clone<$($Arg,)* T> = Rc<RefCell<dyn FnMut($($Arg,)*) -> T>>;
+    }
+}
 
-type Action1<Arg0, T> = box_fn::BoxFn1<Arg0, T>;
-type ActionClone1<Arg0, T> = Rc<RefCell<dyn FnMut(Arg0) -> T>>;
-
-type Action2<Arg0, Arg1, T> = box_fn::BoxFn2<Arg0, Arg1, T>;
-type ActionClone2<Arg0, Arg1, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1) -> T>>;
-
-type Action3<Arg0, Arg1, Arg2, T> = box_fn::BoxFn3<Arg0, Arg1, Arg2, T>;
-type ActionClone3<Arg0, Arg1, Arg2, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1, Arg2) -> T>>;
-
-type Action4<Arg0, Arg1, Arg2, Arg3, T> = box_fn::BoxFn4<Arg0, Arg1, Arg2, Arg3, T>;
-type ActionClone4<Arg0, Arg1, Arg2, Arg3, T> = Rc<RefCell<dyn FnMut(Arg0, Arg1, Arg2, Arg3) -> T>>;
+define_actions!(Action0 ActionClone0 (BoxFn0) { });
+define_actions!(Action1 ActionClone1 (BoxFn1) { Arg0 });
+define_actions!(Action2 ActionClone2 (BoxFn2) { Arg0, Arg1 });
+define_actions!(Action3 ActionClone3 (BoxFn3) { Arg0, Arg1, Arg2 });
+define_actions!(Action4 ActionClone4 (BoxFn4) { Arg0, Arg1, Arg2, Arg3 });
 
 pub trait CallMatch {
     fn matches_args(&self, call: &Call) -> bool;
@@ -98,1214 +98,272 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     }
 }
 
-#[must_use]
-pub struct CallMatch0<Res> {
-    mock_id: usize,
-    mock_type_id: usize,
-    method_name: &'static str,
-    type_param_ids: Vec<usize>,
-    _phantom: PhantomData<Res>,
-}
-impl<Res> CallMatch0<Res> {
-    pub fn new(
-        mock_id: usize,
-        mock_type_id: usize,
-        method_name: &'static str,
-        type_param_ids: Vec<usize>,
-    ) -> Self {
-        CallMatch0 {
-            mock_id: mock_id,
-            mock_type_id: mock_type_id,
-            method_name: method_name,
-            type_param_ids: type_param_ids,
-            _phantom: PhantomData,
+macro_rules! define_all {
+    (
+        $reaction:ident(
+            $callmatch:ident,
+            $action:ident, $actionclone:ident,
+            $expectation:ident, $expectationtimes:ident
+        ) { $($arg:ident => $n:tt, $Arg:ident),* }
+    ) => {
+        #[must_use]
+        pub struct $callmatch<$($Arg,)* Res> {
+            mock_id: usize,
+            mock_type_id: usize,
+            method_name: &'static str,
+            type_param_ids: Vec<usize>,
+            $($arg: Box<dyn MatchArg<$Arg>>,)*
+            _phantom: PhantomData<Res>,
         }
-    }
 
-    fn get_args(mut call: Call) -> Box<()> {
-        unsafe { Box::from_raw(call.take_args() as *mut ()) }
-    }
-}
-impl<Res> CallMatch for CallMatch0<Res> {
-    fn matches_args(&self, call: &Call) -> bool {
-        assert!(
-            call.method_data.mock_type_id == self.mock_type_id
-                && call.method_data.method_name == self.method_name
-                && call.method_data.type_param_ids == self.type_param_ids
-        );
-        true
-    }
-    fn validate(&self, _call: &Call) -> Vec<Result<(), String>> {
-        vec![]
-    }
-    fn get_mock_id(&self) -> usize {
-        self.mock_id
-    }
-    fn get_mock_type_id(&self) -> usize {
-        self.mock_type_id
-    }
-    fn get_method_name(&self) -> &'static str {
-        self.method_name
-    }
-    fn get_type_param_ids(&self) -> &[usize] {
-        &self.type_param_ids
-    }
-    fn describe(&self) -> String {
-        format!("{}()", self.method_name)
-    }
-}
-
-#[must_use]
-pub struct Reaction0<Res> {
-    call_match: CallMatch0<Res>,
-    action: ActionClone0<Res>,
-}
-impl<Res> Reaction0<Res> {
-    pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> ExpectationTimes0<Res> {
-        ExpectationTimes0::new(self.call_match, self.action, Box::new(cardinality))
-    }
-}
-
-#[must_use]
-pub struct ExpectationTimes0<Res> {
-    action: ActionClone0<Res>,
-    call_match: CallMatch0<Res>,
-    cardinality: Box<dyn Cardinality>,
-    count: u32,
-}
-impl<Res> ExpectationTimes0<Res> {
-    fn new(
-        call_match: CallMatch0<Res>,
-        action: ActionClone0<Res>,
-        cardinality: Box<dyn Cardinality>,
-    ) -> Self {
-        ExpectationTimes0 {
-            call_match: call_match,
-            action: action,
-            cardinality: cardinality,
-            count: 0,
-        }
-    }
-}
-impl<Res: 'static> Expectation for ExpectationTimes0<Res> {
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        self.count += 1;
-        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
-            panic!(
-                "{}.{} is called for the {} time, but expected to be {}",
-                mock_name,
-                self.call_match().get_method_name(),
-                format_ordinal(self.count),
-                self.cardinality.describe_upper_bound()
-            );
-        }
-        let _args = CallMatch0::<Res>::get_args(call);
-        box_fn::BoxFn0::new({
-            let action = self.action.clone();
-            move || {
-                let result = (action.borrow_mut().deref_mut())();
-                Box::into_raw(Box::new(result)) as *mut u8
+        impl<$($Arg,)* Res> $callmatch<$($Arg,)* Res> {
+            pub fn new(
+                mock_id: usize,
+                mock_type_id: usize,
+                method_name: &'static str,
+                type_param_ids: Vec<usize>,
+                $($arg: Box<dyn MatchArg<$Arg>>,)*
+            ) -> Self {
+                $callmatch {
+                    mock_id: mock_id,
+                    mock_type_id: mock_type_id,
+                    method_name: method_name,
+                    type_param_ids: type_param_ids,
+                    $($arg: $arg,)*
+                    _phantom: PhantomData,
+                }
             }
-        })
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{} must be {}, called {} times",
-            self.call_match.describe(),
-            self.cardinality.describe(),
-            self.count
-        )
-    }
-}
 
-#[must_use]
-pub struct Expectation0<Res> {
-    call_match: CallMatch0<Res>,
-    action: Option<Action0<Res>>,
-}
-impl<Res: 'static> Expectation for Expectation0<Res> {
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.action.is_none()
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        match self.action.take() {
-            Some(action) => {
-                // nightly: let box () = CallMatch0::<Res>::get_args(call);
-                let () = *CallMatch0::<Res>::get_args(call);
-                box_fn::BoxFn0::<*mut u8>::new(move || {
-                    let result = action.call();
-                    Box::into_raw(Box::new(result)) as *mut u8
+            fn get_args_ref(call: &Call) -> &($($Arg,)*) {
+                unsafe { &mut *(call.args_ptr as *mut ($($Arg,)*)) }
+            }
+
+            fn get_args(mut call: Call) -> Box<($($Arg,)*)> {
+                unsafe { Box::from_raw(call.take_args() as *mut ($($Arg,)*)) }
+            }
+        }
+
+        #[must_use]
+        pub struct $reaction<$($Arg,)* Res> {
+            call_match: $callmatch<$($Arg,)* Res>,
+            action: $actionclone<$($Arg,)* Res>,
+        }
+        impl<$($Arg,)* Res> $reaction<$($Arg,)* Res> {
+            pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> $expectationtimes<$($Arg,)* Res> {
+                $expectationtimes::new(self.call_match, self.action, Box::new(cardinality))
+            }
+        }
+
+        #[must_use]
+        pub struct $expectationtimes<$($Arg,)* Res> {
+            action: $actionclone<$($Arg,)* Res>,
+            call_match: $callmatch<$($Arg,)* Res>,
+            cardinality: Box<dyn Cardinality>,
+            count: u32,
+        }
+
+        impl<$($Arg,)* Res> $expectationtimes<$($Arg,)* Res> {
+            fn new(
+                call_match: $callmatch<$($Arg,)* Res>,
+                action: $actionclone<$($Arg,)* Res>,
+                cardinality: Box<dyn Cardinality>,
+            ) -> Self {
+                $expectationtimes {
+                    call_match: call_match,
+                    action: action,
+                    cardinality: cardinality,
+                    count: 0,
+                }
+            }
+        }
+
+        impl<$($Arg: 'static,)* Res: 'static> Expectation for $expectationtimes<$($Arg,)* Res> {
+            fn call_match(&self) -> &dyn CallMatch {
+                &self.call_match
+            }
+            fn is_satisfied(&self) -> bool {
+                self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
+            }
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> Action0<*mut u8> {
+                self.count += 1;
+                if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
+                    panic!(
+                        "{}.{} is called for the {} time, but expected to be {}",
+                        mock_name,
+                        self.call_match().get_method_name(),
+                        format_ordinal(self.count),
+                        self.cardinality.describe_upper_bound()
+                    );
+                }
+                let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
+                Action0::new({
+                    let action = self.action.clone();
+                    move || {
+                        let result = action.borrow_mut().deref_mut()($($arg,)*);
+                        Box::into_raw(Box::new(result)) as *mut u8
+                    }
                 })
             }
-            None => {
-                panic!(
-                    "{}.{} was already called earlier",
-                    mock_name,
-                    self.call_match().get_method_name()
+            fn describe(&self) -> String {
+                format!(
+                    "{} must be {}, called {} times",
+                    self.call_match.describe(),
+                    self.cardinality.describe(),
+                    self.count
+                )
+            }
+        }
+
+        #[must_use]
+        pub struct $expectation<$($Arg,)* Res> {
+            call_match: $callmatch<$($Arg,)* Res>,
+            action: Option<$action<$($Arg,)* Res>>,
+        }
+
+        impl<$($Arg: 'static,)* Res: 'static> Expectation for $expectation<$($Arg,)* Res> {
+            fn call_match(&self) -> &dyn CallMatch {
+                &self.call_match
+            }
+            fn is_satisfied(&self) -> bool {
+                self.action.is_none()
+            }
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
+                match self.action.take() {
+                    Some(action) => {
+                        let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
+                        box_fn::BoxFn0::<*mut u8>::new(move || {
+                            let result = action.call($($arg,)*);
+                            Box::into_raw(Box::new(result)) as *mut u8
+                        })
+                    }
+                    None => {
+                        panic!(
+                            "{}.{} was already called earlier",
+                            mock_name,
+                            self.call_match().get_method_name()
+                        );
+                    }
+                }
+            }
+            fn describe(&self) -> String {
+                self.call_match.describe()
+            }
+        }
+
+        impl<$($Arg: 'static,)* Res: 'static> $callmatch<$($Arg,)* Res> {
+            pub fn and_return(self, result: Res) -> $expectation<$($Arg,)* Res> {
+                #[allow(unused_variables)]
+                $expectation {
+                    call_match: self,
+                    action: Some($action::new(move |$($arg,)*| result)),
+                }
+            }
+
+            pub fn and_panic(self, msg: String) -> $expectation<$($Arg,)* Res> {
+                #[allow(unused_variables)]
+                $expectation {
+                    call_match: self,
+                    action: Some($action::new(move |$($arg,)*| panic!(msg))),
+                }
+            }
+
+            pub fn and_call<F>(self, func: F) -> $expectation<$($Arg,)* Res>
+            where
+                F: FnOnce($($Arg,)*) -> Res + 'static,
+            {
+                $expectation {
+                    call_match: self,
+                    action: Some($action::new(func)),
+                }
+            }
+
+            pub fn never(self) -> ExpectationNever<Self> {
+                ExpectationNever { call_match: self }
+            }
+        }
+
+        impl<$($Arg,)* Res: Clone + 'static> $callmatch<$($Arg,)* Res> {
+            pub fn and_return_clone(self, result: Res) -> $reaction<$($Arg,)* Res> {
+                #[allow(unused_variables)]
+                $reaction {
+                    call_match: self,
+                    action: Rc::new(RefCell::new(move |$($arg,)*| result.clone())),
+                }
+            }
+        }
+
+        impl<$($Arg,)* Res> $callmatch<$($Arg,)* Res> {
+            pub fn and_call_clone<F>(self, func: F) -> $reaction<$($Arg,)* Res>
+            where
+                F: FnMut($($Arg,)*) -> Res + 'static,
+            {
+                $reaction {
+                    call_match: self,
+                    action: Rc::new(RefCell::new(func)),
+                }
+            }
+        }
+
+        impl<$($Arg,)* Res: Default + 'static> $callmatch<$($Arg,)* Res> {
+            pub fn and_return_default(self) -> $reaction<$($Arg,)* Res> {
+                #[allow(unused_variables)]
+                $reaction {
+                    call_match: self,
+                    action: Rc::new(RefCell::new(|$($arg,)*| Res::default())),
+                }
+            }
+        }
+
+        impl<$($Arg,)* Res> CallMatch for $callmatch<$($Arg,)* Res> {
+            fn matches_args(&self, call: &Call) -> bool {
+                assert!(
+                    call.method_data.mock_type_id == self.mock_type_id
+                        && call.method_data.method_name == self.method_name
+                        && call.method_data.type_param_ids == self.type_param_ids
                 );
+
+                let __args = Self::get_args_ref(call);
+
+                true $(&& self.$arg.matches(&__args.$n).is_ok())*
+            }
+            fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
+                let __args = Self::get_args_ref(call);
+                vec![$(self.$arg.matches(&__args.$n)),*]
+            }
+            fn get_mock_id(&self) -> usize {
+                self.mock_id
+            }
+            fn get_mock_type_id(&self) -> usize {
+                self.mock_type_id
+            }
+            fn get_method_name(&self) -> &'static str {
+                self.method_name
+            }
+            fn get_type_param_ids(&self) -> &[usize] {
+                &self.type_param_ids
+            }
+            fn describe(&self) -> String {
+                let args: &[&std::fmt::Display] = &[$(&self.$arg.describe()),*];
+                format!("{}({})", self.get_method_name(), args.iter().format(", "))
             }
         }
     }
-    fn describe(&self) -> String {
-        self.call_match.describe()
-    }
-}
-impl<Res: 'static> CallMatch0<Res> {
-    pub fn and_return(self, result: Res) -> Expectation0<Res> {
-        Expectation0 {
-            call_match: self,
-            action: Some(Action0::new(move || result)),
-        }
-    }
-
-    pub fn and_panic(self, msg: String) -> Expectation0<Res> {
-        Expectation0 {
-            call_match: self,
-            action: Some(Action0::new(move || panic!(msg))),
-        }
-    }
-
-    pub fn and_call<F>(self, func: F) -> Expectation0<Res>
-    where
-        F: FnOnce() -> Res + 'static,
-    {
-        Expectation0 {
-            call_match: self,
-            action: Some(Action0::new(func)),
-        }
-    }
-
-    pub fn never(self) -> ExpectationNever<Self> {
-        ExpectationNever { call_match: self }
-    }
-}
-impl<Res: Clone + 'static> CallMatch0<Res> {
-    pub fn and_return_clone(self, result: Res) -> Reaction0<Res> {
-        Reaction0 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move || result.clone())),
-        }
-    }
-}
-impl<Res> CallMatch0<Res> {
-    pub fn and_call_clone<F>(self, func: F) -> Reaction0<Res>
-    where
-        F: FnMut() -> Res + 'static,
-    {
-        Reaction0 {
-            call_match: self,
-            action: Rc::new(RefCell::new(func)),
-        }
-    }
 }
 
-impl<Res: Default + 'static> CallMatch0<Res> {
-    pub fn and_return_default(self) -> Reaction0<Res> {
-        Reaction0 {
-            call_match: self,
-            action: Rc::new(RefCell::new(Res::default)),
-        }
-    }
-}
-
-#[must_use]
-pub struct CallMatch1<Arg0, Res> {
-    mock_id: usize,
-    mock_type_id: usize,
-    method_name: &'static str,
-    type_param_ids: Vec<usize>,
-    arg0: Box<dyn MatchArg<Arg0>>,
-
-    _phantom: PhantomData<Res>,
-}
-impl<Arg0, Res> CallMatch1<Arg0, Res> {
-    pub fn new(
-        mock_id: usize,
-        mock_type_id: usize,
-        method_name: &'static str,
-        type_param_ids: Vec<usize>,
-        arg0: Box<dyn MatchArg<Arg0>>,
-    ) -> Self {
-        CallMatch1 {
-            mock_id: mock_id,
-            mock_type_id: mock_type_id,
-            method_name: method_name,
-            type_param_ids: type_param_ids,
-            arg0: arg0,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn get_args_ref(call: &Call) -> &mut (Arg0,) {
-        unsafe { &mut *(call.args_ptr as *mut (Arg0,)) }
-    }
-
-    fn get_args(mut call: Call) -> Box<(Arg0,)> {
-        unsafe { Box::from_raw(call.take_args() as *mut (Arg0,)) }
-    }
-}
-impl<Arg0, Res> CallMatch for CallMatch1<Arg0, Res> {
-    fn matches_args(&self, call: &Call) -> bool {
-        assert!(
-            call.method_data.mock_type_id == self.mock_type_id
-                && call.method_data.method_name == self.method_name
-                && call.method_data.type_param_ids == self.type_param_ids
-        );
-
-        let args = Self::get_args_ref(call);
-        self.arg0.matches(&args.0).is_ok()
-    }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args_ref(call);
-        vec![self.arg0.matches(&args.0)]
-    }
-    fn get_mock_id(&self) -> usize {
-        self.mock_id
-    }
-    fn get_mock_type_id(&self) -> usize {
-        self.mock_type_id
-    }
-    fn get_method_name(&self) -> &'static str {
-        self.method_name
-    }
-    fn get_type_param_ids(&self) -> &[usize] {
-        &self.type_param_ids
-    }
-    fn describe(&self) -> String {
-        format!("{}({})", self.get_method_name(), self.arg0.describe())
-    }
-}
-
-#[must_use]
-pub struct Reaction1<Arg0, Res> {
-    call_match: CallMatch1<Arg0, Res>,
-    action: ActionClone1<Arg0, Res>,
-}
-impl<Arg0, Res> Reaction1<Arg0, Res> {
-    pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> ExpectationTimes1<Arg0, Res> {
-        ExpectationTimes1::new(self.call_match, self.action, Box::new(cardinality))
-    }
-}
-
-#[must_use]
-pub struct ExpectationTimes1<Arg0, Res> {
-    action: ActionClone1<Arg0, Res>,
-    call_match: CallMatch1<Arg0, Res>,
-    cardinality: Box<dyn Cardinality>,
-    count: u32,
-}
-impl<Arg0, Res> ExpectationTimes1<Arg0, Res> {
-    fn new(
-        call_match: CallMatch1<Arg0, Res>,
-        action: ActionClone1<Arg0, Res>,
-        cardinality: Box<dyn Cardinality>,
-    ) -> Self {
-        ExpectationTimes1 {
-            call_match: call_match,
-            action: action,
-            cardinality: cardinality,
-            count: 0,
-        }
-    }
-}
-impl<Arg0: 'static, Res: 'static> Expectation for ExpectationTimes1<Arg0, Res> {
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        self.count += 1;
-        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
-            panic!(
-                "{}.{} is called for the {} time, but expected to be {}",
-                mock_name,
-                self.call_match().get_method_name(),
-                format_ordinal(self.count),
-                self.cardinality.describe_upper_bound()
-            );
-        }
-        // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
-        let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
-        box_fn::BoxFn0::new({
-            let action = self.action.clone();
-            move || {
-                let result = action.borrow_mut().deref_mut()(arg0);
-                Box::into_raw(Box::new(result)) as *mut u8
-            }
-        })
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{} must be {}, called {} times",
-            self.call_match.describe(),
-            self.cardinality.describe(),
-            self.count
-        )
-    }
-}
-
-#[must_use]
-pub struct Expectation1<Arg0, Res> {
-    call_match: CallMatch1<Arg0, Res>,
-    action: Option<Action1<Arg0, Res>>,
-}
-impl<Arg0: 'static, Res: 'static> Expectation for Expectation1<Arg0, Res> {
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.action.is_none()
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        match self.action.take() {
-            Some(action) => {
-                // nightly: let box (arg0,) = CallMatch1::<Arg0, Res>::get_args(call);
-                let (arg0,) = *CallMatch1::<Arg0, Res>::get_args(call);
-                box_fn::BoxFn0::new(move || {
-                    let result = action.call(arg0);
-                    Box::into_raw(Box::new(result)) as *mut u8
-                })
-            }
-            None => {
-                panic!(
-                    "{}.{} was already called earlier",
-                    mock_name,
-                    self.call_match().get_method_name()
-                );
-            }
-        }
-    }
-    fn describe(&self) -> String {
-        self.call_match.describe()
-    }
-}
-impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
-    pub fn and_return(self, result: Res) -> Expectation1<Arg0, Res> {
-        Expectation1 {
-            call_match: self,
-            action: Some(Action1::new(move |_| result)),
-        }
-    }
-
-    pub fn and_panic(self, msg: String) -> Expectation1<Arg0, Res> {
-        Expectation1 {
-            call_match: self,
-            action: Some(Action1::new(move |_| panic!(msg))),
-        }
-    }
-
-    pub fn and_call<F>(self, func: F) -> Expectation1<Arg0, Res>
-    where
-        F: FnOnce(Arg0) -> Res + 'static,
-    {
-        Expectation1 {
-            call_match: self,
-            action: Some(Action1::new(func)),
-        }
-    }
-
-    pub fn never(self) -> ExpectationNever<Self> {
-        ExpectationNever { call_match: self }
-    }
-}
-impl<Arg0, Res: Clone + 'static> CallMatch1<Arg0, Res> {
-    pub fn and_return_clone(self, result: Res) -> Reaction1<Arg0, Res> {
-        Reaction1 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move |_| result.clone())),
-        }
-    }
-}
-impl<Arg0, Res: 'static> CallMatch1<Arg0, Res> {
-    pub fn and_call_clone<F>(self, func: F) -> Reaction1<Arg0, Res>
-    where
-        F: FnMut(Arg0) -> Res + 'static,
-    {
-        Reaction1 {
-            call_match: self,
-            action: Rc::new(RefCell::new(func)),
-        }
-    }
-}
-impl<Arg0, Res: Default + 'static> CallMatch1<Arg0, Res> {
-    pub fn and_return_default(self) -> Reaction1<Arg0, Res> {
-        Reaction1 {
-            call_match: self,
-            action: Rc::new(RefCell::new(|_| Res::default())),
-        }
-    }
-}
-
-#[must_use]
-pub struct CallMatch2<Arg0, Arg1, Res> {
-    mock_id: usize,
-    mock_type_id: usize,
-    method_name: &'static str,
-    type_param_ids: Vec<usize>,
-    arg0: Box<dyn MatchArg<Arg0>>,
-    arg1: Box<dyn MatchArg<Arg1>>,
-
-    _phantom: PhantomData<Res>,
-}
-impl<Arg0, Arg1, Res> CallMatch2<Arg0, Arg1, Res> {
-    pub fn new(
-        mock_id: usize,
-        mock_type_id: usize,
-        method_name: &'static str,
-        type_param_ids: Vec<usize>,
-        arg0: Box<dyn MatchArg<Arg0>>,
-        arg1: Box<dyn MatchArg<Arg1>>,
-    ) -> Self {
-        CallMatch2 {
-            mock_id: mock_id,
-            mock_type_id: mock_type_id,
-            method_name: method_name,
-            type_param_ids: type_param_ids,
-            arg0: arg0,
-            arg1: arg1,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn get_args_ref(call: &Call) -> &mut (Arg0, Arg1) {
-        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1)) }
-    }
-
-    fn get_args(mut call: Call) -> Box<(Arg0, Arg1)> {
-        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1)) }
-    }
-}
-impl<Arg0, Arg1, Res> CallMatch for CallMatch2<Arg0, Arg1, Res> {
-    fn matches_args(&self, call: &Call) -> bool {
-        assert!(
-            call.method_data.mock_type_id == self.mock_type_id
-                && call.method_data.method_name == self.method_name
-                && call.method_data.type_param_ids == self.type_param_ids
-        );
-
-        let args = Self::get_args_ref(call);
-        self.arg0.matches(&args.0).is_ok() && self.arg1.matches(&args.1).is_ok()
-    }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args_ref(call);
-        vec![self.arg0.matches(&args.0), self.arg1.matches(&args.1)]
-    }
-    fn get_mock_id(&self) -> usize {
-        self.mock_id
-    }
-    fn get_mock_type_id(&self) -> usize {
-        self.mock_type_id
-    }
-    fn get_method_name(&self) -> &'static str {
-        self.method_name
-    }
-    fn get_type_param_ids(&self) -> &[usize] {
-        &self.type_param_ids
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{}({}, {})",
-            self.get_method_name(),
-            self.arg0.describe(),
-            self.arg1.describe()
-        )
-    }
-}
-
-#[must_use]
-pub struct Reaction2<Arg0, Arg1, Res> {
-    call_match: CallMatch2<Arg0, Arg1, Res>,
-    action: ActionClone2<Arg0, Arg1, Res>,
-}
-impl<Arg0, Arg1, Res> Reaction2<Arg0, Arg1, Res> {
-    pub fn times<C: Cardinality + 'static>(
-        self,
-        cardinality: C,
-    ) -> ExpectationTimes2<Arg0, Arg1, Res> {
-        ExpectationTimes2::new(self.call_match, self.action, Box::new(cardinality))
-    }
-}
-
-#[must_use]
-pub struct ExpectationTimes2<Arg0, Arg1, Res> {
-    action: ActionClone2<Arg0, Arg1, Res>,
-    call_match: CallMatch2<Arg0, Arg1, Res>,
-    cardinality: Box<dyn Cardinality>,
-    count: u32,
-}
-impl<Arg0, Arg1, Res> ExpectationTimes2<Arg0, Arg1, Res> {
-    fn new(
-        call_match: CallMatch2<Arg0, Arg1, Res>,
-        action: ActionClone2<Arg0, Arg1, Res>,
-        cardinality: Box<dyn Cardinality>,
-    ) -> Self {
-        ExpectationTimes2 {
-            call_match: call_match,
-            action: action,
-            cardinality: cardinality,
-            count: 0,
-        }
-    }
-}
-impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation
-    for ExpectationTimes2<Arg0, Arg1, Res>
-{
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        self.count += 1;
-        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
-            panic!(
-                "{}.{} is called for the {} time, but expected to be {}",
-                mock_name,
-                self.call_match().get_method_name(),
-                format_ordinal(self.count),
-                self.cardinality.describe_upper_bound()
-            );
-        }
-        // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-        let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-        box_fn::BoxFn0::new({
-            let action = self.action.clone();
-            move || {
-                let result = action.borrow_mut().deref_mut()(arg0, arg1);
-                Box::into_raw(Box::new(result)) as *mut u8
-            }
-        })
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{} must be {}, called {} times",
-            self.call_match.describe(),
-            self.cardinality.describe(),
-            self.count
-        )
-    }
-}
-
-#[must_use]
-pub struct Expectation2<Arg0, Arg1, Res> {
-    call_match: CallMatch2<Arg0, Arg1, Res>,
-    action: Option<Action2<Arg0, Arg1, Res>>,
-}
-impl<Arg0: 'static, Arg1: 'static, Res: 'static> Expectation for Expectation2<Arg0, Arg1, Res> {
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.action.is_none()
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        match self.action.take() {
-            Some(action) => {
-                // nightly: let box (arg0, arg1) = CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                let (arg0, arg1) = *CallMatch2::<Arg0, Arg1, Res>::get_args(call);
-                box_fn::BoxFn0::new(move || {
-                    let result = action.call(arg0, arg1);
-                    Box::into_raw(Box::new(result)) as *mut u8
-                })
-            }
-            None => {
-                panic!(
-                    "{}.{} was already called earlier",
-                    mock_name,
-                    self.call_match().get_method_name()
-                );
-            }
-        }
-    }
-    fn describe(&self) -> String {
-        self.call_match.describe()
-    }
-}
-impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
-    pub fn and_return(self, result: Res) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 {
-            call_match: self,
-            action: Some(Action2::new(move |_, _| result)),
-        }
-    }
-
-    pub fn and_panic(self, msg: String) -> Expectation2<Arg0, Arg1, Res> {
-        Expectation2 {
-            call_match: self,
-            action: Some(Action2::new(move |_, _| panic!(msg))),
-        }
-    }
-
-    pub fn and_call<F>(self, func: F) -> Expectation2<Arg0, Arg1, Res>
-    where
-        F: FnOnce(Arg0, Arg1) -> Res + 'static,
-    {
-        Expectation2 {
-            call_match: self,
-            action: Some(Action2::new(func)),
-        }
-    }
-
-    pub fn never(self) -> ExpectationNever<Self> {
-        ExpectationNever { call_match: self }
-    }
-}
-impl<Arg0, Arg1, Res: Clone + 'static> CallMatch2<Arg0, Arg1, Res> {
-    pub fn and_return_clone(self, result: Res) -> Reaction2<Arg0, Arg1, Res> {
-        Reaction2 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move |_, _| result.clone())),
-        }
-    }
-}
-impl<Arg0, Arg1, Res: 'static> CallMatch2<Arg0, Arg1, Res> {
-    pub fn and_call_clone<F>(self, func: F) -> Reaction2<Arg0, Arg1, Res>
-    where
-        F: FnMut(Arg0, Arg1) -> Res + 'static,
-    {
-        Reaction2 {
-            call_match: self,
-            action: Rc::new(RefCell::new(func)),
-        }
-    }
-}
-impl<Arg0, Arg1, Res: Default + 'static> CallMatch2<Arg0, Arg1, Res> {
-    pub fn and_return_default(self) -> Reaction2<Arg0, Arg1, Res> {
-        Reaction2 {
-            call_match: self,
-            action: Rc::new(RefCell::new(|_, _| Res::default())),
-        }
-    }
-}
-
-#[must_use]
-pub struct CallMatch3<Arg0, Arg1, Arg2, Res> {
-    mock_id: usize,
-    mock_type_id: usize,
-    method_name: &'static str,
-    type_param_ids: Vec<usize>,
-    arg0: Box<dyn MatchArg<Arg0>>,
-    arg1: Box<dyn MatchArg<Arg1>>,
-    arg2: Box<dyn MatchArg<Arg2>>,
-
-    _phantom: PhantomData<Res>,
-}
-impl<Arg0, Arg1, Arg2, Res> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn new(
-        mock_id: usize,
-        mock_type_id: usize,
-        method_name: &'static str,
-        type_param_ids: Vec<usize>,
-        arg0: Box<dyn MatchArg<Arg0>>,
-        arg1: Box<dyn MatchArg<Arg1>>,
-        arg2: Box<dyn MatchArg<Arg2>>,
-    ) -> Self {
-        CallMatch3 {
-            mock_id: mock_id,
-            mock_type_id: mock_type_id,
-            method_name: method_name,
-            type_param_ids: type_param_ids,
-            arg0: arg0,
-            arg1: arg1,
-            arg2: arg2,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2) {
-        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1, Arg2)) }
-    }
-
-    fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2)> {
-        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1, Arg2)) }
-    }
-}
-impl<Arg0, Arg1, Arg2, Res> CallMatch for CallMatch3<Arg0, Arg1, Arg2, Res> {
-    fn matches_args(&self, call: &Call) -> bool {
-        assert!(
-            call.method_data.mock_type_id == self.mock_type_id
-                && call.method_data.method_name == self.method_name
-                && call.method_data.type_param_ids == self.type_param_ids
-        );
-
-        let args = Self::get_args_ref(call);
-        self.arg0.matches(&args.0).is_ok()
-            && self.arg1.matches(&args.1).is_ok()
-            && self.arg2.matches(&args.2).is_ok()
-    }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args_ref(call);
-        vec![
-            self.arg0.matches(&args.0),
-            self.arg1.matches(&args.1),
-            self.arg2.matches(&args.2),
-        ]
-    }
-    fn get_mock_id(&self) -> usize {
-        self.mock_id
-    }
-    fn get_mock_type_id(&self) -> usize {
-        self.mock_type_id
-    }
-    fn get_method_name(&self) -> &'static str {
-        self.method_name
-    }
-    fn get_type_param_ids(&self) -> &[usize] {
-        &self.type_param_ids
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{}({}, {}, {})",
-            self.get_method_name(),
-            self.arg0.describe(),
-            self.arg1.describe(),
-            self.arg2.describe()
-        )
-    }
-}
-
-#[must_use]
-pub struct Reaction3<Arg0, Arg1, Arg2, Res> {
-    call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    action: ActionClone3<Arg0, Arg1, Arg2, Res>,
-}
-impl<Arg0, Arg1, Arg2, Res> Reaction3<Arg0, Arg1, Arg2, Res> {
-    pub fn times<C: Cardinality + 'static>(
-        self,
-        cardinality: C,
-    ) -> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-        ExpectationTimes3::new(self.call_match, self.action, Box::new(cardinality))
-    }
-}
-
-#[must_use]
-pub struct ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-    action: ActionClone3<Arg0, Arg1, Arg2, Res>,
-    call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    cardinality: Box<dyn Cardinality>,
-    count: u32,
-}
-impl<Arg0, Arg1, Arg2, Res> ExpectationTimes3<Arg0, Arg1, Arg2, Res> {
-    fn new(
-        call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-        action: ActionClone3<Arg0, Arg1, Arg2, Res>,
-        cardinality: Box<dyn Cardinality>,
-    ) -> Self {
-        ExpectationTimes3 {
-            call_match: call_match,
-            action: action,
-            cardinality: cardinality,
-            count: 0,
-        }
-    }
-}
-impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation
-    for ExpectationTimes3<Arg0, Arg1, Arg2, Res>
-{
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        self.count += 1;
-        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
-            panic!(
-                "{}.{} is called for the {} time, but expected to be {}",
-                mock_name,
-                self.call_match().get_method_name(),
-                format_ordinal(self.count),
-                self.cardinality.describe_upper_bound()
-            );
-        }
-        // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-        let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-        box_fn::BoxFn0::new({
-            let action = self.action.clone();
-            move || {
-                let result = action.borrow_mut().deref_mut()(arg0, arg1, arg2);
-                Box::into_raw(Box::new(result)) as *mut u8
-            }
-        })
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{} must be {}, called {} times",
-            self.call_match.describe(),
-            self.cardinality.describe(),
-            self.count
-        )
-    }
-}
-
-#[must_use]
-pub struct Expectation3<Arg0, Arg1, Arg2, Res> {
-    call_match: CallMatch3<Arg0, Arg1, Arg2, Res>,
-    action: Option<Action3<Arg0, Arg1, Arg2, Res>>,
-}
-impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Res: 'static> Expectation
-    for Expectation3<Arg0, Arg1, Arg2, Res>
-{
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.action.is_none()
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        match self.action.take() {
-            Some(action) => {
-                // nightly: let box (arg0, arg1, arg2) = CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                let (arg0, arg1, arg2) = *CallMatch3::<Arg0, Arg1, Arg2, Res>::get_args(call);
-                box_fn::BoxFn0::new(move || {
-                    let result = action.call(arg0, arg1, arg2);
-                    Box::into_raw(Box::new(result)) as *mut u8
-                })
-            }
-            None => {
-                panic!(
-                    "{}.{} was already called earlier",
-                    mock_name,
-                    self.call_match().get_method_name()
-                );
-            }
-        }
-    }
-    fn describe(&self) -> String {
-        self.call_match.describe()
-    }
-}
-impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn and_return(self, result: Res) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 {
-            call_match: self,
-            action: Some(Action3::new(move |_, _, _| result)),
-        }
-    }
-
-    pub fn and_panic(self, msg: String) -> Expectation3<Arg0, Arg1, Arg2, Res> {
-        Expectation3 {
-            call_match: self,
-            action: Some(Action3::new(move |_, _, _| panic!(msg))),
-        }
-    }
-
-    pub fn and_call<F>(self, func: F) -> Expectation3<Arg0, Arg1, Arg2, Res>
-    where
-        F: FnOnce(Arg0, Arg1, Arg2) -> Res + 'static,
-    {
-        Expectation3 {
-            call_match: self,
-            action: Some(Action3::new(func)),
-        }
-    }
-
-    pub fn never(self) -> ExpectationNever<Self> {
-        ExpectationNever { call_match: self }
-    }
-}
-impl<Arg0, Arg1, Arg2, Res: Clone + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn and_return_clone(self, result: Res) -> Reaction3<Arg0, Arg1, Arg2, Res> {
-        Reaction3 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move |_, _, _| result.clone())),
-        }
-    }
-}
-impl<Arg0, Arg1, Arg2, Res: 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn and_call_clone<F>(self, func: F) -> Reaction3<Arg0, Arg1, Arg2, Res>
-    where
-        F: FnMut(Arg0, Arg1, Arg2) -> Res + 'static,
-    {
-        Reaction3 {
-            call_match: self,
-            action: Rc::new(RefCell::new(func)),
-        }
-    }
-}
-impl<Arg0, Arg1, Arg2, Res: Default + 'static> CallMatch3<Arg0, Arg1, Arg2, Res> {
-    pub fn and_return_default(self) -> Reaction3<Arg0, Arg1, Arg2, Res> {
-        Reaction3 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move |_, _, _| Res::default())),
-        }
-    }
-}
-
-#[must_use]
-pub struct CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    mock_id: usize,
-    mock_type_id: usize,
-    method_name: &'static str,
-    type_param_ids: Vec<usize>,
-    arg0: Box<dyn MatchArg<Arg0>>,
-    arg1: Box<dyn MatchArg<Arg1>>,
-    arg2: Box<dyn MatchArg<Arg2>>,
-    arg3: Box<dyn MatchArg<Arg3>>,
-
-    _phantom: PhantomData<Res>,
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn new(
-        mock_id: usize,
-        mock_type_id: usize,
-        method_name: &'static str,
-        type_param_ids: Vec<usize>,
-        arg0: Box<dyn MatchArg<Arg0>>,
-        arg1: Box<dyn MatchArg<Arg1>>,
-        arg2: Box<dyn MatchArg<Arg2>>,
-        arg3: Box<dyn MatchArg<Arg3>>,
-    ) -> Self {
-        CallMatch4 {
-            mock_id: mock_id,
-            mock_type_id: mock_type_id,
-            method_name: method_name,
-            type_param_ids: type_param_ids,
-            arg0: arg0,
-            arg1: arg1,
-            arg2: arg2,
-            arg3: arg3,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn get_args_ref(call: &Call) -> &(Arg0, Arg1, Arg2, Arg3) {
-        unsafe { &mut *(call.args_ptr as *mut (Arg0, Arg1, Arg2, Arg3)) }
-    }
-
-    fn get_args(mut call: Call) -> Box<(Arg0, Arg1, Arg2, Arg3)> {
-        unsafe { Box::from_raw(call.take_args() as *mut (Arg0, Arg1, Arg2, Arg3)) }
-    }
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res> CallMatch for CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn matches_args(&self, call: &Call) -> bool {
-        assert!(
-            call.method_data.mock_type_id == self.mock_type_id
-                && call.method_data.method_name == self.method_name
-                && call.method_data.type_param_ids == self.type_param_ids
-        );
-
-        let args = Self::get_args_ref(call);
-        self.arg0.matches(&args.0).is_ok()
-            && self.arg1.matches(&args.1).is_ok()
-            && self.arg2.matches(&args.2).is_ok()
-            && self.arg3.matches(&args.3).is_ok()
-    }
-    fn validate(&self, call: &Call) -> Vec<Result<(), String>> {
-        let args = Self::get_args_ref(call);
-        vec![
-            self.arg0.matches(&args.0),
-            self.arg1.matches(&args.1),
-            self.arg2.matches(&args.2),
-            self.arg3.matches(&args.3),
-        ]
-    }
-    fn get_mock_id(&self) -> usize {
-        self.mock_id
-    }
-    fn get_mock_type_id(&self) -> usize {
-        self.mock_type_id
-    }
-    fn get_method_name(&self) -> &'static str {
-        self.method_name
-    }
-    fn get_type_param_ids(&self) -> &[usize] {
-        &self.type_param_ids
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{}({}, {}, {}, {})",
-            self.get_method_name(),
-            self.arg0.describe(),
-            self.arg1.describe(),
-            self.arg2.describe(),
-            self.arg3.describe()
-        )
-    }
-}
-
-#[must_use]
-pub struct Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-    call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn times<C: Cardinality + 'static>(
-        self,
-        cardinality: C,
-    ) -> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-        ExpectationTimes4::new(self.call_match, self.action, Box::new(cardinality))
-    }
-}
-
-#[must_use]
-pub struct ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-    action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
-    call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    cardinality: Box<dyn Cardinality>,
-    count: u32,
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res> ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res> {
-    fn new(
-        call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-        action: ActionClone4<Arg0, Arg1, Arg2, Arg3, Res>,
-        cardinality: Box<dyn Cardinality>,
-    ) -> Self {
-        ExpectationTimes4 {
-            call_match: call_match,
-            action: action,
-            cardinality: cardinality,
-            count: 0,
-        }
-    }
-}
-impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation
-    for ExpectationTimes4<Arg0, Arg1, Arg2, Arg3, Res>
-{
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        self.count += 1;
-        if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
-            panic!(
-                "{}.{} is called for the {} time, but expected to be {}",
-                mock_name,
-                self.call_match().get_method_name(),
-                format_ordinal(self.count),
-                self.cardinality.describe_upper_bound()
-            );
-        }
-        // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-        let (arg0, arg1, arg2, arg3) = *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-        box_fn::BoxFn0::new({
-            let action = self.action.clone();
-            move || {
-                let result = action.borrow_mut().deref_mut()(arg0, arg1, arg2, arg3);
-                Box::into_raw(Box::new(result)) as *mut u8
-            }
-        })
-    }
-    fn describe(&self) -> String {
-        format!(
-            "{} must be {}, called {} times",
-            self.call_match.describe(),
-            self.cardinality.describe(),
-            self.count
-        )
-    }
-}
-
-#[must_use]
-pub struct Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-    call_match: CallMatch4<Arg0, Arg1, Arg2, Arg3, Res>,
-    action: Option<Action4<Arg0, Arg1, Arg2, Arg3, Res>>,
-}
-impl<Arg0: 'static, Arg1: 'static, Arg2: 'static, Arg3: 'static, Res: 'static> Expectation
-    for Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
-{
-    fn call_match(&self) -> &dyn CallMatch {
-        &self.call_match
-    }
-    fn is_satisfied(&self) -> bool {
-        self.action.is_none()
-    }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> box_fn::BoxFn0<*mut u8> {
-        match self.action.take() {
-            Some(action) => {
-                // nightly: let box (arg0, arg1, arg2, arg3) = CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                let (arg0, arg1, arg2, arg3) =
-                    *CallMatch4::<Arg0, Arg1, Arg2, Arg3, Res>::get_args(call);
-                box_fn::BoxFn0::new(move || {
-                    let result = action.call(arg0, arg1, arg2, arg3);
-                    Box::into_raw(Box::new(result)) as *mut u8
-                })
-            }
-            None => {
-                panic!(
-                    "{}.{} was already called earlier",
-                    mock_name,
-                    self.call_match().get_method_name()
-                );
-            }
-        }
-    }
-    fn describe(&self) -> String {
-        self.call_match.describe()
-    }
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn and_return(self, result: Res) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 {
-            call_match: self,
-            action: Some(Action4::new(move |_, _, _, _| result)),
-        }
-    }
-
-    pub fn and_panic(self, msg: String) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Expectation4 {
-            call_match: self,
-            action: Some(Action4::new(move |_, _, _, _| panic!(msg))),
-        }
-    }
-
-    pub fn and_call<F>(self, func: F) -> Expectation4<Arg0, Arg1, Arg2, Arg3, Res>
-    where
-        F: FnOnce(Arg0, Arg1, Arg2, Arg3) -> Res + 'static,
-    {
-        Expectation4 {
-            call_match: self,
-            action: Some(Action4::new(func)),
-        }
-    }
-
-    pub fn never(self) -> ExpectationNever<Self> {
-        ExpectationNever { call_match: self }
-    }
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res: Clone + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn and_return_clone(self, result: Res) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Reaction4 {
-            call_match: self,
-            action: Rc::new(RefCell::new(move |_, _, _, _| result.clone())),
-        }
-    }
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res: 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn and_call_clone<F>(self, func: F) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res>
-    where
-        F: FnMut(Arg0, Arg1, Arg2, Arg3) -> Res + 'static,
-    {
-        Reaction4 {
-            call_match: self,
-            action: Rc::new(RefCell::new(func)),
-        }
-    }
-}
-impl<Arg0, Arg1, Arg2, Arg3, Res: Default + 'static> CallMatch4<Arg0, Arg1, Arg2, Arg3, Res> {
-    pub fn and_return_default(self) -> Reaction4<Arg0, Arg1, Arg2, Arg3, Res> {
-        Reaction4 {
-            call_match: self,
-            action: Rc::new(RefCell::new(|_, _, _, _| Res::default())),
-        }
-    }
-}
+define_all!(Reaction0(CallMatch0, Action0, ActionClone0, Expectation0, ExpectationTimes0) {
+});
+define_all!(Reaction1(CallMatch1, Action1, ActionClone1, Expectation1, ExpectationTimes1) {
+    arg0 => 0, Arg0
+});
+define_all!(Reaction2(CallMatch2, Action2, ActionClone2, Expectation2, ExpectationTimes2) {
+    arg0 => 0, Arg0, arg1 => 1, Arg1
+});
+define_all!(Reaction3(CallMatch3, Action3, ActionClone3, Expectation3, ExpectationTimes3) {
+    arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2
+});
+define_all!(Reaction4(CallMatch4, Action4, ActionClone4, Expectation4, ExpectationTimes4) {
+    arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3
+});
 
 /// Argument matcher
 ///
@@ -1626,155 +684,43 @@ pub struct MethodData {
     pub type_param_ids: Vec<usize>,
 }
 
+macro_rules! define_verify {
+    (
+        $verify:ident { $($arg:ident => $n:tt, $Arg:ident),* }
+    ) => {
+        pub fn $verify<$($Arg,)* Res>(&mut self, method_data: MethodData$(, $arg: $Arg)*) -> box_fn::BoxFn0<Res> {
+            let args = Box::new(($($arg,)*));
+            let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
+            fn destroy<$($Arg,)*>(args_to_destroy: *const u8) {
+                unsafe { Box::from_raw(args_to_destroy as *mut ($($Arg,)*)) };
+            };
+            fn format_args<$($Arg,)*>(args_ptr: *const u8) -> String {
+                let __args_ref: &($($Arg,)*) = unsafe { ::std::mem::transmute(args_ptr) };
+                let args_debug: &[&std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
+                format!("{:?}", args_debug.iter().format(", "))
+            };
+            let call = Call {
+                method_data: method_data,
+                args_ptr: args_ptr,
+                destroy: destroy::<$($Arg,)*>,
+                format_args: format_args::<$($Arg,)*>,
+            };
+            let action = self.verify(call);
+            box_fn::BoxFn0::new(move || {
+                let result_ptr: *mut u8 = action.call();
+                let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
+                *result
+            })
+        }
+    }
+}
+
 impl ScenarioInternals {
-    pub fn verify0<Res>(&mut self, method_data: MethodData) -> box_fn::BoxFn0<Res> {
-        let args = Box::new(());
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut ()) };
-        };
-        fn format_args(args_ptr: *const u8) -> String {
-            let _args_ref: &() = unsafe { ::std::mem::transmute(args_ptr) };
-            format!("")
-        };
-        let call = Call {
-            method_data: method_data,
-            args_ptr: args_ptr,
-            destroy: destroy,
-            format_args: format_args,
-        };
-        let action = self.verify(call);
-        box_fn::BoxFn0::new(move || {
-            let result_ptr: *mut u8 = action.call();
-            let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
-            *result
-        })
-    }
-
-    pub fn verify1<A0, Res>(&mut self, method_data: MethodData, a0: A0) -> box_fn::BoxFn0<Res> {
-        let args = Box::new((a0,));
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy<A0>(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut (A0,)) };
-        };
-        fn format_args<A0>(args_ptr: *const u8) -> String {
-            let _args_ref: &(A0,) = unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}", dbg(&_args_ref.0))
-        };
-        let call = Call {
-            method_data: method_data,
-            args_ptr: args_ptr,
-            destroy: destroy::<A0>,
-            format_args: format_args::<A0>,
-        };
-        let action = self.verify(call);
-        box_fn::BoxFn0::new(move || {
-            let result_ptr: *mut u8 = action.call();
-            let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
-            *result
-        })
-    }
-
-    pub fn verify2<A0, A1, Res>(
-        &mut self,
-        method_data: MethodData,
-        a0: A0,
-        a1: A1,
-    ) -> box_fn::BoxFn0<Res> {
-        let args = Box::new((a0, a1));
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy<A0, A1>(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1)) };
-        };
-        fn format_args<A0, A1>(args_ptr: *const u8) -> String {
-            let _args_ref: &(A0, A1) = unsafe { ::std::mem::transmute(args_ptr) };
-            format!("{:?}, {:?}", dbg(&_args_ref.0), dbg(&_args_ref.1))
-        };
-        let call = Call {
-            method_data: method_data,
-            args_ptr: args_ptr,
-            destroy: destroy::<A0, A1>,
-            format_args: format_args::<A0, A1>,
-        };
-        let action = self.verify(call);
-        box_fn::BoxFn0::new(move || {
-            let result_ptr: *mut u8 = action.call();
-            let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
-            *result
-        })
-    }
-
-    pub fn verify3<A0, A1, A2, Res>(
-        &mut self,
-        method_data: MethodData,
-        a0: A0,
-        a1: A1,
-        a2: A2,
-    ) -> box_fn::BoxFn0<Res> {
-        let args = Box::new((a0, a1, a2));
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy<A0, A1, A2>(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2)) };
-        };
-        fn format_args<A0, A1, A2>(args_ptr: *const u8) -> String {
-            let _args_ref: &(A0, A1, A2) = unsafe { ::std::mem::transmute(args_ptr) };
-            format!(
-                "{:?}, {:?}, {:?}",
-                dbg(&_args_ref.0),
-                dbg(&_args_ref.1),
-                dbg(&_args_ref.2)
-            )
-        };
-        let call = Call {
-            method_data: method_data,
-            args_ptr: args_ptr,
-            destroy: destroy::<A0, A1, A2>,
-            format_args: format_args::<A0, A1, A2>,
-        };
-        let action = self.verify(call);
-        box_fn::BoxFn0::new(move || {
-            let result_ptr: *mut u8 = action.call();
-            let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
-            *result
-        })
-    }
-
-    pub fn verify4<A0, A1, A2, A3, Res>(
-        &mut self,
-        method_data: MethodData,
-        a0: A0,
-        a1: A1,
-        a2: A2,
-        a3: A3,
-    ) -> box_fn::BoxFn0<Res> {
-        let args = Box::new((a0, a1, a2, a3));
-        let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
-        fn destroy<A0, A1, A2, A3>(args_to_destroy: *const u8) {
-            unsafe { Box::from_raw(args_to_destroy as *mut (A0, A1, A2, A3)) };
-        };
-        fn format_args<A0, A1, A2, A3>(args_ptr: *const u8) -> String {
-            let args_ref: &(A0, A1, A2, A3) = unsafe { ::std::mem::transmute(args_ptr) };
-            format!(
-                "{:?}, {:?}, {:?}, {:?}",
-                dbg(&args_ref.0),
-                dbg(&args_ref.1),
-                dbg(&args_ref.2),
-                dbg(&args_ref.3)
-            )
-        };
-        let call = Call {
-            method_data: method_data,
-            args_ptr: args_ptr,
-            destroy: destroy::<A0, A1, A2, A3>,
-            format_args: format_args::<A0, A1, A2, A3>,
-        };
-        let action = self.verify(call);
-        box_fn::BoxFn0::new(move || {
-            let result_ptr: *mut u8 = action.call();
-            let result: Box<Res> = unsafe { Box::from_raw(result_ptr as *mut Res) };
-            *result
-        })
-    }
+    define_verify!(verify0 { });
+    define_verify!(verify1 { arg0 => 0, Arg0 });
+    define_verify!(verify2 { arg0 => 0, Arg0, arg1 => 1, Arg1 });
+    define_verify!(verify3 { arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2 });
+    define_verify!(verify4 { arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3 });
 
     /// Verify call performed on mock object
     /// Returns closure which returns result upon call.
