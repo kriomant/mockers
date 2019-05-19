@@ -5,11 +5,11 @@
 set -e
 
 (echo mockers/stable ; cd mockers && cargo +stable build)
+(echo mockers/stable/test ; cd mockers && cargo +stable test)
+(echo mockers_derive/nightly ; cd mockers_derive && cargo +stable build)
 # `mockers` has more features on nightly Rust.
 (echo mockers/nightly ; cd mockers && cargo +nightly build --features nightly)
-# Tests use `mockers_derive` and thus are only runnable with nightly Rust.
 (echo mockers/nightly/test ; cd mockers && cargo +nightly test --features nightly)
-# `mockers_derive` uses nightly Rust features.
-(echo mockers_derive/nightly ; cd mockers_derive && cargo +nightly build)
+(echo mockers_derive/nightly ; cd mockers_derive && cargo +nightly build --features nightly)
 # Examples
 (echo air_proc_macro/nightly/test ; cd examples/air_proc_macro && cargo +nightly test)

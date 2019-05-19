@@ -22,7 +22,7 @@ mockers_derive = { version = "0.13.2", path = "../mockers_derive" }
 
 [features]
 debug = ["mockers_derive/debug"]
-nightly = []
+nightly = ["mockers_derive/nightly"]
 
 [[test]]
 name = "generic_method"
