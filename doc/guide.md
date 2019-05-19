@@ -362,12 +362,6 @@ scenario.expect(cond.get_temperature_call().and_return_clone(16).times(1..5));
 scenario.expect(cond.get_temperature_call().and_return_clone(16).times(3..));
 // Any number of times
 scenario.expect(cond.get_temperature_call().and_return_clone(16).times(..));
-```
-
-On nightly it is possible to use inclusive range syntax:
-```rust
-#![feature(inclusive_range_syntax))]
-
 // At most once
 scenario.expect(cond.get_temperature_call().and_return_clone(16).times(..=1));
 // 1 to 4 times

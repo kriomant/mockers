@@ -42,11 +42,6 @@ supported and so on.
 Features are added on demand, so feel free to contact me and explain your
 needs.
 
-Mocking magic is implemented using `proc_macro_attribute` attribute
-which is only available on nightly Rust (it was tested to work with
-*1.30.0-nightly (67390c0c3 2018-08-14)*). Working on stable Rust
-will be supported later.
-
 ## Usage at a glance
 
 This is a very short introduction to show what is possible and
