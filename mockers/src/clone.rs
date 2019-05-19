@@ -4,7 +4,7 @@
 /// following trait and function accepting this trait you need to test:
 ///
 /// ```rust,ignore
-/// #[derive(Mock)]
+/// #[mocked]
 /// pub trait A {
 ///     fn foo(&self, a: u32);
 /// }
