@@ -14,4 +14,4 @@ set -e
 (echo mockers_derive/nightly/test ; cd mockers_derive && cargo +nightly test --features nightly)
 # Examples
 (echo air_proc_macro/stable/test ; cd examples/air_proc_macro && cargo +stable test)
-(echo air_proc_macro/nightly/test ; cd examples/air_proc_macro && cargo +nightly test)
+(echo air_proc_macro/nightly/test ; cd examples/air_proc_macro && cargo +nightly test --features nightly)
