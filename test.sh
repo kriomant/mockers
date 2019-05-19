@@ -4,10 +4,11 @@
 
 set -e
 
-# `mockers` can be build by nightly Rust only.
-(echo mockers/nighly ; cd mockers && cargo +nightly build)
+(echo mockers/stable ; cd mockers && cargo +stable build)
+# `mockers` has more features on nightly Rust.
+(echo mockers/nightly ; cd mockers && cargo +nightly build --features nightly)
 # Tests use `mockers_derive` and thus are only runnable with nightly Rust.
-(echo mockers/nightly/test ; cd mockers && cargo +nightly test)
+(echo mockers/nightly/test ; cd mockers && cargo +nightly test --features nightly)
 # `mockers_derive` uses nightly Rust features.
 (echo mockers_derive/nightly ; cd mockers_derive && cargo +nightly build)
 # Examples
