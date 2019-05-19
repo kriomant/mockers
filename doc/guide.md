@@ -928,7 +928,7 @@ mod tests {
 
 ## Error messages
 
-The *Mockers* library tries to produce helpful error messages. It highlights key operations so you can easily spot a problem.
+The *Mockers* library tries to produce helpful error messages. Note that error messages are better on a nightly compiler, because the `proc_macro_diagnostic` is not yet stable. It highlights key operations so you can easily spot a problem.
 And it provides additional information which may help you to resolve this problem:
 
 ![highlighted output](highlight.png)
