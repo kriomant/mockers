@@ -1,4 +1,4 @@
-#![feature(proc_macro_diagnostic)]
+#![cfg_attr(feature = "nightly", feature(proc_macro_diagnostic))]
 
 extern crate proc_macro;
 
@@ -8,7 +8,43 @@ extern crate quote;
 #[macro_use]
 extern crate lazy_static;
 
-use proc_macro::{TokenStream, Diagnostic, Level};
+use proc_macro::TokenStream;
+
+#[cfg(feature = "nightly")]
+use proc_macro::{Diagnostic, Level};
+
+#[cfg(not(feature = "nightly"))]
+#[derive(Debug)]
+enum Level {
+    Error,
+}
+
+#[cfg(not(feature = "nightly"))]
+struct Diagnostic {
+    level: Level,
+    msg: String,
+}
+
+#[cfg(not(feature = "nightly"))]
+impl<'a> Diagnostic {
+    fn new(level: Level, msg: String) -> Self {
+        Self {
+            level,
+            msg,
+        }
+    }
+
+    fn spanned(_: proc_macro::Span, level: Level, msg: String) -> Self {
+        Self {
+            level,
+            msg,
+        }
+    }
+
+    fn emit(&self) {
+        panic!("{:?} in mockers: {}", self.level, self.msg);
+    }
+}
 
 mod codegen;
 mod options;

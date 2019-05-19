@@ -28,3 +28,4 @@ proc-macro = true
 
 [features]
 debug = []
+nightly = []
