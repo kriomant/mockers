@@ -15,9 +15,16 @@ name = "mockers"
 
 [dependencies]
 itertools = "0.8.0"
+select-rustc = "0.1.2"
 
 [dev-dependencies]
 mockers_derive = { version = "0.13.2", path = "../mockers_derive" }
 
 [features]
 debug = ["mockers_derive/debug"]
+nightly = []
+
+[[test]]
+name = "generic_method"
+path = "tests/generic_method.rs"
+required-features = ["nightly"]

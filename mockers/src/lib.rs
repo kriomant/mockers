@@ -1,4 +1,4 @@
-#![feature(specialization)]
+#![cfg_attr(feature = "nightly", feature(specialization))]
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -20,6 +20,7 @@ pub mod clone;
 pub mod type_info;
 
 pub use crate::type_info::TypeInfo;
+pub use dbg::DebugOnStable;
 
 use crate::cardinality::{Cardinality, CardinalityCheckResult};
 use crate::dbg::dbg;
@@ -720,13 +721,15 @@ macro_rules! define_verify {
     (
         $verify:ident { $($arg:ident => $n:tt, $Arg:ident),* }
     ) => {
-        pub fn $verify<$($Arg,)* Res>(&mut self, method_data: MethodData$(, $arg: $Arg)*) -> impl FnOnce() -> Res {
+        pub fn $verify<$($Arg: DebugOnStable,)* Res>(
+            &mut self, method_data: MethodData$(, $arg: $Arg)*
+        ) -> impl FnOnce() -> Res {
             let args = Box::new(($($arg,)*));
             let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
             fn destroy<$($Arg,)*>(args_to_destroy: *const u8) {
                 unsafe { Box::from_raw(args_to_destroy as *mut ($($Arg,)*)) };
             };
-            fn format_args<$($Arg,)*>(args_ptr: *const u8) -> String {
+            fn format_args<$($Arg: DebugOnStable,)*>(args_ptr: *const u8) -> String {
                 let __args_ref: &($($Arg,)*) = unsafe { ::std::mem::transmute(args_ptr) };
                 let args_debug: &[&std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
                 format!("{:?}", args_debug.iter().format(", "))
