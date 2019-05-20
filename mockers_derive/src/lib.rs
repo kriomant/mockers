@@ -45,9 +45,13 @@ impl<'a> Diagnostic {
 
 mod codegen;
 mod options;
+mod type_manip;
+mod error;
+#[cfg(feature="debug")] mod debug;
 
-use crate::codegen::{mock_impl, mocked_impl, register_types_impl, Error};
+use crate::codegen::{mock_impl, mocked_impl, register_types_impl};
 use crate::options::parse_attr_options;
+use crate::error::Error;
 
 use syn::spanned::Spanned as _;
 
