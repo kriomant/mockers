@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
-use quote::ToTokens;
+use proc_quote::{quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use std::result::Result;
 use std::sync::Mutex;
@@ -284,7 +284,6 @@ fn generate_mock_for_traits(
     local: bool,
     derives: &DerivedTraits,
 ) -> Result<TokenStream, Error> {
-    let mock_ident_ref = &mock_ident;
     // Validate items, reject unsupported ones.
     let mut trait_paths = HashSet::<String>::new();
     let traits: Vec<(Path, &Vec<TraitItem>)> = trait_items
@@ -456,11 +455,8 @@ fn generate_mock_for_traits(
                     }
 
                     let trait_path_with_params = {
-                        let type_params_ref = &type_params;
-                        let trait_path_ref = &trait_path;
-                        parse_quote! {
-                            #trait_path_ref<#(#type_params_ref),*>
-                        }
+                        let type_params = type_params.iter();
+                        parse_quote! { #trait_path<#(#type_params),*> }
                     };
                     let methods = generate_trait_methods(
                         sig.ident.clone(),
@@ -512,9 +508,8 @@ fn generate_mock_for_traits(
                 let path: Path = parse_quote! { #param };
                 parse_quote! { type #assoc = #path; }
             });
-        let type_params_ref = &type_params;
         let trait_impl_item = quote! {
-            impl #generics #trait_path<#(#type_params_ref),*> for #struct_type {
+            impl #generics #trait_path<#(#type_params),*> for #struct_type {
                 #(#trait_type_items)*
                 #(#trait_impl_items)*
                 #(#static_trait_impl_methods)*
@@ -587,9 +582,8 @@ fn generate_mock_for_traits(
     let handle_impl_item = generate_handle_impl(&handle_ident, &mock_type_params);
     generated_items.push(handle_impl_item);
 
-    let mock_type_params_ref = &mock_type_params;
     let debug_impl_item = quote! {
-        impl<#(#mock_type_params_ref),*> ::std::fmt::Debug for #mock_ident_ref<#(#mock_type_params_ref),*> {
+        impl<#(#mock_type_params),*> ::std::fmt::Debug for #mock_ident<#(#mock_type_params),*> {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
             }
@@ -613,14 +607,10 @@ fn generate_mock_for_traits(
         //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
         //         type MockImpl = AMock<Item>;
         //     }
-        let mock_type_params_ref = &mock_type_params;
-        let type_params_ref = &type_params;
-        let assoc_types_ref = &assoc_types;
-        let assoc_types_ref2 = &assoc_types;
         let mocked_impl_item = quote! {
-            impl<#(#mock_type_params_ref),*> ::mockers::Mocked
-                for &'static #trait_path<#(#type_params_ref, )* #(#assoc_types_ref=#assoc_types_ref2),*> {
-                type MockImpl = #mock_ident_ref<#(#mock_type_params_ref),*>;
+            impl<#(#mock_type_params),*> ::mockers::Mocked
+                for &'static #trait_path<#(#type_params, )* #(#assoc_types=#assoc_types),*> {
+                type MockImpl = #mock_ident<#(#mock_type_params),*>;
             }
         };
 

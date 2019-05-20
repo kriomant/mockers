@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 syn = { version = "0.15.24", features = ["full", "extra-traits"] }
-quote = "0.6.10"
+proc-quote = "0.2.2"
 itertools = "0.4.13"
 lazy_static = "0.2.9"
 proc-macro2 = { version = "0.4.24", features = ["nightly"] }
