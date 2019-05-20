@@ -588,19 +588,11 @@ fn generate_mock_for_traits(
 /// Since type parameters are unused, we have to use PhantomData for each of them.
 /// We use tuple of |PhantomData| to create just one struct field.
 fn generate_mock_struct(mock_ident: &Ident, associated_type_idents: &[Ident]) -> TokenStream {
-    let phantom_types: Vec<_> = associated_type_idents
-        .iter()
-        .map(|ty_param| {
-            quote! { ::std::marker::PhantomData<#ty_param> }
-        })
-        .collect();
-    let phantom_tuple_type = quote! { (#(#phantom_types),*) };
-
     quote! {
         pub struct #mock_ident<#(#associated_type_idents),*> {
             scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
             mock_id: usize,
-            _phantom_data: #phantom_tuple_type,
+            _phantom_data: ::std::marker::PhantomData<(#(#associated_type_idents),*)>,
         }
     }
 }
@@ -612,12 +604,6 @@ fn generate_mock_impl(
     associated_type_idents: &[Ident],
     custom_init_code: &TokenStream,
 ) -> TokenStream {
-    let phantom_data_initializers: Vec<_> = associated_type_idents
-        .iter()
-        .map(|_| {
-            quote! { ::std::marker::PhantomData }
-        })
-        .collect();
     quote! {
         impl<#(#associated_type_idents),*> ::mockers::Mock for #mock_ident<#(#associated_type_idents),*> {
             type Handle = #handle_ident<#(#associated_type_idents),*>;
@@ -627,7 +613,7 @@ fn generate_mock_impl(
                 #mock_ident {
                     scenario: scenario_int,
                     mock_id: id,
-                    _phantom_data: (#(#phantom_data_initializers),*),
+                    _phantom_data: ::std::marker::PhantomData,
                 }
             }
 
@@ -642,19 +628,13 @@ fn generate_handle_impl(
     handle_ident: &Ident,
     associated_type_idents: &[Ident],
 ) -> TokenStream {
-    let phantom_data_initializers: Vec<_> = associated_type_idents
-        .iter()
-        .map(|_| {
-            quote! { ::std::marker::PhantomData }
-        })
-        .collect();
     quote! {
         impl<#(#associated_type_idents),*> ::mockers::MockHandle for #handle_ident<#(#associated_type_idents),*> {
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
                 #handle_ident {
                     scenario: scenario_int,
                     mock_id: id,
-                    _phantom_data: (#(#phantom_data_initializers),*),
+                    _phantom_data: ::std::marker::PhantomData,
                 }
             }
         }
