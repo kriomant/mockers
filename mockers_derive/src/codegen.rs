@@ -11,11 +11,10 @@ use syn::{
     TraitBound, TraitBoundModifier, TraitItem, TraitItemMethod, TraitItemType, Type, TypeParam,
     TypeParamBound, TypeReference,
 };
-use indoc::indoc;
 
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits, DeriveClone};
 use crate::type_manip::{qualify_self, set_self};
-use crate::error::Error;
+use crate::error::{self, Error};
 use crate::id_gen::IdGen;
 #[cfg(feature="debug")] use crate::debug::format_code;
 
@@ -105,19 +104,13 @@ fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOption
         Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
         Item::ForeignMod(foreign_mod) => {
             let mock_name = opts.mock_name.as_ref().ok_or_else(|| {
-                Error::Spanned(opts_span,
-                               indoc!("
-                                   Since extern blocks, unlike traits, don't have name, mock type name cannot be inferred and must be given explicitly for extern blocks:
-
-                                       #[mocked(ExternMock)]
-                                       extern { ... }
-                                   ").to_string())
+                Error::Spanned(opts_span, error::ERR_MOCK_NAME_REQUIRED_FOR_EXTERN.to_string())
             })?;
             let handle_name = Ident::new(&format!("{}Handle", mock_name), Span::call_site());
 
             Ok((generate_extern_mock(foreign_mod, mock_name, &handle_name)?, false))
         }
-        _ => Err(Error::Spanned(span, "Attribute may be used on traits and extern blocks only".to_string())),
+        _ => Err(Error::Spanned(span, error::ERR_TRAITS_AND_EXTERN_ONLY_ARE_SUPPORTED.to_string())),
     }
 }
 
@@ -148,7 +141,7 @@ fn generate_trait_mock(
             .map(|b| {
                 let path = match *b {
                     TypeParamBound::Lifetime(ref l) => {
-                        return Err(Error::Spanned(l.span(), "lifetime bounds aren't supported yet".to_string()));
+                        return Err(Error::Spanned(l.span(), error::ERR_LIFETIME_BOUNDS_NOT_SUPPORTED.to_string()));
                     }
                     TypeParamBound::Trait(TraitBound { ref path, .. }) => path,
                 };
@@ -159,18 +152,7 @@ fn generate_trait_mock(
                         Some(p) => p,
                         None => {
                             return Err(Error::Spanned(
-                                b.span(),
-                                indoc!(r#"
-                                    Unfortunately, macro can't get full path to referenced parent trait, so it must be be given using 'refs' parameter:
-
-                                        #[mocked]
-                                        trait A {}
-
-                                        #[mocked(refs = "A => ::full::path::to::A")]
-                                        trait B : A {}
-
-                                    "#).to_string()
-                            ));
+                                b.span(), error::ERR_PARENT_TRAIT_NOT_REFERENCED.to_string()));
                         }
                     }
                 };
@@ -191,18 +173,7 @@ fn generate_trait_mock(
                         trait_item: referenced_trait.clone(),
                     })
                 } else {
-                    Err(Error::Spanned(b.span(), indoc!(r#"
-                        Can't resolve trait reference.
-
-                        Please check that referenced trait also has #[mocked] attribute:
-
-                            #[mocked] // <- Parent trait must have this
-                            trait A {}
-
-                            #[mocked(refs = "A => ::A")]
-                            trait B : A {}
-
-                        "#).to_string()))
+                    Err(Error::Spanned(b.span(), error::ERR_REFERENCED_TRAIT_NOT_FOUND.to_string()))
                 }
             })
             .collect::<Result<Vec<TraitDesc>, Error>>()?;
@@ -251,19 +222,19 @@ fn generate_mock_for_traits(
         .map(|desc| {
             let ItemTrait { unsafety, ref generics, ref supertraits, ref items, .. } = desc.trait_item;
             if let Some(unsafety) = unsafety {
-                return Err(Error::Spanned(unsafety.span(), "Unsafe traits are not supported yet.\n".to_string()));
+                return Err(Error::Spanned(unsafety.span(), error::ERR_UNSAFE_TRAITS_NOT_SUPPORTED.to_string()));
             }
 
             if let Some(lt) = generics.lifetimes().next() {
-                return Err(Error::Spanned(lt.span(), "Lifetime parameters are not supported yet\n".to_string()));
+                return Err(Error::Spanned(lt.span(), error::ERR_LIFETIME_PARAMS_NOT_SUPPORTED.to_string()));
             }
 
             if let Some(cp) = generics.const_params().next() {
-                return Err(Error::Spanned(cp.span(), "Const parameters are not supported yet\n".to_string()));
+                return Err(Error::Spanned(cp.span(), error::ERR_CONST_PARAMS_NOT_SUPPORTED.to_string()));
             }
 
             if let Some(ref where_clause) = generics.where_clause {
-                return Err(Error::Spanned(where_clause.where_token.span(), "Where clauses are not supported yet.\n".to_string()));
+                return Err(Error::Spanned(where_clause.where_token.span(), error::ERR_WHERE_CLAUSES_NOT_SUPPORTED.to_string()));
             }
 
             for bound in supertraits {
@@ -284,21 +255,16 @@ fn generate_mock_for_traits(
                                 if !trait_paths
                                     .contains(&path.clone().into_token_stream().to_string())
                                 {
-                                    return Err(Error::General("All base trait definitions must be \
-                                                provided"
-                                        .to_string()));
+                                    return Err(Error::General(error::ERR_NO_BASE_TRAIT_DEFINITIONS.to_string()));
                                 }
                             }
                             _ => {
-                                return Err(Error::General("Type bound modifiers are not supported yet"
-                                    .to_string()));
+                                return Err(Error::General(error::ERR_TYPE_BOUND_MODIFIERS_NOT_SUPPORTED.to_string()));
                             }
                         }
                     }
                     TypeParamBound::Lifetime(..) => {
-                        return Err(Error::General(
-                            "Lifetime parameter bounds are not supported yet".to_string()
-                        ));
+                        return Err(Error::General(error::ERR_LIFETIME_PARAM_BOUNDS_NOT_SUPPORTED.to_string()));
                     }
                 }
             }
@@ -323,10 +289,10 @@ fn generate_mock_for_traits(
     for gen in &trait_items.last().as_ref().unwrap().trait_item.generics.params {
         match gen {
             GenericParam::Const(c) => {
-                return Err(Error::Spanned(c.span(), "Const parameters are not supported yet\n".to_string()));
+                return Err(Error::Spanned(c.span(), error::ERR_CONST_PARAMS_NOT_SUPPORTED.to_string()));
             }
             GenericParam::Lifetime(l) => {
-                return Err(Error::Spanned(l.span(), "Lifetime parameters are not supported yet\n".to_string()));
+                return Err(Error::Spanned(l.span(), error::ERR_LIFETIME_PARAMS_NOT_SUPPORTED.to_string()));
             }
             GenericParam::Type(t) => {
                 type_params.push(t.ident.clone());
@@ -346,7 +312,7 @@ fn generate_mock_for_traits(
             }) = member
             {
                 if let Some(bound) = bounds.first() {
-                    return Err(Error::Spanned(bound.span(), "Associated type bounds are not supported yet.\n".to_string()));
+                    return Err(Error::Spanned(bound.span(), error::ERR_ASSOCIATED_TYPE_BOUNDS_NOT_SUPPORTED.to_string()));
                 }
                 assoc_types.push(ident.clone());
             }
@@ -404,14 +370,14 @@ fn generate_mock_for_traits(
             match member {
                 TraitItem::Method(TraitItemMethod { ref sig, .. }) => {
                     if let Some(unsafety) = sig.unsafety {
-                        return Err(Error::Spanned(unsafety.span(), "Unsafe trait methods are not supported.\n".to_string()));
+                        return Err(Error::Spanned(unsafety.span(), error::ERR_UNSAFE_TRAIT_METHODS_NOT_SUPPORTED.to_string()));
                     }
 
                     // Trait methods may not be const.
                     assert!(sig.constness.is_none());
 
                     if let Some(abi) = &sig.abi {
-                        return Err(Error::Spanned(abi.span(), "Extern specification for trait methods is not supported.\n".to_string()));
+                        return Err(Error::Spanned(abi.span(), error::ERR_EXTERN_METHODS_NOT_SUPPORTED.to_string()));
                     }
 
                     let trait_path_with_params = {
@@ -436,17 +402,17 @@ fn generate_mock_for_traits(
                 }
                 TraitItem::Type(TraitItemType { ref bounds, .. }) => {
                     if !bounds.is_empty() {
-                        return Err(Error::General("associated type bounds are not supported yet".to_string()));
+                        return Err(Error::General(error::ERR_ASSOCIATED_TYPE_BOUNDS_NOT_SUPPORTED.to_string()));
                     }
                 }
                 TraitItem::Const(..) => {
-                    return Err(Error::General("trait constants are not supported yet".to_string()));
+                    return Err(Error::General(error::ERR_TRAIT_CONST_NOT_SUPPORTED.to_string()));
                 }
                 TraitItem::Macro(..) => {
-                    return Err(Error::General("trait macros are not supported yet".to_string()));
+                    return Err(Error::General(error::ERR_TRAIT_MACROS_NOT_SUPPORTED.to_string()));
                 }
                 TraitItem::Verbatim(..) => {
-                    return Err(Error::General("verbatim trait items are not supported".to_string()));
+                    return Err(Error::General(error::ERR_VERBATIM_ITEMS_NOT_SUPPORTED.to_string()));
                 }
             }
         }

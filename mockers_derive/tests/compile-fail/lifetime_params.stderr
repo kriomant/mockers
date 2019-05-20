@@ -1,4 +1,4 @@
-error: lifetime bounds aren't supported yet
+error: Lifetime bounds aren't supported yet
  --> $DIR/lifetime_params.rs:4:10
   |
 4 | trait A: 'static {
