@@ -44,6 +44,8 @@ impl From<syn::parse::Error> for Error {
 /// both mock type ID and method name match.
 static mut NEXT_MOCK_TYPE_ID: usize = 0;
 
+/// Used by `register_types` macro to assign unique ID to each registered
+/// type.
 static mut NEXT_REGISTERED_TYPE_ID: usize = 0;
 
 lazy_static! {
@@ -1214,6 +1216,15 @@ fn generate_extern_mock(
     })
 }
 
+/// Recursively finds all references to `Self` type in `ty` and transforms it
+/// using provided function.
+/// Returns modified `Type`.
+///
+/// `func` accepts two parameters:
+///  * `self_segment: &PathSegment` is reference to `Self` segment of path,
+///  * `rest: &[PathSegment]` is rest of path.
+/// So. basically, `Self::Item::Factory` is split into `Self` and `Item::Factory`.
+/// Then whole path is replaced with type returned by `func`.
 fn replace_self<Func>(ty: &Type, func: Func) -> Type
 where
     Func: Fn(&syn::PathSegment, &[syn::PathSegment]) -> Type,
@@ -1362,7 +1373,7 @@ where
     process_ty(&ty, &func)
 }
 
-/// Replace all unqualified references to `Self` with qualified ones.
+/// Replace all unqualified references to `Self` with `<MockStruct as MockedTrait>`.
 fn qualify_self(ty: &Type, mock_path: &Path, trait_path: &Path) -> Type {
     replace_self(
         ty,
@@ -1470,11 +1481,9 @@ fn gen_type_id() -> usize {
 
 /// Given generic params, returns expression returning vector of type parameter IDs.
 fn gen_type_ids_expr(generics: &Generics) -> Expr {
-    let type_param_id_exprs = generics.params.iter().flat_map(|g| match g {
-        GenericParam::Type(TypeParam { ref ident, .. }) => {
-            Some(quote!(<MockersTypeRegistry<#ident> as ::mockers::TypeInfo>::get_type_id()))
-        }
-        _ => None,
+    let type_param_id_exprs = generics.type_params().map(|p| {
+        let TypeParam { ref ident, .. } = p;
+        quote!(<MockersTypeRegistry<#ident> as ::mockers::TypeInfo>::get_type_id())
     });
     parse_quote!(vec![#(#type_param_id_exprs),*])
 }
