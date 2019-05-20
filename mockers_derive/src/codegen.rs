@@ -126,57 +126,7 @@ fn generate_trait_mock(
         .unwrap_or_else(|| Ident::new(&format!("{}Mock", item_trait.ident), Span::call_site()));
     let handle_ident = Ident::new(&format!("{}Handle", mock_ident), Span::call_site());
 
-    // Trait definition may refer to another traits:
-    // ```
-    // #[mocked(refs="B => ::some::B")]
-    // trait A : B { .. }
-    // ```
-    //
-    // Referenced traits must has `#[mocked(module="::some")]` attribute and thus registered
-    // in global mocked traits registry. Find there definitions for referenced traits.
-    let referenced_items =
-        item_trait
-            .supertraits
-            .iter()
-            .map(|b| {
-                let path = match *b {
-                    TypeParamBound::Lifetime(ref l) => {
-                        return Err(Error::Spanned(l.span(), error::ERR_LIFETIME_BOUNDS_NOT_SUPPORTED.to_string()));
-                    }
-                    TypeParamBound::Trait(TraitBound { ref path, .. }) => path,
-                };
-                let full_path = if path.leading_colon.is_some() {
-                    path
-                } else {
-                    match opts.refs.get(path) {
-                        Some(p) => p,
-                        None => {
-                            return Err(Error::Spanned(
-                                b.span(), error::ERR_PARENT_TRAIT_NOT_REFERENCED.to_string()));
-                        }
-                    }
-                };
-                if let Some(referenced_trait) = KNOWN_TRAITS
-                    .lock()
-                    .unwrap()
-                    .get(&full_path.into_token_stream().to_string())
-                {
-                    let mod_path = Path {
-                        leading_colon: path.leading_colon.clone(),
-                        segments: Punctuated::from_iter(
-                            path.segments.iter().take(path.segments.len() - 1).cloned(),
-                        ),
-                    };
-                    let referenced_trait: ItemTrait = syn::parse_str(&referenced_trait).unwrap();
-                    Ok(TraitDesc {
-                        mod_path: mod_path,
-                        trait_item: referenced_trait.clone(),
-                    })
-                } else {
-                    Err(Error::Spanned(b.span(), error::ERR_REFERENCED_TRAIT_NOT_FOUND.to_string()))
-                }
-            })
-            .collect::<Result<Vec<TraitDesc>, Error>>()?;
+    let referenced_items = find_referenced_supertraits(item_trait, &opts.refs)?;
 
     // Remember full trait definition, so we can recall it when it is references by
     // another trait. `module` parameter must be given for trait in order to be able
@@ -201,7 +151,72 @@ fn generate_trait_mock(
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
+
     generate_mock_for_traits(mock_ident, handle_ident, &all_traits, true, &opts.derives)
+}
+
+/// Find supertrait definitions.
+/// Trait definition may refer to another traits:
+/// ```
+/// #[mocked(refs="B => ::some::B")]
+/// trait A : B { .. }
+/// ```
+///
+/// Referenced traits must has `#[mocked(module="::some")]` attribute and thus be registered
+/// in global mocked traits registry. Find there definitions for referenced traits.
+fn find_referenced_supertraits(item: &ItemTrait, refs: &HashMap<Path, Path>)
+        -> Result<Vec<TraitDesc>, Error> {
+    item.supertraits.iter()
+        .map(|b| {
+            // Reference to supertrait as given in trait definition: `B` in `trait A: B { .. }`
+            let path = match *b {
+                TypeParamBound::Lifetime(ref l) => {
+                    return Err(Error::Spanned(l.span(), error::ERR_LIFETIME_BOUNDS_NOT_SUPPORTED.to_string()));
+                }
+                TypeParamBound::Trait(TraitBound { ref path, .. }) => path,
+            };
+
+            // If absolute path to supertrait is given (`trait A: ::module::B`),
+            // it is used as is. Otherwise supertrait reference must be explained in
+            // attribute 'refs' parameter;
+            // ```
+            // #[mocked(ref="B => ::module::B")]
+            // trait A: B {}
+            // ```
+            let full_path = if path.leading_colon.is_some() {
+                path
+            } else {
+                match refs.get(path) {
+                    Some(p) => p,
+                    None => {
+                        return Err(Error::Spanned(
+                            b.span(), error::ERR_PARENT_TRAIT_NOT_REFERENCED.to_string()));
+                    }
+                }
+            };
+
+            // Now, given absolute supertrait path, try to find it in traits registry.
+            if let Some(referenced_trait) = KNOWN_TRAITS
+                .lock()
+                .unwrap()
+                .get(&full_path.into_token_stream().to_string())
+            {
+                let mod_path = Path {
+                    leading_colon: path.leading_colon.clone(),
+                    segments: Punctuated::from_iter(
+                        path.segments.iter().take(path.segments.len() - 1).cloned(),
+                    ),
+                };
+                let referenced_trait: ItemTrait = syn::parse_str(&referenced_trait).unwrap();
+                Ok(TraitDesc {
+                    mod_path: mod_path,
+                    trait_item: referenced_trait.clone(),
+                })
+            } else {
+                Err(Error::Spanned(b.span(), error::ERR_REFERENCED_TRAIT_NOT_FOUND.to_string()))
+            }
+        })
+        .collect()
 }
 
 /// Generate mock struct and all implementations for given `trait_items`.
