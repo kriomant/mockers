@@ -16,25 +16,26 @@ use indoc::indoc;
 use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits, DeriveClone};
 use crate::type_manip::{qualify_self, set_self};
 use crate::error::Error;
+use crate::id_gen::IdGen;
 #[cfg(feature="debug")] use crate::debug::format_code;
 
 use std::iter::FromIterator as _;
 use syn::spanned::Spanned as _;
 
-/// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
-/// unique type ID. It is added to both call matchers produced by
-/// handler methods and to `Call` structure created by mocked method.
-/// It is same to use call matcher for inspecting call object only when
-/// both mock type ID and method name match.
-static mut NEXT_MOCK_TYPE_ID: usize = 0;
-
-/// Used by `register_types` macro to assign unique ID to each registered
-/// type.
-static mut NEXT_REGISTERED_TYPE_ID: usize = 0;
-
 lazy_static! {
     //static ref KNOWN_TRAITS: Mutex<HashMap<Path, Item>> = Mutex::new(HashMap::new());
     static ref KNOWN_TRAITS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+
+    /// Each mock struct generated with `#[derive(Mock)]` or `mock!` gets
+    /// unique type ID. It is added to both call matchers produced by
+    /// handler methods and to `Call` structure created by mocked method.
+    /// It is same to use call matcher for inspecting call object only when
+    /// both mock type ID and method name match.
+    static ref MOCK_TYPE_ID_GENERATOR: IdGen = IdGen::new();
+
+    /// Used by `register_types` macro to assign unique ID to each registered
+    /// type.
+    static ref REGISTERED_TYPE_ID_GENERATOR: IdGen = IdGen::new();
 }
 
 pub fn mocked_impl(input: TokenStream, opts_span: Span, opts: &MockAttrOptions) -> Result<TokenStream, Error> {
@@ -79,11 +80,7 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let type_impls: Vec<ItemImpl> = types
         .iter()
         .map(|ty| {
-            let type_id = unsafe {
-                let id = NEXT_REGISTERED_TYPE_ID;
-                NEXT_REGISTERED_TYPE_ID += 1;
-                id
-            };
+            let type_id = REGISTERED_TYPE_ID_GENERATOR.next_id();
             let type_name = ty.into_token_stream().to_string();
             parse_quote! {
                 impl ::mockers::TypeInfo for MockersTypeRegistry<#ty> {
@@ -400,7 +397,7 @@ fn generate_mock_for_traits(
         let mut static_impl_methods = Vec::new();
         let mut static_trait_impl_methods = Vec::new();
 
-        let mock_type_id = gen_type_id();
+        let mock_type_id = MOCK_TYPE_ID_GENERATOR.next_id();
         mock_type_ids.push(mock_type_id);
 
         for member in members.iter() {
@@ -1053,7 +1050,7 @@ fn generate_extern_mock(
     mock_ident: &Ident,
     handle_ident: &Ident,
 ) -> Result<TokenStream, String> {
-    let mock_type_id = gen_type_id();
+    let mock_type_id = MOCK_TYPE_ID_GENERATOR.next_id();
 
     let (mock_items, stub_items): (Vec<_>, Vec<_>) = foreign_mod
         .items
@@ -1227,14 +1224,6 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
     }
 
     items
-}
-
-fn gen_type_id() -> usize {
-    unsafe {
-        let id = NEXT_MOCK_TYPE_ID;
-        NEXT_MOCK_TYPE_ID += 1;
-        id
-    }
 }
 
 /// Given generic params, returns expression returning vector of type parameter IDs.
