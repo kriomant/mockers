@@ -299,6 +299,7 @@ fn generate_mock_for_traits(
         .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, Error>>()?;
 
     // Extract type parameters from root trait only (which is last)
+    // This is [`B`, `C`] in `trait A<B, C> { .. }`.
     // TODO: specify root trait explicitly
     let mut type_params: Vec<Ident> = Vec::new();
     for gen in &trait_items.last().as_ref().unwrap().trait_item.generics.params {
@@ -317,6 +318,7 @@ fn generate_mock_for_traits(
 
     // Gather associated types from all traits, because they are used in mock
     // struct definition.
+    // This is `Item` from `trait A { type Item; }`.
     let mut assoc_types = Vec::new();
     for &(_, ref members) in &traits {
         for member in members.iter() {
@@ -334,6 +336,8 @@ fn generate_mock_for_traits(
         }
     }
 
+    // Both associated types and type parameters become type parameters of mock struct.
+    // So for `trait A { type Item; }` mock struct is `struct AMock<Item, A> { .. }`.
     let mut mock_type_params = type_params.clone();
     mock_type_params.extend(assoc_types.iter().cloned());
 
@@ -355,14 +359,15 @@ fn generate_mock_for_traits(
         gen
     };
 
-    // Types of mock and handle structs with all type parameters specified.
+    // Types of mock and handle structs with all type parameters specified:
+    // `AMock<A, B>`.
     let struct_path: Path = {
-        let assoc_types = &mock_type_params;
-        parse_quote! { #mock_ident<#(#assoc_types),*> }
+        let mock_type_params = &mock_type_params;
+        parse_quote! { #mock_ident<#(#mock_type_params),*> }
     };
     let handle_path: Path = {
-        let assoc_types = &mock_type_params;
-        parse_quote! { #handle_ident<#(#assoc_types),*> }
+        let mock_type_params = &mock_type_params;
+        parse_quote! { #handle_ident<#(#mock_type_params),*> }
     };
     let struct_type: Type = parse_quote! { #struct_path };
     let handle_type: Type = parse_quote! { #handle_path };
@@ -545,8 +550,8 @@ fn generate_mock_for_traits(
         // Create path for trait being mocked. Path includes bindings for all associated types.
         // Generated impl example:
         //
-        //     impl<Item> ::mockers::Mocked for &'static A<Item=Item> {
-        //         type MockImpl = AMock<Item>;
+        //     impl<Item, B> ::mockers::Mocked for &'static A<B, Item=Item> {
+        //         type MockImpl = AMock<Item, B>;
         //     }
         let mocked_impl_item = quote! {
             impl<#(#mock_type_params),*> ::mockers::Mocked
@@ -565,15 +570,13 @@ fn generate_mock_for_traits(
 
 /// Create mock structure. Structure is quite simple and basically contains only reference
 /// to scenario and own ID.
-/// Associated types of original trait are converted to type parameters.
-/// Since type parameters are unused, we have to use PhantomData for each of them.
-/// We use tuple of |PhantomData| to create just one struct field.
-fn generate_mock_struct(mock_ident: &Ident, associated_type_idents: &[Ident]) -> TokenStream {
+/// Since type parameters are unused, we have to use PhantomData for them.
+fn generate_mock_struct(mock_ident: &Ident, type_params: &[Ident]) -> TokenStream {
     quote! {
-        pub struct #mock_ident<#(#associated_type_idents),*> {
+        pub struct #mock_ident<#(#type_params),*> {
             scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
             mock_id: usize,
-            _phantom_data: ::std::marker::PhantomData<(#(#associated_type_idents),*)>,
+            _phantom_data: ::std::marker::PhantomData<(#(#type_params),*)>,
         }
     }
 }
