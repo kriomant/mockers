@@ -34,6 +34,7 @@ fn test_b() {
     b.bar();
 }
 
+#[cfg(feature="nightly")]
 #[test]
 fn test_diagnostics() {
     let t = trybuild::TestCases::new();
