@@ -180,6 +180,10 @@ macro_rules! define_all {
             pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> $expectation_times<$($Arg,)* Res> {
                 $expectation_times::new(self.call_match, self.action, Box::new(cardinality))
             }
+
+            pub fn once(self) -> $expectation_times<$($Arg,)* Res> {
+                $expectation_times::new(self.call_match, self.action, Box::new(1))
+            }
         }
 
         #[must_use]

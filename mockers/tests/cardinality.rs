@@ -291,3 +291,12 @@ fn test_times_never() {
 
     mock.foo();
 }
+
+#[test]
+fn test_once() {
+    let scenario = Scenario::new();
+    let (mock, handle) = scenario.create_mock_for::<A>();
+
+    scenario.expect(handle.foo().and_return_default().once());
+    mock.foo();
+}

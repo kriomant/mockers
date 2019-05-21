@@ -368,6 +368,12 @@ on it:
 scenario.expect(cond_handle.get_temperature().and_return_clone(16).times(2));
 ```
 
+For common case when you expect single call there is `once()` shortcut:
+
+```rust
+scenario.expect(cond_handle.get_temperature().and_return_clone(16).once());
+```
+
 It is also possible to specify ranges instead of single call count:
 ```rust
 // At most once
@@ -590,7 +596,7 @@ fn test_target() {
     let (mock, handle) = scenario.create_mock_for::<A>();
     let (mock_clone, clone_handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(clone_handle.foo(2).and_return_default().times(1));
+    scenario.expect(clone_handle.foo(2).and_return_default().once());
     scenario.expect(handle.clone().and_return(mock_clone));  // <--
 
     target(mock);
@@ -613,7 +619,7 @@ fn test_target() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<A>();
 
-    scenario.expect(handle.foo(2).and_return_default().times(1));
+    scenario.expect(handle.foo(2).and_return_default().once());
 
     target(mock);
 }
@@ -662,7 +668,7 @@ trait Bar {
 let scenario = Scenario::new();
 let (mock_static, handle_static) = scenario.create_mock::<BarMockStatic>();
 
-scenario.expect(handle_static.bar().and_return(()).times(1));
+scenario.expect(handle_static.bar().and_return(()).once());
 
 <BarMock as Bar>::bar();
 ```
@@ -739,7 +745,7 @@ fn test() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<AMock>();
 
-    scenario.expect(handle.foo(any::<u32>()).and_return_default().times(1));
+    scenario.expect(handle.foo(any::<u32>()).and_return_default().once());
     mock.foo(3u32);
 }
 ```
@@ -761,7 +767,7 @@ fn test_extern_function() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock::<Foo>();
 
-    scenario.expect(handle.foo(ANY).and_return_default().times(1));
+    scenario.expect(handle.foo(ANY).and_return_default().once());
 
     unsafe { foo(3) };
 }
