@@ -7,30 +7,11 @@
 
 # Mockers
 
-Mocking library for Rust.
+Mocking library for Rust. Both stable and nightly Rust are supported.
 
 Inspired by Google Mock library for C++.
 
 [User Guide]
-
-## Note: breaking change
-
-Versions before 0.10.0 were implemented as compiler plugin and used
-`syntex` crate for parsing. Compiler plugins are now deprecated, and
-`syntex` crate is not maintained anymore.
-
-Version 0.10.0 migrated from compiler plugin implementation
-to usage of `proc_macro_attribute` feature. Since this feature isn't supported
-in stable Rust yet, `mockers` is only available on unstable at the moment.
-It is possible that support for stable Rust will be implemented even before
-`proc_macro_attribute` feature stabilization.
-
-In trivial cases migration of your tests to new `mockers` version is as
-simple as replacing `#[derive(Mock)]` with `#[mocked]`.
-
-In version 0.12.0 macro attribute was renamed from "derive_mock" to
-"mocked". "derive_mock" attribute is still available and is alias to "mocked",
-but it will eventually be deprecated.
 
 ## Limitations
 

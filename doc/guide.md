@@ -39,7 +39,16 @@ It is inspired by [Google Mock].
 
 ## Getting Started
 
-Mockers uses `proc_macro` feature, so it works with both nightly and stable compiler.
+Mockers uses `proc_macro` feature, so it works with both nightly and stable
+compiler.
+
+Note that working on stable has some limitations:
+ * Compilation error messages are better on a nightly compiler, because the
+   `proc_macro_diagnostic` is not yet stable.
+ * Only types implementing `Debug` may be used as arguments to mocked methods on
+   stable.
+ * Mocking generic methods doesn't work on stable due to lack of trait
+   specialization feature.
 
 Add `mockers` and `mockers_derive` as dependencies to your `Cargo.toml`:
 
@@ -928,7 +937,7 @@ mod tests {
 
 ## Error messages
 
-The *Mockers* library tries to produce helpful error messages. Note that error messages are better on a nightly compiler, because the `proc_macro_diagnostic` is not yet stable. It highlights key operations so you can easily spot a problem.
+The *Mockers* library tries to produce helpful error messages. It highlights key operations so you can easily spot a problem.
 And it provides additional information which may help you to resolve this problem:
 
 ![highlighted output](highlight.png)
