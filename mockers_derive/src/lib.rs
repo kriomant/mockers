@@ -49,6 +49,7 @@ mod type_manip;
 mod error;
 #[cfg(feature="debug")] mod debug;
 mod id_gen;
+mod util;
 
 use crate::codegen::{mock_impl, mocked_impl, register_types_impl};
 use crate::options::parse_attr_options;

@@ -6,6 +6,8 @@ use syn::{parse::ParseStream, punctuated::Punctuated, Ident, ItemTrait, Meta, Me
 use proc_macro::Diagnostic;
 use indoc::indoc;
 
+use crate::util::is_path_absolute;
+
 pub fn parse_attr_options(attr_tokens: TokenStream) -> syn::parse::Result<MockAttrOptions> {
     syn::parse2::<MockAttrOptions>(attr_tokens)
 }
@@ -26,11 +28,40 @@ impl Default for DerivedTraits {
     }
 }
 
+pub enum Location {
+    /// Attribute is used on actual trait definition. All generated items will
+    /// refer to this trait just by name, because they are placed right next to it,
+    /// but optional module path may be provided for other mocks to be able to refer to this one.
+    Local(Option<Path>),
+
+    /// Attribute is used on trait definition copied from some other module or even crate.
+    /// Definition itself will be omitted from output. Module path is required and trait will
+    /// be referenced by full path.
+    Extern(Path),
+}
+impl Location {
+    pub fn is_extern(&self) -> bool {
+        match self {
+            Location::Local(_) => false,
+            Location::Extern(_) => true,
+        }
+    }
+
+    pub fn module_path(&self) -> Option<&Path> {
+        match self {
+            Location::Local(p) => p.as_ref(),
+            Location::Extern(p) => Some(&p),
+        }
+    }
+}
+
 pub struct MockAttrOptions {
     pub mock_name: Option<Ident>,
-    pub module_path: Option<Path>,
+    pub location: Location,
     pub refs: HashMap<Path, Path>,
     pub derives: DerivedTraits,
+
+    /// Print expansion of macro attribute to stderr during build.
     pub debug: bool,
 }
 
@@ -40,6 +71,7 @@ impl syn::parse::Parse for MockAttrOptions {
         let mut module_path: Option<Path> = None;
         let mut refs: HashMap<Path, Path> = HashMap::new();
         let mut derives: DerivedTraits = DerivedTraits::default();
+        let mut is_extern: bool = false;
         let mut debug: bool = false;
 
         let metas = input.parse_terminated::<NestedMeta, Token![,]>(NestedMeta::parse)?;
@@ -73,7 +105,7 @@ impl syn::parse::Parse for MockAttrOptions {
                                     "global source path".to_string(),
                                 ));
                             }
-                            if target.leading_colon.is_none() {
+                            if !is_path_absolute(&target) {
                                 return Err(syn::Error::new(
                                     Span::call_site(),
                                     "local target path".to_string(),
@@ -95,7 +127,7 @@ impl syn::parse::Parse for MockAttrOptions {
                             ));
                         }
                         let path: Path = syn::parse_str(&path_lit.value())?;
-                        if path.leading_colon.is_none() {
+                        if !is_path_absolute(&path) {
                             return Err(syn::Error::new(
                                 Span::call_site(),
                                 "module path must be global".to_string(),
@@ -174,6 +206,10 @@ impl syn::parse::Parse for MockAttrOptions {
                         debug = true;
                     }
 
+                    NestedMeta::Meta(Meta::Word(ref ident)) if ident == "extern" => {
+                        is_extern = true;
+                    }
+
                     NestedMeta::Meta(Meta::Word(ref ident)) => {
                         mock_name = Some(ident.clone());
                     }
@@ -187,9 +223,20 @@ impl syn::parse::Parse for MockAttrOptions {
                 }
             }
         }
+
+        let location = if is_extern {
+            if let Some(module_path) = module_path {
+                Location::Extern(module_path)
+            } else {
+                return Err(syn::Error::new(Span::call_site(),
+                           "'module' attribute must be given for extern trait definition".to_string()));
+            }
+        } else {
+            Location::Local(module_path)
+        };
         Ok(MockAttrOptions {
             mock_name,
-            module_path,
+            location,
             refs,
             derives,
             debug,

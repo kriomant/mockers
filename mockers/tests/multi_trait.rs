@@ -9,12 +9,12 @@ mod derive_inherited_trait {
     use super::*;
     use mockers_derive::mocked;
 
-    #[mocked(module = "::derive_inherited_trait")]
+    #[mocked(module = "crate::derive_inherited_trait")]
     pub trait A {
         fn foo(&self, a: u32);
     }
 
-    #[mocked(refs = "A => ::derive_inherited_trait::A")]
+    #[mocked(refs = "A => crate::derive_inherited_trait::A")]
     pub trait B: A {
         fn bar(&self, b: u32);
     }
@@ -39,7 +39,7 @@ mod derive_inherited_trait_different_modules {
     mod a {
         use mockers_derive::mocked;
 
-        #[mocked(module = "::derive_inherited_trait_different_modules::a")]
+        #[mocked(module = "crate::derive_inherited_trait_different_modules::a")]
         pub trait A {
             fn foo(&self, a: u32);
         }
@@ -48,7 +48,7 @@ mod derive_inherited_trait_different_modules {
     mod b {
         use mockers_derive::mocked;
 
-        #[mocked(refs = "super::a::A => ::derive_inherited_trait_different_modules::a::A")]
+        #[mocked(refs = "super::a::A => crate::derive_inherited_trait_different_modules::a::A")]
         pub trait B: super::a::A {
             fn bar(&self, b: u32);
         }

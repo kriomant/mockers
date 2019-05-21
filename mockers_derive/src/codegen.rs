@@ -12,11 +12,12 @@ use syn::{
     TypeParamBound, TypeReference,
 };
 
-use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits, DeriveClone};
+use crate::options::{parse_macro_args, MockAttrOptions, TraitDesc, DerivedTraits, DeriveClone, Location};
 use crate::type_manip::{qualify_self, set_self};
 use crate::error::{self, Error};
 use crate::id_gen::IdGen;
 #[cfg(feature="debug")] use crate::debug::format_code;
+use crate::util::is_path_absolute;
 
 use std::iter::FromIterator as _;
 use syn::spanned::Spanned as _;
@@ -101,7 +102,7 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, Error> {
 /// Returns generated mock and flag telling whether original item must be preserved.
 fn generate_mock(span: Span, item: &Item, opts_span: Span, opts: &MockAttrOptions) -> Result<(TokenStream, bool), Error> {
     match item {
-        Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, true)),
+        Item::Trait(trait_item) => Ok((generate_trait_mock(trait_item, opts)?, !opts.location.is_extern())),
         Item::ForeignMod(foreign_mod) => {
             let mock_name = opts.mock_name.as_ref().ok_or_else(|| {
                 Error::Spanned(opts_span, error::ERR_MOCK_NAME_REQUIRED_FOR_EXTERN.to_string())
@@ -131,7 +132,7 @@ fn generate_trait_mock(
     // Remember full trait definition, so we can recall it when it is references by
     // another trait. `module` parameter must be given for trait in order to be able
     // to be referenced by another mocked trait.
-    if let Some(ref module_path) = opts.module_path {
+    if let Some(module_path) = opts.location.module_path() {
         let mut full_path = module_path.clone();
         full_path
             .segments
@@ -142,22 +143,26 @@ fn generate_trait_mock(
         );
     }
 
-    let trait_desc = TraitDesc {
-        mod_path: Path {
+    let root_module_path = match &opts.location {
+        Location::Extern(path) => path.clone(),
+        Location::Local(path) => path.clone().unwrap_or_else(|| Path {
             leading_colon: None,
             segments: Punctuated::new(),
-        },
+        }),
+    };
+    let trait_desc = TraitDesc {
+        mod_path: root_module_path,
         trait_item: item_trait.clone(),
     };
     let mut all_traits = referenced_items;
     all_traits.push(trait_desc);
 
-    generate_mock_for_traits(mock_ident, handle_ident, &all_traits, true, &opts.derives)
+    generate_mock_for_traits(mock_ident, handle_ident, &all_traits, !opts.location.is_extern(), &opts.derives)
 }
 
 /// Find supertrait definitions.
 /// Trait definition may refer to another traits:
-/// ```
+/// ```ignore
 /// #[mocked(refs="B => ::some::B")]
 /// trait A : B { .. }
 /// ```
@@ -183,7 +188,7 @@ fn find_referenced_supertraits(item: &ItemTrait, refs: &HashMap<Path, Path>)
             // #[mocked(ref="B => ::module::B")]
             // trait A: B {}
             // ```
-            let full_path = if path.leading_colon.is_some() {
+            let full_path = if is_path_absolute(&path) {
                 path
             } else {
                 match refs.get(path) {

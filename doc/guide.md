@@ -452,25 +452,17 @@ Using `#[mocked]` is the easiest way to create a mock.
 
 However sometimes you don't want to have tests-related code in your `src` directory. Or a trait you want to mock is from another crate.
 
-Anyway, this is how you can "mockify" an external trait.
+Anyway, this is how you can "mockify" an external trait using `extern` option:
 
 ```rust
 // tests/lib.rs
-#![feature(proc_macro)]
+use mockers_derive::mocked;
 
-extern crate mockers;
-extern crate mockers_derive;
-
-use mockers_derive::mock;
-
-mock!{
-    AirConditionerMock,  // Mock type name
-    air, // This is mocked trait's package
-    trait AirConditioner {
-        fn make_hotter(&mut self, by: i16);
-        fn make_cooler(&mut self, by: i16);
-        fn get_temperature(&self) -> i16;
-    }
+#[mocked(AirConditionerMock, extern, module="::air")]
+trait AirConditioner {
+    fn make_hotter(&mut self, by: i16);
+    fn make_cooler(&mut self, by: i16);
+    fn get_temperature(&self) -> i16;
 }
 
 #[test]
@@ -489,7 +481,9 @@ fn test() {
 
 Unfortunately, compiler plugins work on syntax level and
 can't infer the trait definition just by its name. So you have
-to copy-paste the definition.
+to copy-paste the definition. But `extern` option ensures that trait
+definition is used for generating mock only and will be omitted from
+macro output.
 
 ### Specifying mock type name explicitly
 
