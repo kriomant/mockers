@@ -16,6 +16,9 @@ mod ext;
 mod option;
 mod result;
 
+/// Type of [`ANY`]. See its documentation for more.
+///
+/// [`ANY`]: constant.ANY.html
 pub struct MatchAny;
 impl ToString for MatchAny {
     fn to_string(&self) -> String {
@@ -31,9 +34,15 @@ impl<T> MatchArg<T> for MatchAny {
         "_".to_owned()
     }
 }
-/// Matches any value.
+
+/// Matches any value. You may also use [`any`] when matching parameters with generic type.
+///
+/// [`any`]: fn.any.html
 pub const ANY: MatchAny = MatchAny;
 
+/// This struct is created by the [`any`] function. See its documentation for more.
+///
+/// [`any`]: fn.any.html
 pub struct MatchAnyT<T>(PhantomData<T>);
 impl<T> MatchArg<T> for MatchAnyT<T> {
     fn matches(&self, _: &T) -> Result<(), String> {
@@ -45,6 +54,9 @@ impl<T> MatchArg<T> for MatchAnyT<T> {
     }
 }
 
+/// Matches any value. Must be used instead of [`ANY`] if you are using generics.
+///
+/// [`ANY`]: constant.ANY.html
 pub fn any<T>() -> MatchAnyT<T> {
     MatchAnyT(PhantomData)
 }
@@ -82,8 +94,19 @@ macro_rules! to_items {
 /// }
 /// ```
 macro_rules! simple_matcher {
-    ($func_name:ident, $class_name:ident, $comp:tt, $msg:expr, $($bounds:tt)+) => {
+    (@impl $func_name:ident, $func_name_str:expr, $func_name_link:expr,
+     $class_name:ident,
+     $comp:tt, $comp_str:expr,
+     $msg:expr, $($bounds:tt)+) => {
         to_items! {
+            /// This struct is created by the [`
+            #[doc = $func_name_str]
+            /// `] function. See its documentation for more.
+            ///
+            /// [`
+            #[doc = $func_name_str]
+            /// `]:
+            #[doc = $func_name_link]
             pub struct $class_name<T>(T);
             impl<T: $($bounds)+ + Debug> MatchArg<T> for $class_name<T> {
                 fn matches(&self, arg: &T) -> Result<(), String> {
@@ -98,11 +121,27 @@ macro_rules! simple_matcher {
                     format!("lt({:?})", self.0)
                 }
             }
-            pub fn $func_name<T: $($bounds)+ + Debug>(than: T) -> $class_name<T> {
-                $class_name(than)
+
+            /// Matches `value` if 
+            #[doc = $comp_str]
+            pub fn $func_name<T: $($bounds)+ + Debug>(other: T) -> $class_name<T> {
+                $class_name(other)
             }
         }
-    }
+    };
+
+    ($func_name:ident, $class_name:ident, $comp:tt, $msg:expr, $($bounds:tt)+) => {
+        simple_matcher!(
+            @impl $func_name, stringify!($func_name),
+            // The link needs to be concatenated here rather than in `@impl` to work.
+            concat!("fn.", stringify!($func_name), ".html"),
+            $class_name,
+            // The `value <op> other`. needs to be concatenated here rather than in `@impl`,
+            // otherwise, the spacing is funky.
+            $comp, concat!("`value ", stringify!($comp), " other`."),
+            $msg, $($bounds)+
+        );
+    };
 }
 
 simple_matcher!(lt, LtMatchArg,  <, "not less than", PartialOrd);
@@ -112,6 +151,9 @@ simple_matcher!(ne, NeMatchArg, !=, "equal to", PartialEq);
 simple_matcher!(ge, GeMatchArg, >=, "not greater than or equal to", PartialOrd);
 simple_matcher!(gt, GtMatchArg,  >, "not greater than", PartialOrd);
 
+/// This struct is created by the [`in_range`] function. See its documentation for more.
+///
+/// [`in_range`]: fn.in_range.html
 pub struct RangeMatchArg<T: Ord + Debug, R: RangeBounds<T>> {
     range: R,
     _phantom: PhantomData<T>,
@@ -161,6 +203,15 @@ impl<T: Ord + Debug, R: RangeBounds<T>> MatchArg<T> for RangeMatchArg<T, R> {
     }
 }
 
+/// Matches an argument in a range.
+///
+/// # Example
+/// ```rust
+/// # use mockers::MatchArg;
+/// # use mockers::matchers::in_range;
+///
+/// assert!(in_range(0..100).matches(&4).is_ok());
+/// ```
 pub fn in_range<T: Ord + Debug, R: RangeBounds<T>>(range: R) -> RangeMatchArg<T, R> {
     RangeMatchArg {
         range: range,
@@ -168,6 +219,9 @@ pub fn in_range<T: Ord + Debug, R: RangeBounds<T>>(range: R) -> RangeMatchArg<T,
     }
 }
 
+/// This struct is created by the [`not`] function. See its documentation for more.
+///
+/// [`not`]: fn.not.html
 pub struct NotMatchArg<T: Debug, M: MatchArg<T>>(M, PhantomData<T>);
 impl<T: Debug, M: MatchArg<T>> MatchArg<T> for NotMatchArg<T, M> {
     fn matches(&self, arg: &T) -> Result<(), String> {
@@ -185,10 +239,24 @@ impl<T: Debug, M: MatchArg<T>> MatchArg<T> for NotMatchArg<T, M> {
         format!("lt({:?})", self.0.describe())
     }
 }
+
+/// Matches an argument that does not match another matcher.
+///
+/// # Example
+/// ```rust
+/// # use mockers::MatchArg;
+/// # use mockers::matchers::in_range;
+/// # use mockers::matchers::not;
+///
+/// assert!(not(in_range(0..100)).matches(&400).is_ok());
+/// ```
 pub fn not<T: Debug, M: MatchArg<T>>(matcher: M) -> NotMatchArg<T, M> {
     NotMatchArg(matcher, PhantomData)
 }
 
+/// This struct is created by the [`and`] function. See its documentation for more.
+///
+/// [`and`]: fn.and.html
 pub struct AndMatchArg<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(M0, M1, PhantomData<T>);
 impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for AndMatchArg<T, M0, M1> {
     fn matches(&self, arg: &T) -> Result<(), String> {
@@ -205,6 +273,18 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for AndMatchArg<T, 
         format!("and({}, {})", self.0.describe(), self.1.describe())
     }
 }
+
+/// Matches an argument that matches both argument matcher parameters.
+///
+/// # Example
+/// ```rust
+/// # use mockers::MatchArg;
+/// # use mockers::matchers::and;
+/// # use mockers::matchers::check;
+/// # use mockers::matchers::in_range;
+///
+/// assert!(and(in_range(0..100), check(|i| i % 2 == 0)).matches(&4).is_ok());
+/// ```
 pub fn and<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(
     matcher0: M0,
     matcher1: M1,
@@ -212,6 +292,9 @@ pub fn and<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(
     AndMatchArg(matcher0, matcher1, PhantomData)
 }
 
+/// This struct is created by the [`or`] function. See its documentation for more.
+///
+/// [`or`]: fn.or.html
 pub struct OrMatchArg<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(M0, M1, PhantomData<T>);
 impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for OrMatchArg<T, M0, M1> {
     fn matches(&self, arg: &T) -> Result<(), String> {
@@ -228,6 +311,16 @@ impl<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>> MatchArg<T> for OrMatchArg<T, M
         format!("or({}, {})", self.0.describe(), self.1.describe())
     }
 }
+
+/// Matches an argument that matches either argument matcher parameters.
+///
+/// # Example
+/// ```rust
+/// # use mockers::MatchArg;
+/// # use mockers::matchers::or;
+///
+/// assert!(or(4, 42).matches(&4).is_ok());
+/// ```
 pub fn or<T: Debug, M0: MatchArg<T>, M1: MatchArg<T>>(
     matcher0: M0,
     matcher1: M1,
@@ -257,6 +350,9 @@ impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
     }
 }
 
+/// This struct is created by the [`check`] function. See its documentation for more.
+///
+/// [`check`]: fn.check.html
 pub struct BoolFnMatchArg<T, F: Fn(&T) -> bool> {
     func: F,
     _phantom: PhantomData<T>,
@@ -282,6 +378,11 @@ impl<T, F: Fn(&T) -> bool> MatchArg<T> for BoolFnMatchArg<T, F> {
         "<custom function>".to_owned()
     }
 }
+
+/// Matches an argument that satisfies a predicate.
+/// See also [`check!`].
+///
+/// [`check!`]: ../macro.check.html
 pub fn check<T, F: Fn(&T) -> bool>(f: F) -> BoolFnMatchArg<T, F> {
     BoolFnMatchArg {
         func: f,
