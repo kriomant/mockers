@@ -9,18 +9,18 @@ version = "0.13.3"
 edition = "2018"
 
 [dependencies]
-syn = { version = "0.15.24", features = ["full", "extra-traits"] }
-quote = "0.6.10"
+syn = { version = "0.15.34", features = ["full", "extra-traits"] }
+quote = "0.6.12"
 itertools = "0.8.0"
-lazy_static = "0.2.9"
-proc-macro2 = { version = "0.4.24", features = ["nightly"] }
+lazy_static = "1.3.0"
+proc-macro2 = { version = "0.4.30", features = ["nightly"] }
 indoc = "0.3.3"
 
 [build-dependencies]
 
 [dev-dependencies]
 mockers = { version = "0.13.3", path = "../mockers" }
-trybuild = "1.0.2"
+trybuild = "1.0.4"
 
 [lib]
 name = "mockers_derive"
