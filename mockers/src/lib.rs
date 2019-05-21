@@ -103,11 +103,11 @@ pub trait Satisfy {
 
 macro_rules! define_all {
     (
-        $reaction:ident(
-            $callmatch:ident, $actionclone:ident,
-            $satisfy:ident, $satisfyclone:ident,
-            $expectation:ident, $expectationtimes:ident
-        ) { $($arg:ident => $n:tt, $Arg:ident),* }
+        ($call_match:ident, $reaction:ident,
+          $action_clone:ident,
+          $satisfy:ident, $satisfy_clone:ident,
+          $expectation:ident, $expectation_times:ident)
+        { $(($n:tt, $arg:ident, $Arg:ident)),* }
     ) => {
         struct $satisfy<$($Arg,)* Res, F: FnOnce($($Arg,)*) -> Res> {
             action: F,
@@ -121,12 +121,12 @@ macro_rules! define_all {
             }
         }
 
-        struct $satisfyclone<$($Arg,)* Res> {
-            action: $actionclone<$($Arg,)* Res>,
+        struct $satisfy_clone<$($Arg,)* Res> {
+            action: $action_clone<$($Arg,)* Res>,
             $($arg: $Arg,)*
         }
 
-        impl<$($Arg,)* Res> Satisfy for $satisfyclone<$($Arg,)* Res> {
+        impl<$($Arg,)* Res> Satisfy for $satisfy_clone<$($Arg,)* Res> {
             fn satisfy(self: Box<Self>) -> *mut u8 {
                 let result = self.action.borrow_mut().deref_mut()($(self.$arg,)*);
                 Box::into_raw(Box::new(result)) as *mut u8
@@ -134,7 +134,7 @@ macro_rules! define_all {
         }
 
         #[must_use]
-        pub struct $callmatch<$($Arg,)* Res> {
+        pub struct $call_match<$($Arg,)* Res> {
             mock_id: usize,
             mock_type_id: usize,
             method_name: &'static str,
@@ -143,7 +143,7 @@ macro_rules! define_all {
             _phantom: PhantomData<Res>,
         }
 
-        impl<$($Arg,)* Res> $callmatch<$($Arg,)* Res> {
+        impl<$($Arg,)* Res> $call_match<$($Arg,)* Res> {
             pub fn new(
                 mock_id: usize,
                 mock_type_id: usize,
@@ -151,7 +151,7 @@ macro_rules! define_all {
                 type_param_ids: Vec<usize>,
                 $($arg: Box<dyn MatchArg<$Arg>>,)*
             ) -> Self {
-                $callmatch {
+                $call_match {
                     mock_id: mock_id,
                     mock_type_id: mock_type_id,
                     method_name: method_name,
@@ -172,30 +172,30 @@ macro_rules! define_all {
 
         #[must_use]
         pub struct $reaction<$($Arg,)* Res> {
-            call_match: $callmatch<$($Arg,)* Res>,
-            action: $actionclone<$($Arg,)* Res>,
+            call_match: $call_match<$($Arg,)* Res>,
+            action: $action_clone<$($Arg,)* Res>,
         }
         impl<$($Arg,)* Res> $reaction<$($Arg,)* Res> {
-            pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> $expectationtimes<$($Arg,)* Res> {
-                $expectationtimes::new(self.call_match, self.action, Box::new(cardinality))
+            pub fn times<C: Cardinality + 'static>(self, cardinality: C) -> $expectation_times<$($Arg,)* Res> {
+                $expectation_times::new(self.call_match, self.action, Box::new(cardinality))
             }
         }
 
         #[must_use]
-        pub struct $expectationtimes<$($Arg,)* Res> {
-            action: $actionclone<$($Arg,)* Res>,
-            call_match: $callmatch<$($Arg,)* Res>,
+        pub struct $expectation_times<$($Arg,)* Res> {
+            action: $action_clone<$($Arg,)* Res>,
+            call_match: $call_match<$($Arg,)* Res>,
             cardinality: Box<dyn Cardinality>,
             count: u32,
         }
 
-        impl<$($Arg,)* Res> $expectationtimes<$($Arg,)* Res> {
+        impl<$($Arg,)* Res> $expectation_times<$($Arg,)* Res> {
             fn new(
-                call_match: $callmatch<$($Arg,)* Res>,
-                action: $actionclone<$($Arg,)* Res>,
+                call_match: $call_match<$($Arg,)* Res>,
+                action: $action_clone<$($Arg,)* Res>,
                 cardinality: Box<dyn Cardinality>,
             ) -> Self {
-                $expectationtimes {
+                $expectation_times {
                     call_match: call_match,
                     action: action,
                     cardinality: cardinality,
@@ -204,7 +204,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg: 'static,)* Res: 'static> Expectation for $expectationtimes<$($Arg,)* Res> {
+        impl<$($Arg: 'static,)* Res: 'static> Expectation for $expectation_times<$($Arg,)* Res> {
             fn call_match(&self) -> &dyn CallMatch {
                 &self.call_match
             }
@@ -222,10 +222,10 @@ macro_rules! define_all {
                         self.cardinality.describe_upper_bound()
                     );
                 }
-                let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
+                let ($($arg,)*) = *$call_match::<$($Arg,)* Res>::get_args(call);
                 let action = self.action.clone();
                 Box::new(
-                    $satisfyclone {
+                    $satisfy_clone {
                         action,
                         $($arg,)*
                     }
@@ -243,7 +243,7 @@ macro_rules! define_all {
 
         #[must_use]
         pub struct $expectation<$($Arg,)* Res, F: FnOnce($($Arg,)*) -> Res> {
-            call_match: $callmatch<$($Arg,)* Res>,
+            call_match: $call_match<$($Arg,)* Res>,
             action: Option<F>,
         }
 
@@ -258,7 +258,7 @@ macro_rules! define_all {
             fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
                 match self.action.take() {
                     Some(action) => {
-                        let ($($arg,)*) = *$callmatch::<$($Arg,)* Res>::get_args(call);
+                        let ($($arg,)*) = *$call_match::<$($Arg,)* Res>::get_args(call);
                         Box::new(
                             $satisfy {
                                 action,
@@ -280,7 +280,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg: 'static,)* Res: 'static> $callmatch<$($Arg,)* Res> {
+        impl<$($Arg: 'static,)* Res: 'static> $call_match<$($Arg,)* Res> {
             pub fn and_return(self, result: Res)
             -> $expectation<$($Arg,)* Res, impl FnOnce($($Arg,)*) -> Res> {
                 #[allow(unused_variables)]
@@ -315,7 +315,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg,)* Res: Clone + 'static> $callmatch<$($Arg,)* Res> {
+        impl<$($Arg,)* Res: Clone + 'static> $call_match<$($Arg,)* Res> {
             pub fn and_return_clone(self, result: Res) -> $reaction<$($Arg,)* Res> {
                 #[allow(unused_variables)]
                 $reaction {
@@ -325,7 +325,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg,)* Res> $callmatch<$($Arg,)* Res> {
+        impl<$($Arg,)* Res> $call_match<$($Arg,)* Res> {
             pub fn and_call_clone<F>(self, func: F) -> $reaction<$($Arg,)* Res>
             where
                 F: FnMut($($Arg,)*) -> Res + 'static,
@@ -337,7 +337,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg,)* Res: Default + 'static> $callmatch<$($Arg,)* Res> {
+        impl<$($Arg,)* Res: Default + 'static> $call_match<$($Arg,)* Res> {
             pub fn and_return_default(self) -> $reaction<$($Arg,)* Res> {
                 #[allow(unused_variables)]
                 $reaction {
@@ -347,7 +347,7 @@ macro_rules! define_all {
             }
         }
 
-        impl<$($Arg,)* Res> CallMatch for $callmatch<$($Arg,)* Res> {
+        impl<$($Arg,)* Res> CallMatch for $call_match<$($Arg,)* Res> {
             fn matches_args(&self, call: &Call) -> bool {
                 assert!(
                     call.method_data.mock_type_id == self.mock_type_id
@@ -383,19 +383,19 @@ macro_rules! define_all {
     }
 }
 
-define_all!(Reaction0(CallMatch0, ActionClone0, Satisfy0, SatisfyClone0, Expectation0, ExpectationTimes0) {
+define_all!((CallMatch0, Reaction0, ActionClone0, Satisfy0, SatisfyClone0, Expectation0, ExpectationTimes0) {
 });
-define_all!(Reaction1(CallMatch1, ActionClone1, Satisfy1, SatisfyClone1, Expectation1, ExpectationTimes1) {
-    arg0 => 0, Arg0
+define_all!((CallMatch1, Reaction1, ActionClone1, Satisfy1, SatisfyClone1, Expectation1, ExpectationTimes1) {
+    (0, arg0, Arg0)
 });
-define_all!(Reaction2(CallMatch2, ActionClone2, Satisfy2, SatisfyClone2, Expectation2, ExpectationTimes2) {
-    arg0 => 0, Arg0, arg1 => 1, Arg1
+define_all!((CallMatch2, Reaction2, ActionClone2, Satisfy2, SatisfyClone2, Expectation2, ExpectationTimes2) {
+    (0, arg0, Arg0), (1, arg1, Arg1)
 });
-define_all!(Reaction3(CallMatch3, ActionClone3, Satisfy3, SatisfyClone3, Expectation3, ExpectationTimes3) {
-    arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2
+define_all!((CallMatch3, Reaction3, ActionClone3, Satisfy3, SatisfyClone3, Expectation3, ExpectationTimes3) {
+    (0, arg0, Arg0), (1, arg1, Arg1), (2, arg2, Arg2)
 });
-define_all!(Reaction4(CallMatch4, ActionClone4, Satisfy4, SatisfyClone4, Expectation4, ExpectationTimes4) {
-    arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3
+define_all!((CallMatch4, Reaction4, ActionClone4, Satisfy4, SatisfyClone4, Expectation4, ExpectationTimes4) {
+    (0, arg0, Arg0), (1, arg1, Arg1), (2, arg2, Arg2), (3, arg3, Arg3)
 });
 
 /// Argument matcher
@@ -719,7 +719,7 @@ pub struct MethodData {
 
 macro_rules! define_verify {
     (
-        $verify:ident { $($arg:ident => $n:tt, $Arg:ident),* }
+        $verify:ident { $(($n:tt, $arg:ident, $Arg:ident)),* }
     ) => {
         pub fn $verify<$($Arg: DebugOnStable,)* Res>(
             &mut self, method_data: MethodData$(, $arg: $Arg)*
@@ -752,10 +752,10 @@ macro_rules! define_verify {
 
 impl ScenarioInternals {
     define_verify!(verify0 { });
-    define_verify!(verify1 { arg0 => 0, Arg0 });
-    define_verify!(verify2 { arg0 => 0, Arg0, arg1 => 1, Arg1 });
-    define_verify!(verify3 { arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2 });
-    define_verify!(verify4 { arg0 => 0, Arg0, arg1 => 1, Arg1, arg2 => 2, Arg2, arg3 => 3, Arg3 });
+    define_verify!(verify1 { (0, arg0, Arg0) });
+    define_verify!(verify2 { (0, arg0, Arg0), (1, arg1, Arg1) });
+    define_verify!(verify3 { (0, arg0, Arg0), (1, arg1, Arg1), (2, arg2, Arg2) });
+    define_verify!(verify4 { (0, arg0, Arg0), (1, arg1, Arg1), (2, arg2, Arg2), (3, arg3, Arg3) });
 
     /// Verify call performed on mock object
     /// Returns closure which returns result upon call.
