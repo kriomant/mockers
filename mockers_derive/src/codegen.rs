@@ -511,7 +511,7 @@ fn generate_mock_for_traits(
     };
     generated_items.push(debug_impl_item);
 
-    let has_generic_method = Itertools::flatten(traits.iter().map(|&(_, members)| members.iter()))
+    let has_generic_method = traits.iter().map(|&(_, members)| members.iter()).flat_map(|x| x)
         .any(|member| match member {
             TraitItem::Method(TraitItemMethod { ref sig, .. }) => {
                 !sig.decl.generics.params.is_empty()
