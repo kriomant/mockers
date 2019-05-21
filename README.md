@@ -30,12 +30,7 @@ how it looks. Read [User Guide] for details.
 
 We will use nightly Rust in this example for simplicity.
 
-For multirust, run the following command:
-```
-$ multirust override nightly
-```
-
-Or if you're using rustup:
+If you're using rustup:
 
 ```
 $ rustup override set nightly
@@ -54,7 +49,7 @@ src/lib.rs:
 ```rust
 #![feature(use_extern_macros)]
 
-#[cfg(test)] extern crate mockers_derive;
+#[cfg(test)] extern crate mockers_derive; // Only needed for 2015 edition
 
 #[cfg(test)] use mockers_derive::mocked;
 
@@ -89,19 +84,6 @@ mod test {
 
       set_temperature_20(&mut cond);
   }
-}
-```
-
-And if you're using `2018` edition:
-
-```rust
-#[cfg(test)] use mockers_derive::mocked;
-
-#[cfg_attr(test, mocked)]
-pub trait AirConditioner {
-    fn make_hotter(&mut self, by: i16);
-    fn make_cooler(&mut self, by: i16);
-    fn get_temperature(&self) -> i16;
 }
 ```
 
