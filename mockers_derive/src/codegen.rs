@@ -3,6 +3,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
 use std::result::Result;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use syn::{
     parse_quote, punctuated::Punctuated, AngleBracketedGenericArguments, ArgCaptured, BareFnArg,
@@ -36,9 +37,9 @@ impl From<String> for Error {
 /// `*_call` methods and to `Call` structure created by mocked method.
 /// It is same to use call matcher for inspecting call object only when
 /// both mock type ID and method name match.
-static mut NEXT_MOCK_TYPE_ID: usize = 0;
+static NEXT_MOCK_TYPE_ID: AtomicUsize = AtomicUsize::new(0);
 
-static mut NEXT_REGISTERED_TYPE_ID: usize = 0;
+static NEXT_REGISTERED_TYPE_ID: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
     //static ref KNOWN_TRAITS: Mutex<HashMap<Path, Item>> = Mutex::new(HashMap::new());
@@ -85,11 +86,7 @@ pub fn register_types_impl(input: TokenStream) -> Result<TokenStream, Error> {
     let type_impls: Vec<ItemImpl> = types
         .iter()
         .map(|ty| {
-            let type_id = unsafe {
-                let id = NEXT_REGISTERED_TYPE_ID;
-                NEXT_REGISTERED_TYPE_ID += 1;
-                id
-            };
+            let type_id = NEXT_REGISTERED_TYPE_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
             let type_name = ty.into_token_stream().to_string();
             parse_quote! {
                 impl ::mockers::TypeInfo for MockersTypeRegistry<#ty> {
@@ -367,11 +364,7 @@ fn generate_mock_for_traits(
         let mut static_impl_methods = Vec::new();
         let mut static_trait_impl_methods = Vec::new();
 
-        let mock_type_id = unsafe {
-            let id = NEXT_MOCK_TYPE_ID;
-            NEXT_MOCK_TYPE_ID += 1;
-            id
-        };
+        let mock_type_id = NEXT_MOCK_TYPE_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         mock_type_ids.push(mock_type_id);
 
         for member in members.iter() {
@@ -511,7 +504,7 @@ fn generate_mock_for_traits(
     };
     generated_items.push(debug_impl_item);
 
-    let has_generic_method = Itertools::flatten(traits.iter().map(|&(_, members)| members.iter()))
+    let has_generic_method = traits.iter().map(|&(_, members)| members.iter()).flat_map(|x| x)
         .any(|member| match member {
             TraitItem::Method(TraitItemMethod { ref sig, .. }) => {
                 !sig.decl.generics.params.is_empty()
@@ -981,11 +974,7 @@ fn generate_extern_mock(
     foreign_mod: &syn::ItemForeignMod,
     mock_ident: &Ident,
 ) -> Result<TokenStream, String> {
-    let mock_type_id = unsafe {
-        let id = NEXT_MOCK_TYPE_ID;
-        NEXT_MOCK_TYPE_ID += 1;
-        id
-    };
+    let mock_type_id = NEXT_MOCK_TYPE_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 
     let (mock_items, stub_items): (Vec<_>, Vec<_>) = foreign_mod
         .items

@@ -968,4 +968,3 @@ mockers_derive = { version = "0.13.3", features = ["debug"] }
 
 [Google Mock]: https://github.com/google/googletest/blob/master/googlemock/README.md
 ["macros 1.1"]: https://github.com/rust-lang/rust/issues/35900
-[procedural macros feature] https://github.com/rust-lang/rust/issues/38356

@@ -22,6 +22,11 @@ impl<T: Debug, M: MatchArg<T>> MatchArgExt<T, M> for M {
     }
 }
 
+/// This struct is created by the [`with_custom_msg`] method on [`MatchArgExt`].
+/// See its documentation for more.
+///
+/// [`MatchArgExt`]: trait.MatchArgExt.html
+/// [`with_custom_msg`]: trait.MatchArgExt.html#tymethod.with_custom_msg
 pub struct WithDescriptionFn<T: Debug, M: MatchArg<T>, F: Fn() -> String> {
     matcher: M,
     description_fn: F,
@@ -49,6 +54,11 @@ impl<T: Debug, M: MatchArg<T>, F: Fn() -> String> MatchArg<T> for WithDescriptio
     }
 }
 
+/// This struct is created by the [`with_description_fn`] method on [`MatchArgExt`].
+/// See its documentation for more.
+///
+/// [`MatchArgExt`]: trait.MatchArgExt.html
+/// [`with_description_fn`]: trait.MatchArgExt.html#tymethod.with_description_fn
 pub struct WithMessageFn<T: Debug, M: MatchArg<T>, F: Fn(&T) -> String> {
     matcher: M,
     msg_fn: F,
