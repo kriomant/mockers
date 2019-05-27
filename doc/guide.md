@@ -286,6 +286,11 @@ The `matchers` module contains other matchers which may be useful:
     cond.opt_call(some(gt(3))).and_return(());
     ```
 
+	* `by_ref` allows matching values behind the reference:
+	   ```rust
+		 cond.method_with_ref_arg(by_ref(gt(3))).and_return(());
+		 ```
+
 You can also use a function returning `bool` to match an argument:
 
 ```rust

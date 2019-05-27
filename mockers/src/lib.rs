@@ -408,21 +408,6 @@ pub trait MatchArg<T> {
     fn describe(&self) -> String;
 }
 
-/// Matches argument with value of same type using equality.
-impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
-    fn matches(&self, arg: &T) -> Result<(), String> {
-        if self == arg {
-            Ok(())
-        } else {
-            Err(format!("{:?} is not equal to {:?}", arg, self))
-        }
-    }
-
-    fn describe(&self) -> String {
-        format!("{:?}", self)
-    }
-}
-
 #[derive(Default)]
 pub struct Sequence {
     expectations: Vec<Box<dyn Expectation>>,

@@ -16,6 +16,39 @@ mod ext;
 mod option;
 mod result;
 
+/// Matches argument with value of same type using equality.
+impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
+    fn matches(&self, arg: &T) -> Result<(), String> {
+        if self == arg {
+            Ok(())
+        } else {
+            Err(format!("{:?} is not equal to {:?}", arg, self))
+        }
+    }
+
+    fn describe(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+pub struct MatchRef<T, M: MatchArg<T>> { inner: M, _phantom_data: PhantomData<T> }
+impl<T, M: MatchArg<T>> MatchRef<T, M> {
+    pub fn new(inner: M) -> Self { MatchRef { inner, _phantom_data: PhantomData } }
+}
+impl<T, M: MatchArg<T>> MatchArg<&T> for MatchRef<T, M> {
+    fn matches(&self, arg: &&T) -> Result<(), String> {
+        self.inner.matches(*arg)
+    }
+
+    fn describe(&self) -> String {
+        self.inner.describe()
+    }
+}
+
+pub fn by_ref<T, M: MatchArg<T>>(inner: M) -> MatchRef<T, M> {
+    MatchRef::new(inner)
+}
+
 pub struct MatchAny;
 impl ToString for MatchAny {
     fn to_string(&self) -> String {
