@@ -1167,7 +1167,7 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
                             type_param_ids: vec![],
                         };
                         let action = self.scenario.borrow_mut().verify0(method_data);
-                        action.call()
+                        action()
                     }
                 }
 
