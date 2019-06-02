@@ -97,6 +97,14 @@ There is now `once()` shortcut for `times(1)`:
 scenario.expect(handle.foo().and_return_clone(1).once());
 ```
 
+## 0.13.4
+
+`by_ref` matcher allows matching value behind the reference:
+
+```rust
+handle.method_with_ref_arg(by_ref(lt(3))).and_return(());
+```
+
 ## 0.13.2
 
 ### Errors reporting

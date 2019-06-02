@@ -11,10 +11,12 @@ Mocking library for Rust. Both stable and nightly Rust are supported.
 
 Inspired by Google Mock library for C++.
 
+**Warning**: There are breaking changes in 0.20.0 release, read What's New for details.
+
+[What's New]
 [User Guide]
 
-## Limitations
-
+## Limitations 
 For now it is not a full-featured mocking library, but just
 a prototype to gather feedback. For example, only methods with
 four or fewer arguments are supported, non-'static lifetimes are not
@@ -146,3 +148,5 @@ Copyright © 2016 Mikhail Trishchenkov
 Distributed under the [MIT License](LICENSE).
 
 [User Guide]: doc/guide.md
+[What's New]: doc/whats-new.md
+
