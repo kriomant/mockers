@@ -53,15 +53,6 @@ pub fn mocked(attr: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[deprecated(
-    since = "0.14.0",
-    note = "`derive_mock` is deprecated, use `mocked` instead"
-)]
-#[proc_macro_attribute]
-pub fn derive_mock(attr: TokenStream, input: TokenStream) -> TokenStream {
-    mocked(attr, input)
-}
-
 #[proc_macro]
 pub fn mock(input: TokenStream) -> TokenStream {
     match mock_impl(input.into()) {
