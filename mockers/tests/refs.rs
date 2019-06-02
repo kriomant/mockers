@@ -32,9 +32,9 @@ fn test_refs_comparison() {
 #[test]
 fn test_ref_can_be_matched_by_value() {
     let scenario = Scenario::new();
-    let mock = scenario.create_mock::<AMock>();
+    let (mock, handler) = scenario.create_mock::<AMock>();
 
-    scenario.expect(mock.foo_call(by_ref(2)).and_return_default().times(1));
+    scenario.expect(handler.foo(by_ref(2)).and_return_default().times(1));
 
     mock.foo(&2);
 }
