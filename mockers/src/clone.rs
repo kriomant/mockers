@@ -31,8 +31,8 @@ pub trait CloneMock<Mock>: Sized {
 /// #[test]
 /// fn test_clone_mock() {
 ///     let scenario = Scenario::new();
-///     let mock = scenario.create_mock_for::<A>();
-///     let mock_clone = scenario.create_mock_for::<A>();
+///     let mock = scenario.create_mock_for::<dyn A>();
+///     let mock_clone = scenario.create_mock_for::<dyn A>();
 ///
 ///     scenario.expect(mock_clone.foo(2).and_return_default().times(1));
 ///     scenario.expect(mock.clone().and_return(mock_clone));
@@ -57,7 +57,7 @@ pub trait CloneMock<Mock>: Sized {
 /// #[test]
 /// fn test_shared() {
 ///     let scenario = Scenario::new();
-///     let mock = scenario.create_mock_for::<A>();
+///     let mock = scenario.create_mock_for::<dyn A>();
 ///
 ///     scenario.expect(mock.foo(2).and_return_default().times(1));
 ///

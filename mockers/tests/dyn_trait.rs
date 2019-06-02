@@ -12,7 +12,7 @@ pub trait A {
 #[test]
 fn test() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A>();
 
     scenario.expect(handle.foo(ANY).and_return(()));
 

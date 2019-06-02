@@ -8,7 +8,7 @@ pub trait A {
     fn foo(&self);
 }
 
-struct Wrapper(pub Box<A>);
+struct Wrapper(pub Box<dyn A>);
 impl Wrapper {
     fn foo(&self) { self.0.foo() }
 }
@@ -16,7 +16,7 @@ impl Wrapper {
 #[test]
 fn test() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A>();
 
     let wrapper = Wrapper(Box::new(mock));
 

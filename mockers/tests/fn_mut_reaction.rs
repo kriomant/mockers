@@ -15,7 +15,7 @@ pub trait A {
 #[test]
 fn test_fn_mut() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A>();
 
     scenario.expect(handle.create0().and_call_clone(|| NonClonable).times(1));
     scenario.expect(

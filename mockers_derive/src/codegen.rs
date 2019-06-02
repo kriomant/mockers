@@ -227,7 +227,7 @@ fn find_referenced_supertraits(item: &ItemTrait, refs: &HashMap<Path, Path>)
 /// Generate mock struct and all implementations for given `trait_items`.
 /// `mock_ident` is identifier for mock struct.
 /// If `local` is `true`, `Mocked` instance generated for mock, which
-/// allows to use `scenario.create_mock_for::<Trait>`.
+/// allows to use `scenario.create_mock_for::<dyn Trait>`.
 fn generate_mock_for_traits(
     mock_ident: Ident,
     handle_ident: Ident,

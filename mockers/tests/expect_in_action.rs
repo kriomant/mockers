@@ -17,11 +17,11 @@ pub trait B {
 #[test]
 fn test_expectation_from_action() {
     let scenario = Scenario::new();
-    let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
+    let (a, a_handle) = scenario.create_mock_for::<dyn A<Item = BMock>>();
     scenario.expect(a_handle.create().and_call({
         let scenario = scenario.handle();
         move || {
-            let (b, b_handle) = scenario.create_mock_for::<B>();
+            let (b, b_handle) = scenario.create_mock_for::<dyn B>();
             scenario.expect(b_handle.foo().and_return(()));
             b
         }
@@ -36,11 +36,11 @@ fn test_expectation_from_action() {
 #[should_panic(expected = "not satisfied:\n`B#0.foo()`")]
 fn test_expectation_from_action_are_verified() {
     let scenario = Scenario::new();
-    let (a, a_handle) = scenario.create_mock_for::<A<Item = BMock>>();
+    let (a, a_handle) = scenario.create_mock_for::<dyn A<Item = BMock>>();
     scenario.expect(a_handle.create().and_call({
         let scenario = scenario.handle();
         move || {
-            let (b, b_handle) = scenario.create_mock_for::<B>();
+            let (b, b_handle) = scenario.create_mock_for::<dyn B>();
             scenario.expect(b_handle.foo().and_return(()));
             b
         }

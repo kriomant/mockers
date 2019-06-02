@@ -15,7 +15,7 @@ So, summarizing, before:
 
 ```rust
 let scenario = Scenario::new();
-let mock = scenario.create_mock_for::<A>();
+let mock = scenario.create_mock_for::<dyn A>();
 
 scenario.expect(mock.foo_call().and_return(()));
 mock.foo();
@@ -25,7 +25,7 @@ After:
 
 ```rust
 let scenario = Scenario::new();
-let (mock, handle) = scenario.create_mock_for::<A>();
+let (mock, handle) = scenario.create_mock_for::<dyn A>();
 
 scenario.expect(handle.foo().and_return(()));
 //              ^ `handle.foo`, not `mock.foo_call`

@@ -21,7 +21,7 @@ mock! {
 #[test]
 fn test_a() {
     let scenario = mockers::Scenario::new();
-    let (a, a_handle) = scenario.create_mock_for::<A>();
+    let (a, a_handle) = scenario.create_mock_for::<dyn A>();
     scenario.expect(a_handle.foo().and_return(()));
     a.foo();
 }

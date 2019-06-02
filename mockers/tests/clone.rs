@@ -83,8 +83,8 @@ fn test_clone_mock() {
 #[test]
 fn test_derive() {
     let scenario = Scenario::new();
-    let (mock, mock_handle) = scenario.create_mock_for::<ADerive>();
-    let (mock_clone, mock_clone_handle) = scenario.create_mock_for::<ADerive>();
+    let (mock, mock_handle) = scenario.create_mock_for::<dyn ADerive>();
+    let (mock_clone, mock_clone_handle) = scenario.create_mock_for::<dyn ADerive>();
 
     scenario.expect(mock_clone_handle.foo(2).and_return_default().times(1));
     scenario.expect(mock_handle.clone().and_return(mock_clone));
@@ -95,7 +95,7 @@ fn test_derive() {
 #[test]
 fn test_derive_shared() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<ADeriveShared>();
+    let (mock, handle) = scenario.create_mock_for::<dyn ADeriveShared>();
 
     scenario.expect(handle.foo(2).and_return_default().times(1));
 

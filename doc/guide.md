@@ -130,7 +130,7 @@ mod test {
     #[test]
     fn test_set_temperature_20() {
         let scenario = Scenario::new();
-        let (mut cond, cond_handle) = scenario.create_mock_for::<AirConditioner>();
+        let (mut cond, cond_handle) = scenario.create_mock_for::<dyn AirConditioner>();
 
         scenario.expect(cond_handle.get_temperature().and_return(16));
         scenario.expect(cond_handle.make_hotter(4).and_return(()));
@@ -187,7 +187,7 @@ and expectations. When the scenario object is destroyed it checks
 that all expectations are satisfied and fails otherwise.
 
 ```rust
-let (mut cond, cond_handle) = scenario.create_mock_for::<AirConditioner>();
+let (mut cond, cond_handle) = scenario.create_mock_for::<dyn AirConditioner>();
 scenario.expect(cond_handle.get_temperature().and_return(16));
 scenario.expect(cond_handle.make_hotter(4).and_return(()));
 ```
@@ -537,7 +537,7 @@ pub trait Item {
 #[test]
 fn test_factory() {
     let scenario = Scenario::new();
-    let factory = scenario.create_mock_for::<Factory<Item=ItemMock>>();
+    let factory = scenario.create_mock_for::<dyn Factory<Item=ItemMock>>();
     scenario.expect(a.create_call().and_call(|| {
         // ???
     }));
@@ -556,7 +556,7 @@ Here is what `Scenario::handle()` method is for. It returns `ScenarioHandle` obj
 scenario.expect(factory.create_call().and_call({
     let scenario = scenario.handle();
     move || {
-        let (item, item_handle) = scenario.create_mock_for::<Item>();
+        let (item, item_handle) = scenario.create_mock_for::<dyn Item>();
         scenario.expect(item_handle.foo().and_return(()));
         item
     }
@@ -593,8 +593,8 @@ use mockers::CloneMock as _;
 #[test]
 fn test_target() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A>();
-    let (mock_clone, clone_handle) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A>();
+    let (mock_clone, clone_handle) = scenario.create_mock_for::<dyn A>();
 
     scenario.expect(clone_handle.foo(2).and_return_default().once());
     scenario.expect(handle.clone().and_return(mock_clone));  // <--
@@ -617,7 +617,7 @@ so any expectation set on one of them will be satisfied by call on any other:
 #[test]
 fn test_target() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A>();
 
     scenario.expect(handle.foo(2).and_return_default().once());
 
@@ -639,7 +639,7 @@ pub trait A {
 #[test]
 fn test_assocated_type() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<A<Item=i32>>();
+    let (mock, handle) = scenario.create_mock_for::<dyn A<Item=i32>>();
     scenario.expect(handle.create().and_return(2));
     assert_eq!(mock.create(), 2);
 }

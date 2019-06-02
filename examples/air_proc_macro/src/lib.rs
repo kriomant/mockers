@@ -11,7 +11,7 @@ pub trait AirConditioner {
     fn get_temperature(&self) -> i16;
 }
 
-pub fn set_temperature_20(cond: &mut AirConditioner) {
+pub fn set_temperature_20(cond: &mut dyn AirConditioner) {
     let t = cond.get_temperature();
     if t < 20 {
         cond.make_hotter(20 - t);

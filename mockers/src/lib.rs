@@ -72,7 +72,7 @@ pub trait CallMatch {
 pub trait Expectation {
     fn call_match(&self) -> &dyn CallMatch;
     fn is_satisfied(&self) -> bool;
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy>;
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<dyn Satisfy>;
     fn describe(&self) -> String;
 }
 
@@ -86,7 +86,7 @@ impl<CM: CallMatch> Expectation for ExpectationNever<CM> {
     fn is_satisfied(&self) -> bool {
         true
     }
-    fn satisfy(&mut self, _call: Call, mock_name: &str) -> Box<Satisfy> {
+    fn satisfy(&mut self, _call: Call, mock_name: &str) -> Box<dyn Satisfy> {
         panic!(
             "{}.{} should never be called",
             mock_name,
@@ -216,7 +216,7 @@ macro_rules! define_all {
             fn is_satisfied(&self) -> bool {
                 self.cardinality.check(self.count) == CardinalityCheckResult::Satisfied
             }
-            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<dyn Satisfy> {
                 self.count += 1;
                 if self.cardinality.check(self.count) == CardinalityCheckResult::Wrong {
                     panic!(
@@ -260,7 +260,7 @@ macro_rules! define_all {
             fn is_satisfied(&self) -> bool {
                 self.action.is_none()
             }
-            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
+            fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<dyn Satisfy> {
                 match self.action.take() {
                     Some(action) => {
                         let ($($arg,)*) = *$call_match::<$($Arg,)* Res>::get_args(call);
@@ -381,7 +381,7 @@ macro_rules! define_all {
                 &self.type_param_ids
             }
             fn describe(&self) -> String {
-                let args: &[&std::fmt::Display] = &[$(&self.$arg.describe()),*];
+                let args: &[&dyn std::fmt::Display] = &[$(&self.$arg.describe()),*];
                 format!("{}({})", self.get_method_name(), args.iter().format(", "))
             }
         }
@@ -436,7 +436,7 @@ impl Expectation for Sequence {
     fn is_satisfied(&self) -> bool {
         self.expectations.is_empty()
     }
-    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<Satisfy> {
+    fn satisfy(&mut self, call: Call, mock_name: &str) -> Box<dyn Satisfy> {
         let (res, remove) = {
             let exp = &mut self.expectations[0];
             let res = exp.satisfy(call, mock_name);
@@ -732,7 +732,7 @@ macro_rules! define_verify {
             };
             fn format_args<$($Arg: DebugOnStable,)*>(args_ptr: *const u8) -> String {
                 let __args_ref: &($($Arg,)*) = unsafe { ::std::mem::transmute(args_ptr) };
-                let args_debug: &[&std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
+                let args_debug: &[&dyn std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
                 format!("{:?}", args_debug.iter().format(", "))
             };
             let call = Call {
@@ -764,7 +764,7 @@ impl ScenarioInternals {
     /// use user-provided closure as action, and that closure may want to
     /// use scenario object to create mocks or establish expectations, so
     /// we need to release scenario borrow before calling expectation action.
-    fn verify(&mut self, call: Call) -> Box<Satisfy> {
+    fn verify(&mut self, call: Call) -> Box<dyn Satisfy> {
         for expectation in self.expectations.iter_mut().rev() {
             if expectation.call_match().matches(&call) {
                 let mock_name = self
