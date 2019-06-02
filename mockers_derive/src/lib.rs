@@ -7,42 +7,6 @@ extern crate lazy_static;
 
 use proc_macro::TokenStream;
 
-#[cfg(feature = "nightly")]
-use proc_macro::{Diagnostic, Level};
-
-#[cfg(not(feature = "nightly"))]
-#[derive(Debug)]
-enum Level {
-    Error,
-}
-
-#[cfg(not(feature = "nightly"))]
-struct Diagnostic {
-    level: Level,
-    msg: String,
-}
-
-#[cfg(not(feature = "nightly"))]
-impl<'a> Diagnostic {
-    fn new(level: Level, msg: String) -> Self {
-        Self {
-            level,
-            msg,
-        }
-    }
-
-    fn spanned(_: proc_macro::Span, level: Level, msg: String) -> Self {
-        Self {
-            level,
-            msg,
-        }
-    }
-
-    fn emit(&self) {
-        panic!("{:?} in mockers: {}", self.level, self.msg);
-    }
-}
-
 mod codegen;
 mod options;
 mod type_manip;
@@ -50,10 +14,12 @@ mod error;
 #[cfg(feature="debug")] mod debug;
 mod id_gen;
 mod util;
+mod diagnostics;
 
 use crate::codegen::{mock_impl, mocked_impl, register_types_impl};
 use crate::options::parse_attr_options;
 use crate::error::Error;
+use diagnostics::{Diagnostic, Level};
 
 use syn::spanned::Spanned as _;
 

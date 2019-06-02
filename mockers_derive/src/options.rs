@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 use proc_macro2::{Span, TokenStream};
 use syn::{parse::ParseStream, punctuated::Punctuated, Ident, ItemTrait, Meta, MetaNameValue, NestedMeta, Path, Token, MetaList};
-use proc_macro::Diagnostic;
 use indoc::indoc;
 
 use crate::util::is_path_absolute;
+use crate::diagnostics::{Diagnostic, Level};
 
 pub fn parse_attr_options(attr_tokens: TokenStream) -> syn::parse::Result<MockAttrOptions> {
     syn::parse2::<MockAttrOptions>(attr_tokens)
@@ -161,7 +161,7 @@ impl syn::parse::Parse for MockAttrOptions {
                                 Meta::Word(ident) if ident == "Clone" => {
                                     if derives.clone != DeriveClone::No {
                                          Diagnostic::spanned(ident.span().unstable(),
-                                                             proc_macro::Level::Warning,
+                                                             Level::Warning,
                                                              "duplicate derived trait name").emit();
                                     }
                                     derives.clone = DeriveClone::Normal;
@@ -170,7 +170,7 @@ impl syn::parse::Parse for MockAttrOptions {
                                 Meta::List(MetaList { ident, nested, .. }) if ident == "Clone" => {
                                     if derives.clone != DeriveClone::No {
                                         Diagnostic::spanned(ident.span().unstable(),
-                                                            proc_macro::Level::Warning,
+                                                            Level::Warning,
                                                             "duplicate derived trait name").emit();
                                     }
 
