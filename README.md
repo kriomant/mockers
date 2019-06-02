@@ -1,7 +1,7 @@
 
-| master | 0.13.4 |
+| master | 0.20.0 |
 | ------ | ----- |
-| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.13.4)](https://travis-ci.org/kriomant/mockers) |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.20.0)](https://travis-ci.org/kriomant/mockers) |
 
 
 
@@ -47,8 +47,8 @@ Cargo.toml:
 
 ```toml
 [dev-dependencies]
-mockers = "0.13.4"
-mockers_derive = "0.13.4"
+mockers = "0.20.0"
+mockers_derive = "0.20.0"
 ```
 
 src/lib.rs:
