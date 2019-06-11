@@ -207,14 +207,14 @@ fn find_referenced_supertraits(item: &ItemTrait, refs: &HashMap<Path, Path>)
                 .get(&full_path.into_token_stream().to_string())
             {
                 let mod_path = Path {
-                    leading_colon: path.leading_colon.clone(),
+                    leading_colon: path.leading_colon,
                     segments: Punctuated::from_iter(
                         path.segments.iter().take(path.segments.len() - 1).cloned(),
                     ),
                 };
                 let referenced_trait: ItemTrait = syn::parse_str(&referenced_trait).unwrap();
                 Ok(TraitDesc {
-                    mod_path: mod_path,
+                    mod_path,
                     trait_item: referenced_trait.clone(),
                 })
             } else {
@@ -295,10 +295,7 @@ fn generate_mock_for_traits(
                 arguments: PathArguments::None,
             });
 
-            trait_paths.insert(format!(
-                "{}",
-                trait_path.clone().into_token_stream().to_string()
-            ));
+            trait_paths.insert(trait_path.clone().into_token_stream().to_string());
             Ok((trait_path, items))
         })
         .collect::<Result<Vec<(Path, &Vec<TraitItem>)>, Error>>()?;
@@ -784,7 +781,7 @@ fn generate_stub_code(
     let arg_values: Vec<Expr> = args
         .iter()
         .flat_map(|i| {
-            if let &FnArg::Captured(ArgCaptured {
+            if let FnArg::Captured(ArgCaptured {
                 pat: Pat::Ident(PatIdent { ref ident, .. }),
                 ..
             }) = i
@@ -949,9 +946,9 @@ fn generate_impl_method(
         //           (&self, arg0: Arg0Match)
         //  -> ::mockers::CallMatch1<&'a0 u32, ()>;
         // ```
-        let new_arg_type = match &arg_type {
+        let new_arg_type = match arg_type {
             // Parameter is reference
-            &Type::Reference(TypeReference {
+            Type::Reference(TypeReference {
                 elem: ref ty,
                 mutability,
                 ..
@@ -1034,6 +1031,7 @@ fn generate_extern_mock(
                     ReturnType::Type(_, ref ty) => *ty.clone(),
                     ReturnType::Default => parse_quote! { () },
                 };
+
                 let mock_method = generate_impl_method(
                     mock_type_id,
                     ident.clone(),
@@ -1061,10 +1059,10 @@ fn generate_extern_mock(
                 Ok((mock_method, stub_method))
             }
 
-            ForeignItem::Static(..) => return Err("extern statics are not supported".to_string()),
-            ForeignItem::Type(..) => return Err("types are not supported".to_string()),
-            ForeignItem::Macro(..) => return Err("macros are not supported".to_string()),
-            ForeignItem::Verbatim(..) => return Err("verbatim items are not supported".to_string()),
+            ForeignItem::Static(..) => Err("extern statics are not supported".to_string()),
+            ForeignItem::Type(..) => Err("types are not supported".to_string()),
+            ForeignItem::Macro(..) => Err("macros are not supported".to_string()),
+            ForeignItem::Verbatim(..) => Err("verbatim items are not supported".to_string()),
         })
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()

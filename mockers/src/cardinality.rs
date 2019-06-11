@@ -175,7 +175,7 @@ impl Cardinality for RangeToInclusive<u32> {
         if self.end == 0 {
             "never called".to_string()
         } else if self.end == 1 {
-            format!("called at most one time")
+            "called at most one time".to_string()
         } else {
             format!("called at most {} times", self.end)
         }

@@ -26,10 +26,12 @@ pub use clone::CloneMock;
 use crate::cardinality::{Cardinality, CardinalityCheckResult};
 use crate::dbg::dbg;
 
+pub type MockRef = (usize, Rc<RefCell<ScenarioInternals>>);
+
 thread_local! {
     // Mapping from mock_type_id of 'extern' block mock to corresponding mock object.
     // It is needed since mock is object but mocked functions are static.
-    pub static EXTERN_MOCKS: RefCell<HashMap<usize, (usize, Rc<RefCell<ScenarioInternals>>)>> = RefCell::new(HashMap::new());
+    pub static EXTERN_MOCKS: RefCell<HashMap<usize, MockRef>> = RefCell::new(HashMap::new());
 }
 
 macro_rules! define_actions {
@@ -145,6 +147,7 @@ macro_rules! define_all {
         }
 
         impl<$($Arg,)* Res> $call_match<$($Arg,)* Res> {
+            #[allow(clippy::too_many_arguments)]
             pub fn new(
                 mock_id: usize,
                 mock_type_id: usize,
@@ -344,7 +347,7 @@ macro_rules! define_all {
 
         impl<$($Arg,)* Res: Default + 'static> $call_match<$($Arg,)* Res> {
             pub fn and_return_default(self) -> $reaction<$($Arg,)* Res> {
-                #[allow(unused_variables)]
+                #[allow(unused_variables, clippy::redundant_closure)]
                 $reaction {
                     call_match: self,
                     action: Rc::new(RefCell::new(|$($arg,)*| Res::default())),
@@ -731,7 +734,7 @@ macro_rules! define_verify {
                 unsafe { Box::from_raw(args_to_destroy as *mut ($($Arg,)*)) };
             };
             fn format_args<$($Arg: DebugOnStable,)*>(args_ptr: *const u8) -> String {
-                let __args_ref: &($($Arg,)*) = unsafe { ::std::mem::transmute(args_ptr) };
+                let __args_ref: &($($Arg,)*) = unsafe { &*(args_ptr as *const ($($Arg,)*)) };
                 let args_debug: &[&dyn std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
                 format!("{:?}", args_debug.iter().format(", "))
             };

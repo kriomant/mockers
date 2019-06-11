@@ -66,10 +66,10 @@ where
                     && path
                         .segments
                         .first()
-                        .map(|s| s.value().ident.to_string() == "Self")
+                        .map(|s| s.value().ident == "Self")
                         .unwrap_or(false)
                 {
-                    let self_seg = path.segments.first().unwrap().value().clone();
+                    let self_seg = *path.segments.first().unwrap().value();
                     func(
                         &self_seg,
                         &path.segments.iter().skip(1).cloned().collect::<Vec<_>>(),

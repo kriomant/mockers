@@ -29,11 +29,7 @@ pub struct WithDescriptionFn<T: Debug, M: MatchArg<T>, F: Fn() -> String> {
 }
 impl<T: Debug, M: MatchArg<T>, F: Fn() -> String> WithDescriptionFn<T, M, F> {
     pub fn new(matcher: M, description_fn: F) -> Self {
-        WithDescriptionFn {
-            matcher: matcher,
-            description_fn: description_fn,
-            _phantom: PhantomData,
-        }
+        WithDescriptionFn { matcher, description_fn, _phantom: PhantomData }
     }
     fn description(&self) -> String {
         let fun = &self.description_fn;
@@ -56,11 +52,7 @@ pub struct WithMessageFn<T: Debug, M: MatchArg<T>, F: Fn(&T) -> String> {
 }
 impl<T: Debug, M: MatchArg<T>, F: Fn(&T) -> String> WithMessageFn<T, M, F> {
     pub fn new(matcher: M, msg_fn: F) -> Self {
-        WithMessageFn {
-            matcher: matcher,
-            msg_fn: msg_fn,
-            _phantom: PhantomData,
-        }
+        WithMessageFn { matcher, msg_fn, _phantom: PhantomData }
     }
     fn message(&self, arg: &T) -> String {
         let fun = &self.msg_fn;

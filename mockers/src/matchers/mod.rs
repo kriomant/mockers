@@ -195,10 +195,7 @@ impl<T: Ord + Debug, R: RangeBounds<T>> MatchArg<T> for RangeMatchArg<T, R> {
 }
 
 pub fn in_range<T: Ord + Debug, R: RangeBounds<T>>(range: R) -> RangeMatchArg<T, R> {
-    RangeMatchArg {
-        range: range,
-        _phantom: PhantomData,
-    }
+    RangeMatchArg { range, _phantom: PhantomData }
 }
 
 pub struct NotMatchArg<T: Debug, M: MatchArg<T>>(M, PhantomData<T>);
@@ -274,10 +271,7 @@ pub struct FnMatchArg<T, F: Fn(&T) -> Result<(), String>> {
 }
 impl<T, F: Fn(&T) -> Result<(), String>> FnMatchArg<T, F> {
     pub fn new(func: F) -> Self {
-        FnMatchArg {
-            func: func,
-            _phantom: PhantomData,
-        }
+        FnMatchArg { func, _phantom: PhantomData }
     }
 }
 impl<T, F: Fn(&T) -> Result<(), String>> MatchArg<T> for FnMatchArg<T, F> {
@@ -296,10 +290,7 @@ pub struct BoolFnMatchArg<T, F: Fn(&T) -> bool> {
 }
 impl<T, F: Fn(&T) -> bool> BoolFnMatchArg<T, F> {
     pub fn new(func: F) -> Self {
-        BoolFnMatchArg {
-            func: func,
-            _phantom: PhantomData,
-        }
+        BoolFnMatchArg { func, _phantom: PhantomData }
     }
 }
 impl<T, F: Fn(&T) -> bool> MatchArg<T> for BoolFnMatchArg<T, F> {

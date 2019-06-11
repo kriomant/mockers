@@ -105,7 +105,7 @@ fn test_value_self_method() {
 #[should_panic(expected = "unexpected call to `amock.foo()`")]
 fn test_named_mock() {
     let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_named_mock_for::<A>("amock".to_owned());
+    let (mock, handle) = scenario.create_named_mock_for::<dyn A>("amock".to_owned());
     scenario.expect(handle.bar(2).and_return(()));
     mock.foo();
 }
