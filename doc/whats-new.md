@@ -1,5 +1,12 @@
 # What's new
 
+## Dev
+
+### Support for arbitrary self type
+
+Now you can mock methods with arbitrary `self` type, for example
+`self: Box<Self>` or `self: Rc<Self>`.
+
 ## 0.20.0
 
 ### **Breaking change**: introducing mock handles

@@ -642,11 +642,7 @@ fn generate_trait_methods(
     mock_type_id: usize,
     mock_struct_path: &Path,
 ) -> Result<GeneratedMethods, String> {
-    let is_static = match decl.inputs.iter().next() {
-        Some(FnArg::SelfRef(..)) | Some(FnArg::SelfValue(..)) => false,
-        _ => true,
-    };
-
+    let is_static = !decl.inputs.iter().next().map(is_self_arg).unwrap_or(false);
     let return_type = match decl.output {
         ReturnType::Default => parse_quote! { () },
         ReturnType::Type(_, ref ty) => *ty.clone(),
@@ -1200,4 +1196,12 @@ fn gen_type_ids_expr(generics: &Generics) -> Expr {
         quote!(<MockersTypeRegistry<#ident> as ::mockers::TypeInfo>::get_type_id())
     });
     parse_quote!(vec![#(#type_param_id_exprs),*])
+}
+
+fn is_self_arg(arg: &FnArg) -> bool {
+    match arg {
+        FnArg::SelfRef(..) | FnArg::SelfValue(..) => true,
+        FnArg::Captured(ArgCaptured { pat: Pat::Ident(PatIdent { ident, .. }), ..}) if ident == "self" => true,
+        a => false,
+    }
 }
