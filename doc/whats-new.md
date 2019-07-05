@@ -1,6 +1,6 @@
 # What's new
 
-## Dev
+## 0.21.0
 
 ### Support for arbitrary self type
 

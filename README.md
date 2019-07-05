@@ -1,7 +1,7 @@
 
-| master | 0.20.0 |
+| master | 0.21.0 |
 | ------ | ----- |
-| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.20.0)](https://travis-ci.org/kriomant/mockers) |
+| [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=master)](https://travis-ci.org/kriomant/mockers) [![Coverage Status](https://coveralls.io/repos/github/kriomant/mockers/badge.svg?branch=master)](https://coveralls.io/github/kriomant/mockers?branch=master) | [![Build Status](https://travis-ci.org/kriomant/mockers.svg?branch=0.21.0)](https://travis-ci.org/kriomant/mockers) |
 
 
 
@@ -11,7 +11,7 @@ Mocking library for Rust. Both stable and nightly Rust are supported.
 
 Inspired by Google Mock library for C++.
 
-**Warning**: There are breaking changes in 0.20.0 release, read What's New for details.
+**Warning**: There are breaking changes in 0.21.0 release, read What's New for details.
 
 [What's New]
 [User Guide]
@@ -47,8 +47,8 @@ Cargo.toml:
 
 ```toml
 [dev-dependencies]
-mockers = "0.20.0"
-mockers_derive = "0.20.0"
+mockers = "0.21.0"
+mockers_derive = "0.21.0"
 ```
 
 src/lib.rs:
