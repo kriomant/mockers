@@ -1,5 +1,17 @@
 # What's new
 
+## Dev
+
+### Generic type parameter bounds
+
+It is now possible to mock generic trait with type parameter bounds. Trait
+bounds and `'static` lifetime are supported:
+
+```rust
+#[mocked]
+trait <T: 'static + std::fmt::Display> {}
+```
+
 ## 0.21.0
 
 ### Support for arbitrary self type

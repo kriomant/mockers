@@ -303,7 +303,7 @@ fn generate_mock_for_traits(
     // Extract type parameters from root trait only (which is last)
     // This is [`B`, `C`] in `trait A<B, C> { .. }`.
     // TODO: specify root trait explicitly
-    let mut type_params: Vec<Ident> = Vec::new();
+    let mut type_params: Vec<TypeParam> = Vec::new();
     for gen in &trait_items.last().as_ref().unwrap().trait_item.generics.params {
         match gen {
             GenericParam::Const(c) => {
@@ -313,35 +313,33 @@ fn generate_mock_for_traits(
                 return Err(Error::Spanned(l.span(), error::ERR_LIFETIME_PARAMS_NOT_SUPPORTED.to_string()));
             }
             GenericParam::Type(t) => {
-                type_params.push(t.ident.clone());
+                type_params.push(validate_type_param_bounds(t)?.clone());
             }
         }
     }
+
+    let type_param_idents = type_params.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
 
     // Gather associated types from all traits, because they are used in mock
     // struct definition.
     // This is `Item` from `trait A { type Item; }`.
-    let mut assoc_types = Vec::new();
+    let mut assoc_types2 = Vec::new();
     for &(_, ref members) in &traits {
         for member in members.iter() {
-            if let TraitItem::Type(TraitItemType {
-                ref ident,
-                ref bounds,
-                ..
-            }) = member
-            {
-                if let Some(bound) = bounds.first() {
-                    return Err(Error::Spanned(bound.span(), error::ERR_ASSOCIATED_TYPE_BOUNDS_NOT_SUPPORTED.to_string()));
-                }
-                assoc_types.push(ident.clone());
+            if let TraitItem::Type(assoc_type) = member {
+                assoc_types2.push(validate_trait_item_type_bounds(assoc_type)?.clone());
             }
         }
     }
 
+    let assoc_types = assoc_types2.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
+
     // Both associated types and type parameters become type parameters of mock struct.
     // So for `trait A { type Item; }` mock struct is `struct AMock<Item, A> { .. }`.
     let mut mock_type_params = type_params.clone();
-    mock_type_params.extend(assoc_types.iter().cloned());
+    mock_type_params.extend(assoc_types2.iter().map(assoc_type_to_type_param));
+
+    let mock_type_param_idents = mock_type_params.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
 
     assert_ne!(mock_ident, handle_ident);
     let struct_item = generate_mock_struct(&mock_ident, &mock_type_params);
@@ -355,7 +353,9 @@ fn generate_mock_for_traits(
             .iter()
             .cloned()
             .map(|param| -> GenericParam {
-                parse_quote! { #param: ::std::fmt::Debug }
+                let mut param = param.clone();
+                param.bounds.push(parse_quote! { ::std::fmt::Debug });
+                GenericParam::Type(param)
             })
             .collect();
         gen
@@ -364,12 +364,12 @@ fn generate_mock_for_traits(
     // Types of mock and handle structs with all type parameters specified:
     // `AMock<A, B>`.
     let struct_path: Path = {
-        let mock_type_params = &mock_type_params;
-        parse_quote! { #mock_ident<#(#mock_type_params),*> }
+        let mock_type_param_idents = &mock_type_param_idents;
+        parse_quote! { #mock_ident<#(#mock_type_param_idents),*> }
     };
     let handle_path: Path = {
-        let mock_type_params = &mock_type_params;
-        parse_quote! { #handle_ident<#(#mock_type_params),*> }
+        let mock_type_param_idents = &mock_type_param_idents;
+        parse_quote! { #handle_ident<#(#mock_type_param_idents),*> }
     };
     let struct_type: Type = parse_quote! { #struct_path };
     let handle_type: Type = parse_quote! { #handle_path };
@@ -403,8 +403,8 @@ fn generate_mock_for_traits(
                     }
 
                     let trait_path_with_params = {
-                        let type_params = type_params.iter();
-                        parse_quote! { #trait_path<#(#type_params),*> }
+                        let type_param_idents = type_param_idents.iter();
+                        parse_quote! { #trait_path<#(#type_param_idents),*> }
                     };
                     let methods = generate_trait_methods(
                         sig.ident.clone(),
@@ -451,13 +451,13 @@ fn generate_mock_for_traits(
         let trait_type_items = assoc_types
             .iter()
             .cloned()
-            .zip(mock_type_params.iter().cloned())
+            .zip(mock_type_param_idents.iter().cloned())
             .map(|(assoc, param)| -> ImplItemType {
                 let path: Path = parse_quote! { #param };
                 parse_quote! { type #assoc = #path; }
             });
         let trait_impl_item = quote! {
-            impl #generics #trait_path<#(#type_params),*> for #struct_type {
+            impl #generics #trait_path<#(#type_param_idents),*> for #struct_type {
                 #(#trait_type_items)*
                 #(#trait_impl_items)*
                 #(#static_trait_impl_methods)*
@@ -531,7 +531,7 @@ fn generate_mock_for_traits(
     generated_items.push(handle_impl_item);
 
     let debug_impl_item = quote! {
-        impl<#(#mock_type_params),*> ::std::fmt::Debug for #mock_ident<#(#mock_type_params),*> {
+        impl<#(#mock_type_params),*> ::std::fmt::Debug for #mock_ident<#(#mock_type_param_idents),*> {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 f.write_str(self.scenario.borrow().get_mock_name(self.mock_id))
             }
@@ -557,8 +557,8 @@ fn generate_mock_for_traits(
         //     }
         let mocked_impl_item = quote! {
             impl<#(#mock_type_params),*> ::mockers::Mocked
-                for &'static #trait_path<#(#type_params, )* #(#assoc_types=#assoc_types),*> {
-                type MockImpl = #mock_ident<#(#mock_type_params),*>;
+                for &'static #trait_path<#(#type_param_idents, )* #(#assoc_types=#assoc_types),*> {
+                type MockImpl = #mock_ident<#(#mock_type_param_idents),*>;
             }
         };
 
@@ -573,12 +573,13 @@ fn generate_mock_for_traits(
 /// Create mock structure. Structure is quite simple and basically contains only reference
 /// to scenario and own ID.
 /// Since type parameters are unused, we have to use PhantomData for them.
-fn generate_mock_struct(mock_ident: &Ident, type_params: &[Ident]) -> TokenStream {
+fn generate_mock_struct(mock_ident: &Ident, type_params: &[TypeParam]) -> TokenStream {
+    let type_param_idents = type_params.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
     quote! {
         pub struct #mock_ident<#(#type_params),*> {
             scenario: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>,
             mock_id: usize,
-            _phantom_data: ::std::marker::PhantomData<(#(#type_params),*)>,
+            _phantom_data: ::std::marker::PhantomData<(#(#type_param_idents),*)>,
         }
     }
 }
@@ -587,11 +588,12 @@ fn generate_mock_impl(
     mock_ident: &Ident,
     handle_ident: &Ident,
     mocked_class_name: &str,
-    associated_type_idents: &[Ident],
+    associated_types: &[TypeParam],
     custom_init_code: &TokenStream,
 ) -> TokenStream {
+    let associated_type_idents = associated_types.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
     quote! {
-        impl<#(#associated_type_idents),*> ::mockers::Mock for #mock_ident<#(#associated_type_idents),*> {
+        impl<#(#associated_types),*> ::mockers::Mock for #mock_ident<#(#associated_type_idents),*> {
             type Handle = #handle_ident<#(#associated_type_idents),*>;
 
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
@@ -612,10 +614,11 @@ fn generate_mock_impl(
 
 fn generate_handle_impl(
     handle_ident: &Ident,
-    associated_type_idents: &[Ident],
+    associated_types: &[TypeParam],
 ) -> TokenStream {
+    let associated_type_idents = associated_types.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
     quote! {
-        impl<#(#associated_type_idents),*> ::mockers::MockHandle for #handle_ident<#(#associated_type_idents),*> {
+        impl<#(#associated_types),*> ::mockers::MockHandle for #handle_ident<#(#associated_type_idents),*> {
             fn new(id: usize, scenario_int: ::std::rc::Rc<::std::cell::RefCell<::mockers::ScenarioInternals>>) -> Self {
                 #handle_ident {
                     scenario: scenario_int,
@@ -1143,8 +1146,9 @@ pub fn mock_impl(input: TokenStream) -> Result<TokenStream, Error> {
 
 /// Generate implementation of supported standard traits for mock and handle structs.
 fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_ident: &Ident,
-                          type_params: &[Ident])
+                          type_params: &[TypeParam])
         -> Vec<TokenStream> {
+    let type_param_idents = type_params.iter().map(|t| t.ident.clone()).collect::<Vec<_>>();
     let mut items = Vec::new();
 
     match derives.clone {
@@ -1152,7 +1156,7 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
 
         DeriveClone::Normal => {
             items.push(quote! {
-                impl<#(#type_params),*> Clone for #mock_ident<#(#type_params),*> {
+                impl<#(#type_params),*> Clone for #mock_ident<#(#type_param_idents),*> {
                     fn clone(&self) -> Self {
                         let method_data = ::mockers::MethodData {
                             mock_id: self.mock_id,
@@ -1165,9 +1169,9 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
                     }
                 }
 
-                impl<#(#type_params),*> ::mockers::CloneMock<#mock_ident<#(#type_params),*>> for #handle_ident<#(#type_params),*> {
+                impl<#(#type_params),*> ::mockers::CloneMock<#mock_ident<#(#type_param_idents),*>> for #handle_ident<#(#type_params),*> {
                     #[allow(dead_code)]
-                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident<#(#type_params),*>> {
+                    fn clone(&self) -> ::mockers::CallMatch0<#mock_ident<#(#type_param_idents),*>> {
                         ::mockers::CallMatch0::new(self.mock_id, 0usize, "Clone::clone", vec![])
                     }
                 }
@@ -1176,7 +1180,7 @@ fn derive_standard_traits(derives: &DerivedTraits, mock_ident: &Ident, handle_id
 
         DeriveClone::Shared => {
             items.push(quote! {
-                impl<#(#type_params),*> Clone for #mock_ident<#(#type_params),*> {
+                impl<#(#type_params),*> Clone for #mock_ident<#(#type_param_idents),*> {
                     fn clone(&self) -> Self {
                         use ::mockers::Mock;
                         #mock_ident::new(self.mock_id, self.scenario.clone())
@@ -1202,6 +1206,42 @@ fn is_self_arg(arg: &FnArg) -> bool {
     match arg {
         FnArg::SelfRef(..) | FnArg::SelfValue(..) => true,
         FnArg::Captured(ArgCaptured { pat: Pat::Ident(PatIdent { ident, .. }), ..}) if ident == "self" => true,
-        a => false,
+        _ => false,
+    }
+}
+
+/// Checks whether type parameter bounds are supported.
+/// Returns passed type parameter reference on success.
+fn validate_type_param_bounds(param: &TypeParam) -> Result<&TypeParam, Error> {
+    validate_type_bounds(&param.bounds).map(|_| param)
+}
+
+/// Checks whether associated type bounds are supported.
+/// Returns passed associated type reference on success.
+fn validate_trait_item_type_bounds(assoc_type: &TraitItemType) -> Result<&TraitItemType, Error> {
+    validate_type_bounds(&assoc_type.bounds).map(|_| assoc_type)
+}
+
+/// Checks whether type bounds are supported.
+fn validate_type_bounds(bounds: &Punctuated<TypeParamBound, Token![+]>) -> Result<(), Error> {
+    for bound in bounds {
+        match bound {
+            TypeParamBound::Trait(_) => (),
+            TypeParamBound::Lifetime(lt) if lt.ident == "static" => (),
+            TypeParamBound::Lifetime(lt) =>
+                return Err(Error::Spanned(lt.apostrophe, error::ERR_ONLY_STATIC_LIFETIME_BOUND_IS_SUPPORTED.to_string())),
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts associated type to type parameter
+fn assoc_type_to_type_param(assoc_type: &TraitItemType) -> TypeParam {
+    let TraitItemType { ident, bounds, .. } = assoc_type;
+    if !bounds.is_empty() {
+        parse_quote!{ #ident: #bounds }
+    } else {
+        parse_quote!{ #ident }
     }
 }

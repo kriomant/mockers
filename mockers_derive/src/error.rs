@@ -81,3 +81,5 @@ pub const ERR_TRAIT_CONST_NOT_SUPPORTED: &str = "trait constants are not support
 pub const ERR_TRAIT_MACROS_NOT_SUPPORTED: &str = "trait macros are not supported yet";
 
 pub const ERR_VERBATIM_ITEMS_NOT_SUPPORTED: &str = "verbatim trait items are not supported";
+
+pub const ERR_ONLY_STATIC_LIFETIME_BOUND_IS_SUPPORTED: &str = "only 'static lifetime is supported for type parameters and associated types";
