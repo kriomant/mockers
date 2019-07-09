@@ -17,6 +17,23 @@ trait <T: 'static + std::fmt::Display> {}
 There was error causing simple matchers (created with `eq`, `lt`, etc.) to
 always be displayed as 'lt'.
 
+### More ergonomic equality matching
+
+Previously, you had to use exactly same type for argument matcher, e.g. for
+method accepting string you had to provide `String` instance:
+
+```rust
+trait A { fn foo(&self, s: String) }
+handle.foo(String::from("bar"));
+```
+
+Now you can use any type comparable to one of method parameter, e.g. `&str`
+for `String` parameter:
+
+```rust
+handle.foo("bar");
+```
+
 ## 0.21.0
 
 ### Support for arbitrary self type

@@ -17,7 +17,7 @@ mod option;
 mod result;
 
 /// Matches argument with value of same type using equality.
-impl<T: Eq + std::fmt::Debug> MatchArg<T> for T {
+impl<T: std::fmt::Debug, S: std::fmt::Debug + PartialEq<T>> MatchArg<T> for S {
     fn matches(&self, arg: &T) -> Result<(), String> {
         if self == arg {
             Ok(())
