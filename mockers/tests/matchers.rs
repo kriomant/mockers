@@ -437,4 +437,5 @@ fn simple_test_matcher_name() {
     use crate::mockers::MatchArg;
     assert_eq!(eq(5).describe(), "eq(5)");
     assert_eq!(lt(5).describe(), "lt(5)");
+    assert_eq!(not(lt(5)).describe(), "not(lt(5))");
 }

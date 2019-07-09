@@ -212,7 +212,7 @@ impl<T: Debug, M: MatchArg<T>> MatchArg<T> for NotMatchArg<T, M> {
     }
 
     fn describe(&self) -> String {
-        format!("lt({:?})", self.0.describe())
+        format!("not({})", self.0.describe())
     }
 }
 pub fn not<T: Debug, M: MatchArg<T>>(matcher: M) -> NotMatchArg<T, M> {
