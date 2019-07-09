@@ -822,7 +822,7 @@ impl ScenarioInternals {
 
                 write!(
                     &mut msg,
-                    "\n  expectation `{}.{}`:\n",
+                    "\n  expectation `{}.{}`\n",
                     mock_name,
                     expectation.describe()
                 )
@@ -838,6 +838,8 @@ impl ScenarioInternals {
                         Ok(()) => (),
                     }
                 }
+
+                write!(&mut msg, "\n").unwrap();
             }
         }
 

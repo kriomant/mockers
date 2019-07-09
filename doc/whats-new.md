@@ -12,6 +12,11 @@ bounds and `'static` lifetime are supported:
 trait <T: 'static + std::fmt::Display> {}
 ```
 
+### Fix simple matcher displayed names
+
+There was error causing simple matchers (created with `eq`, `lt`, etc.) to
+always be displayed as 'lt'.
+
 ## 0.21.0
 
 ### Support for arbitrary self type

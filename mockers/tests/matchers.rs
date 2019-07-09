@@ -142,7 +142,7 @@ fn test_not_matcher_match() {
 }
 
 #[test]
-#[should_panic(expected = "2 matches (but shouldn\'t): lt(2)")]
+#[should_panic(expected = "2 matches (but shouldn\'t): ge(2)")]
 fn test_not_matcher_mismatch() {
     let scenario = Scenario::new();
     let (mock, handle) = scenario.create_mock_for::<dyn A>();
@@ -430,4 +430,11 @@ fn test_ok_inner_mismatch() {
     scenario.expect(handle.func(ok(gt(3))).and_return(()));
 
     mock.func(Ok(2));
+}
+
+#[test]
+fn simple_test_matcher_name() {
+    use crate::mockers::MatchArg;
+    assert_eq!(eq(5).describe(), "eq(5)");
+    assert_eq!(lt(5).describe(), "lt(5)");
 }

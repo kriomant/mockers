@@ -128,7 +128,7 @@ macro_rules! simple_matcher {
                 }
 
                 fn describe(&self) -> String {
-                    format!("lt({:?})", self.0)
+                    format!("{}({:?})", stringify!($func_name), self.0)
                 }
             }
             pub fn $func_name<T: $($bounds)+ + Debug>(than: T) -> $class_name<T> {
