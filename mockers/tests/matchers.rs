@@ -439,18 +439,3 @@ fn simple_test_matcher_name() {
     assert_eq!(lt(5).describe(), "lt(5)");
     assert_eq!(not(lt(5)).describe(), "not(lt(5))");
 }
-
-#[mocked]
-trait Stringed {
-    fn foo(&self, s: String);
-}
-
-#[test]
-fn test_partial_eq_match() {
-    let scenario = Scenario::new();
-    let (mock, handle) = scenario.create_mock_for::<dyn Stringed>();
-
-    scenario.expect(handle.foo("bla").and_return(()));
-
-    mock.foo(String::from("bla"));
-}
