@@ -12,3 +12,5 @@ Please check that referenced trait also has #[mocked] attribute:
   |
 6 | trait B : A {}
   |           ^
+
+error: could not compile `mockers_derive-tests`.

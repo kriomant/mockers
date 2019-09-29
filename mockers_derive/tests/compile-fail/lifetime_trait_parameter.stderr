@@ -4,3 +4,5 @@ error: Lifetime parameters are not supported yet
   |
 4 | trait A<'a> {}
   |         ^^
+
+error: could not compile `mockers_derive-tests`.

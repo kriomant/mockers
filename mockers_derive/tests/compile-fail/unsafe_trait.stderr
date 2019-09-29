@@ -4,3 +4,5 @@ error: Unsafe traits are not supported yet.
   |
 4 | unsafe trait A {}
   | ^^^^^^
+
+error: could not compile `mockers_derive-tests`.

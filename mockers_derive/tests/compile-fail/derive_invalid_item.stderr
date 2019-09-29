@@ -5,3 +5,5 @@ error: Parsing error: name of trait expected, for example:
   |
 3 | #[mocked(derive("Clone"))]
   |                 ^^^^^^^
+
+error: could not compile `mockers_derive-tests`.

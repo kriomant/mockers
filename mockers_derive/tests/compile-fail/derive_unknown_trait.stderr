@@ -3,3 +3,5 @@ error: Parsing error: don't know how to derive this trait, supported traits are:
   |
 3 | #[mocked(derive(Foo))]
   |                 ^^^
+
+error: could not compile `mockers_derive-tests`.

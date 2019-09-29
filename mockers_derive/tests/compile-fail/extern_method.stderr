@@ -4,3 +4,5 @@ error: Extern specification for trait methods is not supported.
   |
 5 |     extern "C" fn foo();
   |     ^^^^^^
+
+error: could not compile `mockers_derive-tests`.

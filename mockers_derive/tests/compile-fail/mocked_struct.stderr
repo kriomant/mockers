@@ -3,3 +3,5 @@ error: Attribute may be used on traits and extern blocks only
   |
 4 | struct A {
   | ^^^^^^
+
+error: could not compile `mockers_derive-tests`.

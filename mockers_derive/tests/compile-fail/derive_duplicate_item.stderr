@@ -9,3 +9,5 @@ error: Warnings verification
   |
 7 |     compile_error!("Warnings verification");
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mockers_derive-tests`.

@@ -4,3 +4,5 @@ error: Where clauses are not supported yet.
   |
 4 | trait A where Self : 'static {}
   |         ^^^^^
+
+error: could not compile `mockers_derive-tests`.

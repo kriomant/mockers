@@ -4,3 +4,5 @@ error: Unsafe trait methods are not supported.
   |
 5 |     unsafe fn foo();
   |     ^^^^^^
+
+error: could not compile `mockers_derive-tests`.

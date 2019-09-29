@@ -10,3 +10,5 @@ error: Unfortunately, macro can't get full path to referenced parent trait, so i
   |
 6 | trait B : A {}
   |           ^
+
+error: could not compile `mockers_derive-tests`.

@@ -7,3 +7,5 @@ error: Since extern blocks, unlike traits, don't have name, mock type name canno
   |
 3 | #[mocked]
   | ^^^^^^^^^
+
+error: could not compile `mockers_derive-tests`.
