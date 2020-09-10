@@ -22,7 +22,7 @@ rustfmt-nightly = { version = "1.2.2", optional = true }
 
 [dev-dependencies]
 mockers = { version = "0.21.0", path = "../mockers" }
-trybuild = "1.0.2"
+trybuild = "1.0.33"
 
 [lib]
 name = "mockers_derive"
