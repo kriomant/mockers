@@ -303,7 +303,7 @@ macro_rules! define_all {
                 #[allow(unused_variables)]
                 $expectation {
                     call_match: self,
-                    action: Some(move |$($arg,)*| panic!(msg)),
+                    action: Some(move |$($arg,)*| panic!("{}", msg)),
                 }
             }
 
@@ -618,7 +618,7 @@ impl Scenario {
                     .unwrap();
                 s.push_str(&format!("`{}.{}`\n", mock_name, expectation.describe()));
             }
-            panic!(s);
+            panic!("{}", s);
         }
     }
 }
@@ -732,12 +732,12 @@ macro_rules! define_verify {
             let args_ptr: *const u8 = ::std::boxed::Box::into_raw(args) as *const u8;
             fn destroy<$($Arg,)*>(args_to_destroy: *const u8) {
                 unsafe { Box::from_raw(args_to_destroy as *mut ($($Arg,)*)) };
-            };
+            }
             fn format_args<$($Arg: DebugOnStable,)*>(args_ptr: *const u8) -> String {
                 let __args_ref: &($($Arg,)*) = unsafe { &*(args_ptr as *const ($($Arg,)*)) };
                 let args_debug: &[&dyn std::fmt::Debug] = &[$(&dbg(&__args_ref.$n)),*];
                 format!("{:?}", args_debug.iter().format(", "))
-            };
+            }
             let call = Call {
                 method_data: method_data,
                 args_ptr: args_ptr,
@@ -801,7 +801,7 @@ impl ScenarioInternals {
 
         if self.expectations.is_empty() {
             msg.push_str("no call are expected");
-            panic!(msg);
+            panic!("{}", msg);
         }
 
         let mut target_first_match = true;
@@ -883,7 +883,7 @@ impl ScenarioInternals {
         }
 
         msg.push('\n');
-        panic!(msg);
+        panic!("{}", msg);
     }
 
     pub fn get_mock_name(&self, mock_id: usize) -> &str {
