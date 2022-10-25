@@ -96,6 +96,7 @@ macro_rules! to_items {
 /// Example of code generated for
 /// `simple_matcher!(lt, LtMatchArg,  <, "not less than", PartialOrd);`:
 /// ```
+/// # use mockers::MatchArg;
 /// pub struct LtMatchArg<T>(T);
 /// impl<T: PartialOrd + std::fmt::Debug> MatchArg<T> for LtMatchArg<T> {
 ///     fn matches(&self, arg: &T) -> Result<(), String> {
