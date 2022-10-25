@@ -7,8 +7,8 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-mockers = { version = "0.21.0", path = "../../mockers" }
-mockers_derive = { version = "0.21.0", path = "../../mockers_derive" }
+mockers = { version = "0.22.0", path = "../../mockers" }
+mockers_derive = { version = "0.22.0", path = "../../mockers_derive" }
 
 [features]
 nightly = ["mockers_derive/nightly"]

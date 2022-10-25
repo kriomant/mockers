@@ -1,6 +1,6 @@
 # What's new
 
-## Dev
+## 0.22.0
 
 ### Generic type parameter bounds
 
