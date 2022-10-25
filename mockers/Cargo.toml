@@ -15,7 +15,6 @@ name = "mockers"
 
 [dependencies]
 itertools = "0.8.0"
-select-rustc = "0.1.2"
 
 [dev-dependencies]
 mockers_derive = { version = "0.21.0", path = "../mockers_derive" }
